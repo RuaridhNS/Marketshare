@@ -145,6 +145,7 @@ def main():
         "market_share_entries": market_share,
         "market_share_boats": market_share_boats,
         "entry_trends": trend_rows,
+        "class_counts": class_counts,
     }
 
     with open(out_path, "w") as f:

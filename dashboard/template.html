@@ -116,6 +116,59 @@
   .tag-flag { color: var(--series-doyle); font-weight: 600; }
   footer.note { color: var(--text-muted); font-size: 11.5px; margin-top: 40px; border-top: 1px solid var(--gridline); padding-top: 14px; }
   code { background: var(--gridline); padding: 1px 5px; border-radius: 4px; font-size: 12px; }
+
+  .nav-badge {
+    display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: 999px;
+    background: var(--series-doyle); color: white; font-size: 11px; font-weight: 700;
+    vertical-align: 1px;
+  }
+  input[type=number] {
+    background: var(--surface-1); border: 1px solid var(--border); border-radius: 8px;
+    padding: 8px 10px; font-size: 13.5px; color: var(--text-primary); font-family: inherit; width: 100%;
+  }
+  label.field-label { display:block; font-size: 12px; color: var(--text-muted); margin-bottom: 4px; font-weight: 600; }
+  .field { margin-bottom: 12px; }
+  .field input, .field select { width: 100%; }
+  .btn {
+    display: inline-flex; align-items: center; gap: 6px; background: var(--series-north); color: white;
+    border: none; border-radius: 8px; padding: 8px 14px; font-size: 13px; font-weight: 600;
+    cursor: pointer; font-family: inherit;
+  }
+  .btn:hover { filter: brightness(1.08); }
+  .btn.secondary { background: var(--gridline); color: var(--text-primary); }
+  .btn.danger { background: var(--series-unknown); }
+  .btn-row { display:flex; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
+  .edited-flag {
+    display:inline-block; margin-left: 6px; font-size: 10.5px; font-weight: 700; color: var(--series-doyle);
+    border: 1px solid var(--series-doyle); border-radius: 999px; padding: 1px 7px; text-transform: uppercase;
+    letter-spacing: 0.03em; vertical-align: 1px;
+  }
+  .filter-panel summary {
+    cursor: pointer; font-size: 13px; font-weight: 600; color: var(--text-secondary);
+    padding: 4px 0; user-select: none;
+  }
+  .filter-panel summary:hover { color: var(--text-primary); }
+  .filter-panel[open] summary { margin-bottom: 10px; }
+  .filter-group { margin-bottom: 14px; }
+  .filter-group-title { font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; color: var(--text-muted); margin-bottom: 6px; }
+  .chip-row { display:flex; flex-wrap:wrap; gap: 6px; margin-bottom: 8px; }
+  .chip { display:inline-flex; align-items:center; gap: 5px; background: var(--gridline); border-radius: 999px; padding: 4px 10px 4px 8px; font-size: 12.5px; cursor: pointer; user-select:none; }
+  .chip input { margin: 0; }
+  .mode-row { display:flex; gap: 14px; font-size: 12.5px; color: var(--text-secondary); align-items:center; }
+  .mode-row label { display:flex; align-items:center; gap: 5px; cursor:pointer; }
+  .regatta-checklist { max-height: 220px; overflow-y: auto; border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; margin-bottom: 8px; }
+  .regatta-checklist .cat-heading { font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--text-muted); margin: 8px 0 4px; }
+  .regatta-checklist .cat-heading:first-child { margin-top: 0; }
+  .regatta-checklist label { display:flex; align-items:center; gap: 7px; font-size: 13px; padding: 3px 0; cursor: pointer; }
+  textarea.csv-box {
+    width: 100%; min-height: 140px; font-family: ui-monospace, "SF Mono", Consolas, monospace; font-size: 12px;
+    background: var(--page); border: 1px solid var(--border); border-radius: 8px; padding: 10px; color: var(--text-primary);
+    resize: vertical;
+  }
+  .banner {
+    background: var(--gridline); border-radius: 8px; padding: 10px 14px; font-size: 13px; margin-bottom: 16px;
+    display:flex; align-items:center; justify-content:space-between; gap: 10px; flex-wrap: wrap;
+  }
 </style>
 </head>
 <body>
@@ -127,6 +180,7 @@
     <a class="nav-item" href="#/regattas" data-route="#/regattas">Regattas</a>
     <a class="nav-item" href="#/market-share" data-route="#/market-share">Market share</a>
     <a class="nav-item" href="#/sales" data-route="#/sales">Sales opportunities</a>
+    <a class="nav-item" href="#/changes" data-route="#/changes">Pending changes<span class="nav-badge" id="pending-badge" style="display:none;"></span></a>
   </nav>
   <main class="main" id="main"></main>
 </div>
@@ -156,6 +210,57 @@ const boatsById = {}; DATA.boats.forEach(b => boatsById[b.id] = b);
 const regattasById = {}; DATA.regattas.forEach(r => regattasById[r.id] = r);
 const eventsById = {}; DATA.events.forEach(e => eventsById[e.id] = e);
 const racesById = {}; DATA.races.forEach(r => racesById[r.id] = r);
+
+// per-boat set of regatta ids / categories it has entries in, for the boats-list filter
+DATA.boats.forEach(b => {
+  b.regattaIds = new Set(b.entries.map(e => e.regatta_id));
+  b.regattaCategories = new Set(b.entries.map(e => e.regatta_category));
+});
+
+// ---------- pending edits (sailmaker / owner / TCC changes made in-browser) ----------
+// The dashboard is a static file with no backend, so edits are held here (persisted to
+// localStorage) and exported as a CSV to be applied to the DB via
+// scripts/apply_boat_updates.py - see the "Pending changes" page.
+const PENDING_KEY = 'marketshare_pending_edits_v1';
+function loadPendingEdits() {
+  try { return JSON.parse(localStorage.getItem(PENDING_KEY) || '{}'); }
+  catch (e) { return {}; }
+}
+let PENDING = loadPendingEdits();
+function savePendingEdits() { localStorage.setItem(PENDING_KEY, JSON.stringify(PENDING)); }
+function setPendingEdit(boatId, patch) {
+  const existing = PENDING[boatId] || {};
+  PENDING[boatId] = { ...existing, ...patch };
+  // drop keys that were cleared back to empty
+  Object.keys(PENDING[boatId]).forEach(k => { if (PENDING[boatId][k] === '' || PENDING[boatId][k] == null) delete PENDING[boatId][k]; });
+  if (Object.keys(PENDING[boatId]).length === 0) delete PENDING[boatId];
+  savePendingEdits();
+  updatePendingBadge();
+}
+function clearPendingEdit(boatId) { delete PENDING[boatId]; savePendingEdits(); updatePendingBadge(); }
+function clearAllPendingEdits() { PENDING = {}; savePendingEdits(); updatePendingBadge(); }
+function updatePendingBadge() {
+  const n = Object.keys(PENDING).length;
+  const badge = document.getElementById('pending-badge');
+  if (!badge) return;
+  badge.style.display = n ? '' : 'none';
+  badge.textContent = n;
+}
+function pendingEditsToCSV() {
+  const cols = ['SailNo', 'BoatName', 'NewSailmaker', 'NewOwner', 'NewTCC', 'Notes'];
+  const lines = [cols.join(',')];
+  const csvEsc = v => { v = (v==null?'':String(v)); return /[",\n]/.test(v) ? '"'+v.replace(/"/g,'""')+'"' : v; };
+  Object.keys(PENDING).forEach(boatId => {
+    const b = boatsById[boatId];
+    const p = PENDING[boatId];
+    if (!b) return;
+    lines.push([
+      csvEsc(b.sail_no), csvEsc(b.boat_name), csvEsc(p.sailmaker||''),
+      csvEsc(p.owner||''), csvEsc(p.tcc||''), csvEsc(p.notes||''),
+    ].join(','));
+  });
+  return lines.join('\n') + '\n';
+}
 
 // ---------- tiny SVG chart helpers ----------
 function svgBarChart(items, {width=520, barHeight=22, gap=8, valueKey='entries', labelKey='sailmaker', colorFn}={}) {
@@ -214,12 +319,16 @@ function navigate() {
     else if (route === 'race') main.innerHTML = renderRacePage(parseInt(arg));
     else if (route === 'market-share') main.innerHTML = renderMarketShare();
     else if (route === 'sales') main.innerHTML = renderSales();
+    else if (route === 'changes') main.innerHTML = renderPendingChanges();
     else main.innerHTML = renderOverview();
   } catch (err) {
     main.innerHTML = `<div class="card">Something went wrong rendering this page: ${esc(err.message)}</div>`;
     console.error(err);
   }
   attachBoatFilterHandlers();
+  attachBoatEditHandlers();
+  attachPendingChangesHandlers();
+  updatePendingBadge();
   window.scrollTo(0,0);
 }
 window.addEventListener('hashchange', navigate);
@@ -281,28 +390,57 @@ function attachBoatFilterHandlers() {
   const search = document.getElementById('boat-search');
   const filter = document.getElementById('boat-filter');
   if (!search) return;
+  const catBoxes = () => Array.from(document.querySelectorAll('.cat-chip:checked'));
+  const regattaBoxes = () => Array.from(document.querySelectorAll('.regatta-box:checked'));
   const apply = () => {
     const q = search.value.trim().toLowerCase();
     const f = filter.value;
+    const selectedCats = new Set(catBoxes().map(b => b.value));
+    const catMode = (document.querySelector('input[name=cat-mode]:checked') || {}).value || 'and';
+    const selectedRegattas = new Set(regattaBoxes().map(b => parseInt(b.value)));
+    const regMode = (document.querySelector('input[name=reg-mode]:checked') || {}).value || 'any';
+
     document.querySelectorAll('#boats-tbody tr').forEach(tr => {
       const hay = tr.dataset.hay;
       const bucket = tr.dataset.bucket;
-      const show = (!q || hay.includes(q)) && (f==='all' || bucket===f);
+      const b = boatsById[tr.dataset.boatId];
+      let show = (!q || hay.includes(q)) && (f==='all' || bucket===f);
+
+      if (show && selectedCats.size) {
+        const cats = b.regattaCategories;
+        if (catMode === 'and') { for (const c of selectedCats) if (!cats.has(c)) { show = false; break; } }
+        else { show = Array.from(selectedCats).some(c => cats.has(c)); }
+      }
+      if (show && selectedRegattas.size) {
+        const ids = b.regattaIds;
+        if (regMode === 'any') show = Array.from(selectedRegattas).some(id => ids.has(id));
+        else if (regMode === 'all') show = Array.from(selectedRegattas).every(id => ids.has(id));
+        else if (regMode === 'only') show = ids.size > 0 && Array.from(ids).every(id => selectedRegattas.has(id));
+      }
       tr.style.display = show ? '' : 'none';
     });
   };
   search.addEventListener('input', apply);
   filter.addEventListener('change', apply);
+  document.querySelectorAll('.cat-chip, .regatta-box').forEach(el => el.addEventListener('change', apply));
+  document.querySelectorAll('input[name=cat-mode], input[name=reg-mode]').forEach(el => el.addEventListener('change', apply));
+  const clearBtn = document.getElementById('clear-regatta-filter');
+  if (clearBtn) clearBtn.addEventListener('click', () => {
+    document.querySelectorAll('.cat-chip, .regatta-box').forEach(el => el.checked = false);
+    apply();
+  });
 }
 
 function renderBoatsList() {
   const rows = DATA.boats.map(b => {
     const bucket = bucketOf(b.current_sailmaker);
     const hay = [b.boat_name,b.sail_no,b.owner_name,b.boat_type,b.current_sailmaker,b.tag].join(' ').toLowerCase();
-    return `<tr class="clickable" data-route="#/boat/${b.id}" data-hay="${esc(hay)}" data-bucket="${bucket}">
-      <td><strong>${esc(b.boat_name||'—')}</strong></td>
+    const edited = PENDING[b.id] ? '<span class="edited-flag">Edited</span>' : '';
+    return `<tr class="clickable" data-route="#/boat/${b.id}" data-hay="${esc(hay)}" data-bucket="${bucket}" data-boat-id="${b.id}">
+      <td><strong>${esc(b.boat_name||'—')}</strong>${edited}</td>
       <td>${esc(b.sail_no||'')}</td>
       <td>${esc(b.boat_type||'')}</td>
+      <td class="num">${b.tcc||''}</td>
       <td>${esc(b.owner_name||'')}</td>
       <td><span class="pill" style="background:${BUCKET_COLOR[bucket]}">${esc(b.current_sailmaker||'Unknown')}</span></td>
       <td>${esc(b.tag||'')}</td>
@@ -310,6 +448,20 @@ function renderBoatsList() {
     </tr>`;
   }).join('');
   const options = BUCKET_ORDER.map(b => `<option value="${b}">${b}</option>`).join('');
+
+  const catsPresent = Array.from(new Set(DATA.regattas.map(r => r.category || 'Other'))).sort();
+  const catChips = catsPresent.map(c => `<label class="chip"><input type="checkbox" class="cat-chip" value="${esc(c)}"> ${esc(c)}</label>`).join('');
+
+  const byCat = {};
+  DATA.regattas.forEach(r => { (byCat[r.category||'Other'] ||= []).push(r); });
+  let regattaList = '';
+  Object.keys(byCat).sort().forEach(cat => {
+    regattaList += `<div class="cat-heading">${esc(cat)}</div>`;
+    byCat[cat].sort((a,b)=>a.name.localeCompare(b.name)).forEach(r => {
+      regattaList += `<label><input type="checkbox" class="regatta-box" value="${r.id}"> ${esc(r.name)}</label>`;
+    });
+  });
+
   return `
     <h1>Boats</h1>
     <p class="subtitle">${DATA.boats.length} boats. The boat is the central record — click into one to see its owner, sailmaker history and every race it's entered.</p>
@@ -317,9 +469,30 @@ function renderBoatsList() {
       <input type="text" id="boat-search" placeholder="Search by name, sail no, owner, type, tag…">
       <select id="boat-filter"><option value="all">All sailmakers</option>${options}</select>
     </div>
+    <details class="filter-panel card">
+      <summary>Filter by regatta / series</summary>
+      <div class="filter-group">
+        <div class="filter-group-title">By category (e.g. "entered JOG and RORC")</div>
+        <div class="chip-row">${catChips || '<span class="muted">No categories on file.</span>'}</div>
+        <div class="mode-row">
+          <label><input type="radio" name="cat-mode" value="and" checked> Must have entered ALL checked categories</label>
+          <label><input type="radio" name="cat-mode" value="or"> Must have entered ANY checked category</label>
+        </div>
+      </div>
+      <div class="filter-group">
+        <div class="filter-group-title">By specific regatta (e.g. "only entered Royal Southern regattas")</div>
+        <div class="regatta-checklist">${regattaList}</div>
+        <div class="mode-row">
+          <label><input type="radio" name="reg-mode" value="any" checked> Entered ANY of these</label>
+          <label><input type="radio" name="reg-mode" value="all"> Entered ALL of these</label>
+          <label><input type="radio" name="reg-mode" value="only"> Entered ONLY these (nothing else)</label>
+        </div>
+      </div>
+      <button class="btn secondary" id="clear-regatta-filter" type="button">Clear regatta filters</button>
+    </details>
     <div class="card" style="padding:0; overflow:auto;">
       <table>
-        <thead><tr><th>Boat</th><th>Sail No</th><th>Type</th><th>Owner</th><th>Sailmaker</th><th>Tag</th><th class="num">Entries</th></tr></thead>
+        <thead><tr><th>Boat</th><th>Sail No</th><th>Type</th><th class="num">TCC</th><th>Owner</th><th>Sailmaker</th><th>Tag</th><th class="num">Entries</th></tr></thead>
         <tbody id="boats-tbody">${rows}</tbody>
       </table>
     </div>
@@ -357,10 +530,47 @@ function renderBoatProfile(id) {
       <dt>Notes</dt><dd>${esc(b.crm_notes||'—')}</dd>
     </dl>`;
 
+  const pending = PENDING[b.id];
+  const pendingBanner = pending ? `
+    <div class="banner">
+      <span>This boat has unsaved edits (${Object.keys(pending).filter(k=>k!=='notes').join(', ')||'notes'}) — not yet written to the database. See <a href="#/changes" data-route="#/changes">Pending changes</a> to export them.</span>
+      <button class="btn secondary" type="button" data-discard-edit="${b.id}">Discard</button>
+    </div>` : '';
+
+  const sailmakerOptions = DATA.sailmakers.map(s => s.name)
+    .concat(BUCKET_ORDER).filter((v,i,a) => a.indexOf(v)===i).sort()
+    .map(name => `<option value="${esc(name)}" ${((pending&&pending.sailmaker)||b.current_sailmaker)===name?'selected':''}>${esc(name)}</option>`).join('');
+
+  const editForm = `
+    <div class="card" id="edit-card">
+      <h2>Edit (saved locally, export to apply)</h2>
+      <div class="field">
+        <label class="field-label">Sailmaker</label>
+        <select id="edit-sailmaker"><option value="">— no change —</option>${sailmakerOptions}</select>
+      </div>
+      <div class="field">
+        <label class="field-label">Owner</label>
+        <input type="text" id="edit-owner" placeholder="${esc(b.owner_name||'Unknown')}" value="${esc((pending&&pending.owner)||'')}">
+      </div>
+      <div class="field">
+        <label class="field-label">TCC (IRC rating)</label>
+        <input type="number" step="0.001" id="edit-tcc" placeholder="${b.tcc||''}" value="${esc((pending&&pending.tcc)||'')}">
+      </div>
+      <div class="field">
+        <label class="field-label">Notes (optional, for whoever applies this change)</label>
+        <input type="text" id="edit-notes" value="${esc((pending&&pending.notes)||'')}">
+      </div>
+      <div class="btn-row">
+        <button class="btn" type="button" id="save-edit-btn" data-boat-id="${b.id}">Save edit</button>
+        ${pending ? `<button class="btn secondary" type="button" data-discard-edit="${b.id}">Discard</button>` : ''}
+      </div>
+    </div>`;
+
   return `
     <a class="back-link" href="#/boats" data-route="#/boats">← All boats</a>
-    <h1>${esc(b.boat_name||'Unnamed boat')} <span class="pill" style="background:${BUCKET_COLOR[bucket]}">${esc(b.current_sailmaker||'Unknown')}</span></h1>
+    <h1>${esc(b.boat_name||'Unnamed boat')} <span class="pill" style="background:${BUCKET_COLOR[bucket]}">${esc(b.current_sailmaker||'Unknown')}</span>${pending?'<span class="edited-flag">Edited</span>':''}</h1>
     <p class="subtitle">${esc(b.sail_no||'')} · ${esc(b.boat_type||'')}${b.tcc ? ' · TCC '+b.tcc : ''}</p>
+    ${pendingBanner}
     <div class="card-row">
       <div class="card">
         <h2>Owner &amp; boat</h2>
@@ -376,6 +586,7 @@ function renderBoatProfile(id) {
         ${crm}
       </div>
     </div>
+    ${editForm}
     <div class="card">
       <h2>Sailmaker history</h2>
       <table><thead><tr><th>Sailmaker</th><th>Source</th><th>Confidence</th></tr></thead><tbody>${smHistoryRows}</tbody></table>
@@ -388,6 +599,95 @@ function renderBoatProfile(id) {
       </table>
     </div>
   `;
+}
+
+function attachBoatEditHandlers() {
+  const saveBtn = document.getElementById('save-edit-btn');
+  if (saveBtn) {
+    saveBtn.addEventListener('click', () => {
+      const boatId = saveBtn.dataset.boatId;
+      const sailmaker = document.getElementById('edit-sailmaker').value;
+      const owner = document.getElementById('edit-owner').value.trim();
+      const tcc = document.getElementById('edit-tcc').value.trim();
+      const notes = document.getElementById('edit-notes').value.trim();
+      setPendingEdit(boatId, { sailmaker, owner, tcc, notes });
+      navigate();
+    });
+  }
+}
+
+// ---------- page: pending changes ----------
+function renderPendingChanges() {
+  const ids = Object.keys(PENDING);
+  const rows = ids.map(boatId => {
+    const b = boatsById[boatId];
+    if (!b) return '';
+    const p = PENDING[boatId];
+    const changes = [];
+    if (p.sailmaker) changes.push(`Sailmaker: <strong>${esc(b.current_sailmaker||'—')}</strong> → <strong>${esc(p.sailmaker)}</strong>`);
+    if (p.owner) changes.push(`Owner: <strong>${esc(b.owner_name||'—')}</strong> → <strong>${esc(p.owner)}</strong>`);
+    if (p.tcc) changes.push(`TCC: <strong>${esc(b.tcc||'—')}</strong> → <strong>${esc(p.tcc)}</strong>`);
+    return `<tr>
+      <td><a href="#/boat/${b.id}" data-route="#/boat/${b.id}">${esc(b.boat_name||b.sail_no)}</a></td>
+      <td>${esc(b.sail_no||'')}</td>
+      <td style="font-size:13px;">${changes.join('<br>') || '<span class="muted">—</span>'}</td>
+      <td>${esc(p.notes||'')}</td>
+      <td><button class="btn secondary" type="button" data-discard-edit="${b.id}">Discard</button></td>
+    </tr>`;
+  }).join('');
+
+  const csv = pendingEditsToCSV();
+
+  return `
+    <h1>Pending changes</h1>
+    <p class="subtitle">${ids.length} boat(s) with unsaved edits, held in this browser only. Export them below and run
+      <code>python3 scripts/apply_boat_updates.py db/marketshare.db changes.csv</code> to write them into the database,
+      then rebuild the dashboard.</p>
+    <div class="card" style="padding:0;overflow:auto;">
+      <table>
+        <thead><tr><th>Boat</th><th>Sail No</th><th>Changes</th><th>Notes</th><th></th></tr></thead>
+        <tbody>${rows || '<tr><td colspan="5" class="muted">No pending edits. Edit a sailmaker, owner or TCC from any boat profile to see it here.</td></tr>'}</tbody>
+      </table>
+    </div>
+    ${ids.length ? `
+    <div class="card">
+      <h2>Export as CSV</h2>
+      <div class="btn-row">
+        <button class="btn" type="button" id="copy-csv-btn">Copy CSV to clipboard</button>
+        <a class="btn secondary" id="download-csv-link" href="#" download="changes.csv" style="text-decoration:none;">Download changes.csv</a>
+        <button class="btn danger" type="button" id="clear-all-btn">Clear all pending edits</button>
+      </div>
+      <p class="muted" style="font-size:12px;margin:10px 0 6px;">If the download button doesn't do anything (e.g. viewing this in a sandboxed preview), copy the text below instead:</p>
+      <textarea class="csv-box" id="csv-box" readonly>${esc(csv)}</textarea>
+    </div>` : ''}
+  `;
+}
+
+function attachPendingChangesHandlers() {
+  document.querySelectorAll('[data-discard-edit]').forEach(btn => {
+    btn.addEventListener('click', () => { clearPendingEdit(btn.dataset.discardEdit); navigate(); });
+  });
+  const copyBtn = document.getElementById('copy-csv-btn');
+  if (copyBtn) copyBtn.addEventListener('click', async () => {
+    const text = pendingEditsToCSV();
+    try {
+      await navigator.clipboard.writeText(text);
+      copyBtn.textContent = 'Copied ✓';
+      setTimeout(() => { copyBtn.textContent = 'Copy CSV to clipboard'; }, 1800);
+    } catch (e) {
+      const box = document.getElementById('csv-box');
+      if (box) { box.focus(); box.select(); }
+    }
+  });
+  const dlLink = document.getElementById('download-csv-link');
+  if (dlLink) dlLink.addEventListener('click', (e) => {
+    const text = pendingEditsToCSV();
+    dlLink.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(text);
+  });
+  const clearAllBtn = document.getElementById('clear-all-btn');
+  if (clearAllBtn) clearAllBtn.addEventListener('click', () => {
+    if (confirm('Discard all pending edits? This cannot be undone.')) { clearAllPendingEdits(); navigate(); }
+  });
 }
 
 // ---------- page: regattas list ----------
@@ -424,6 +724,29 @@ function renderRegattaProfile(id) {
     return `<tr class="clickable" data-route="#/race/${ra.id}"><td>${esc(ra.race_name)}</td><td class="num">${ev.season_year}</td><td class="num">${n}</td></tr>`;
   }).join('');
 
+  // -- breakdown by class: prefer per-season aggregate counts (event_class_counts),
+  // which cover years with no boat-level breakdown; fall back to/augment with
+  // boat-level race_entries.class where we have it.
+  const evIds = new Set(evs.map(e => e.id));
+  const aggByClass = {};
+  DATA.class_counts.forEach(c => {
+    if (!evIds.has(c.event_id) || c.class_label.toLowerCase() === 'total') return;
+    aggByClass[c.class_label] = (aggByClass[c.class_label] || 0) + (c.entry_count || 0);
+  });
+  const boatLevelByClass = {};
+  DATA.boats.forEach(b => b.entries.forEach(e => {
+    if (e.regatta_id !== id) return;
+    const cls = e.class || 'Unclassed';
+    (boatLevelByClass[cls] ||= new Set()).add(b.id);
+  }));
+  const classNames = Array.from(new Set([...Object.keys(aggByClass), ...Object.keys(boatLevelByClass)])).sort();
+  const classRows = classNames.map(cls => `
+    <tr>
+      <td>${esc(cls)}</td>
+      <td class="num">${aggByClass[cls] != null ? aggByClass[cls] : '—'}</td>
+      <td class="num">${boatLevelByClass[cls] ? boatLevelByClass[cls].size : '—'}</td>
+    </tr>`).join('');
+
   return `
     <a class="back-link" href="#/regattas" data-route="#/regattas">← All regattas</a>
     <h1>${esc(r.name)}</h1>
@@ -432,8 +755,15 @@ function renderRegattaProfile(id) {
       <h2>Entries over time</h2>
       ${pts.length ? sparkline(pts) : '<p class="muted">No aggregate historical counts on file for this regatta.</p>'}
     </div>
+    ${classRows ? `<div class="card" style="padding:0;overflow:auto;">
+      <h2 style="padding:18px 20px 0;">Breakdown by class</h2>
+      <table>
+        <thead><tr><th>Class</th><th class="num">Aggregate entries (all seasons on file)</th><th class="num">Distinct boats (boat-level races on file)</th></tr></thead>
+        <tbody>${classRows}</tbody>
+      </table>
+    </div>` : ''}
     ${raceRows ? `<div class="card" style="padding:0;overflow:auto;">
-      <h2 style="padding:18px 20px 0;">Boat-level races on file</h2>
+      <h2 style="padding:18px 20px 0;">Results by race</h2>
       <table><thead><tr><th>Race</th><th class="num">Year</th><th class="num">Entries</th></tr></thead><tbody>${raceRows}</tbody></table>
     </div>` : ''}
   `;
@@ -454,9 +784,11 @@ function renderRacePage(raceId) {
       <td>${esc(e.boat.boat_name)}</td>
       <td>${esc(e.boat.sail_no)}</td>
       <td>${esc(e.class||'')}</td>
+      <td class="num">${e.tcc!=null ? e.tcc : (e.boat.tcc||'')}</td>
       <td>${esc(e.owner_name_used||e.boat.owner_name||'')}</td>
       <td>${e.sailmaker_name ? `<span class="pill" style="background:${BUCKET_COLOR[bucketOf(e.sailmaker_name)]}">${esc(e.sailmaker_name)}</span>` : ''}</td>
       <td>${esc(e.corrected_time||e.status||'')}</td>
+      <td class="num">${e.points!=null ? e.points : ''}</td>
     </tr>`).join('');
   return `
     <a class="back-link" href="#/regatta/${reg.id}" data-route="#/regatta/${reg.id}">← ${esc(reg.name)}</a>
@@ -464,8 +796,8 @@ function renderRacePage(raceId) {
     <p class="subtitle">${esc(reg.name)} · ${ev.season_year}${race.source_url ? ' · <a href="'+esc(race.source_url)+'" target="_blank" rel="noopener">source</a>' : ''}</p>
     <div class="card" style="padding:0;overflow:auto;">
       <table>
-        <thead><tr><th>Pos</th><th>Boat</th><th>Sail No</th><th>Class</th><th>Owner</th><th>Sailmaker</th><th>Corrected / status</th></tr></thead>
-        <tbody>${rows || '<tr><td colspan="7" class="muted">No boat-level entries on file for this race.</td></tr>'}</tbody>
+        <thead><tr><th>Pos</th><th>Boat</th><th>Sail No</th><th>Class</th><th class="num">TCC</th><th>Owner</th><th>Sailmaker</th><th>Corrected / status</th><th class="num">Points</th></tr></thead>
+        <tbody>${rows || '<tr><td colspan="9" class="muted">No boat-level entries on file for this race.</td></tr>'}</tbody>
       </table>
     </div>
   `;
