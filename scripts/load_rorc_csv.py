@@ -22,7 +22,7 @@ import argparse
 import sqlite3
 import re
 
-sys.path.insert(0, "/home/claude/marketshare/scripts")
+sys.path.insert(0, str(__import__("pathlib").Path(__file__).resolve().parent))
 from build_db import (get_or_create_sailmaker, get_or_create_owner, get_or_create_boat,
                        get_or_create_regatta, get_or_create_event, create_race, norm, norm_upper)
 
