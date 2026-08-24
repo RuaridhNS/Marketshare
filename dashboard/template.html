@@ -1,0 +1,533 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Marketshare — Race Entry &amp; Sailmaker Tracker</title>
+<style>
+  :root {
+    color-scheme: light;
+    --surface-1:      #fcfcfb;
+    --page:           #f9f9f7;
+    --text-primary:   #0b0b0b;
+    --text-secondary: #52514e;
+    --text-muted:     #898781;
+    --gridline:       #e1e0d9;
+    --baseline:       #c3c2b7;
+    --border:         rgba(11,11,11,0.10);
+    --success:        #006300;
+    --card-shadow:    0 1px 2px rgba(11,11,11,0.06), 0 1px 1px rgba(11,11,11,0.04);
+
+    --series-north:   #2a78d6;
+    --series-doyle:   #eb6834;
+    --series-one:     #1baf7a;
+    --series-sanders: #eda100;
+    --series-quantum: #e87ba4;
+    --series-other:   #008300;
+    --series-partial: #4a3aa7;
+    --series-unknown: #e34948;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      color-scheme: dark;
+      --surface-1:      #1a1a19;
+      --page:           #0d0d0d;
+      --text-primary:   #ffffff;
+      --text-secondary: #c3c2b7;
+      --text-muted:     #898781;
+      --gridline:       #2c2c2a;
+      --baseline:       #383835;
+      --border:         rgba(255,255,255,0.10);
+      --success:        #0ca30c;
+      --card-shadow:    0 1px 2px rgba(0,0,0,0.4);
+
+      --series-north:   #3987e5;
+      --series-doyle:   #d95926;
+      --series-one:     #199e70;
+      --series-sanders: #c98500;
+      --series-quantum: #d55181;
+      --series-other:   #008300;
+      --series-partial: #9085e9;
+      --series-unknown: #e66767;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--page);
+    color: var(--text-primary);
+    font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  a { color: inherit; }
+  .app { display: flex; min-height: 100vh; }
+
+  .sidebar {
+    width: 220px; flex: none; background: var(--surface-1);
+    border-right: 1px solid var(--border); padding: 20px 12px;
+    position: sticky; top: 0; height: 100vh; overflow-y: auto;
+  }
+  .brand { font-weight: 700; font-size: 15px; padding: 0 10px 18px; letter-spacing: -0.01em; }
+  .brand small { display:block; color: var(--text-muted); font-weight: 500; font-size: 11px; margin-top: 2px;}
+  .nav-item {
+    display: block; padding: 9px 10px; border-radius: 8px; margin-bottom: 2px;
+    color: var(--text-secondary); text-decoration: none; font-size: 13.5px; font-weight: 500;
+    cursor: pointer;
+  }
+  .nav-item:hover { background: var(--gridline); color: var(--text-primary); }
+  .nav-item.active { background: var(--series-north); color: white; }
+
+  .main { flex: 1; min-width: 0; padding: 28px 36px 80px; max-width: 1180px; }
+  h1 { font-size: 22px; margin: 0 0 4px; letter-spacing: -0.01em; }
+  h2 { font-size: 16px; margin: 0 0 14px; }
+  .subtitle { color: var(--text-secondary); font-size: 13.5px; margin: 0 0 24px; }
+
+  .stat-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px,1fr)); gap: 12px; margin-bottom: 26px; }
+  .stat-tile { background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; box-shadow: var(--card-shadow); }
+  .stat-tile .v { font-size: 24px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .stat-tile .l { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+
+  .card { background: var(--surface-1); border: 1px solid var(--border); border-radius: 12px; padding: 18px 20px; box-shadow: var(--card-shadow); margin-bottom: 20px; }
+  .card-row { display: grid; grid-template-columns: 1.3fr 1fr; gap: 20px; align-items: start; }
+  @media (max-width: 900px) { .card-row { grid-template-columns: 1fr; } }
+
+  table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  th { text-align: left; color: var(--text-muted); font-weight: 600; font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.03em; padding: 8px 10px; border-bottom: 1px solid var(--gridline); position: sticky; top:0; background: var(--surface-1);}
+  td { padding: 8px 10px; border-bottom: 1px solid var(--gridline); vertical-align: top; }
+  tr.clickable { cursor: pointer; }
+  tr.clickable:hover td { background: var(--gridline); }
+  .num { text-align: right; font-variant-numeric: tabular-nums; }
+
+  .pill { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 11.5px; font-weight: 600; color: white; white-space: nowrap; }
+  .search-row { display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; }
+  input[type=text], select {
+    background: var(--surface-1); border: 1px solid var(--border); border-radius: 8px;
+    padding: 8px 10px; font-size: 13.5px; color: var(--text-primary); font-family: inherit;
+  }
+  input[type=text] { flex: 1; min-width: 200px; }
+  .legend { display:flex; gap: 14px; flex-wrap: wrap; margin-top: 10px; font-size: 12.5px; color: var(--text-secondary); }
+  .legend-item { display:flex; align-items:center; gap: 6px; }
+  .legend-dot { width: 10px; height: 10px; border-radius: 3px; flex: none; }
+  .muted { color: var(--text-muted); }
+  .back-link { display:inline-block; margin-bottom: 14px; font-size: 13px; color: var(--text-secondary); cursor:pointer; text-decoration: none;}
+  .back-link:hover { color: var(--text-primary); }
+  .kv { display:grid; grid-template-columns: auto 1fr; gap: 6px 14px; font-size: 13.5px; }
+  .kv dt { color: var(--text-muted); }
+  .kv dd { margin: 0; }
+  .tag-flag { color: var(--series-doyle); font-weight: 600; }
+  footer.note { color: var(--text-muted); font-size: 11.5px; margin-top: 40px; border-top: 1px solid var(--gridline); padding-top: 14px; }
+  code { background: var(--gridline); padding: 1px 5px; border-radius: 4px; font-size: 12px; }
+</style>
+</head>
+<body>
+<div class="app">
+  <nav class="sidebar" id="sidebar">
+    <div class="brand">Marketshare<small>Race entry &amp; sailmaker tracker</small></div>
+    <a class="nav-item" data-route="#/overview">Overview</a>
+    <a class="nav-item" data-route="#/boats">Boats</a>
+    <a class="nav-item" data-route="#/regattas">Regattas</a>
+    <a class="nav-item" data-route="#/market-share">Market share</a>
+    <a class="nav-item" data-route="#/sales">Sales opportunities</a>
+  </nav>
+  <main class="main" id="main"></main>
+</div>
+<script id="data-json" type="application/json">/*__DATA_JSON__*/</script>
+<script>
+const DATA = JSON.parse(document.getElementById('data-json').textContent);
+
+// ---------- sailmaker bucketing / colors ----------
+const BUCKET_ORDER = ['North Sails','Doyle','One','Sanders','Quantum','Other','Partial','Unknown'];
+const BUCKET_COLOR = {
+  'North Sails':'var(--series-north)', 'Doyle':'var(--series-doyle)', 'One':'var(--series-one)',
+  'Sanders':'var(--series-sanders)', 'Quantum':'var(--series-quantum)', 'Other':'var(--series-other)',
+  'Partial':'var(--series-partial)', 'Unknown':'var(--series-unknown)'
+};
+function bucketOf(name) {
+  if (!name) return 'Unknown';
+  if (BUCKET_ORDER.includes(name)) return name;
+  if (name === 'Unknown') return 'Unknown';
+  if (name === 'Partial') return 'Partial';
+  return 'Other';
+}
+function esc(s) { return (s===null||s===undefined) ? '' : String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+function fmtDate(iso) { return iso ? iso.slice(0,10) : ''; }
+
+// ---------- lookups ----------
+const boatsById = {}; DATA.boats.forEach(b => boatsById[b.id] = b);
+const regattasById = {}; DATA.regattas.forEach(r => regattasById[r.id] = r);
+const eventsById = {}; DATA.events.forEach(e => eventsById[e.id] = e);
+const racesById = {}; DATA.races.forEach(r => racesById[r.id] = r);
+
+// ---------- tiny SVG chart helpers ----------
+function svgBarChart(items, {width=520, barHeight=22, gap=8, valueKey='entries', labelKey='sailmaker', colorFn}={}) {
+  const max = Math.max(...items.map(i => i[valueKey]), 1);
+  const chartW = width - 150;
+  const h = items.length * (barHeight+gap);
+  let bars = '';
+  items.forEach((it, i) => {
+    const y = i*(barHeight+gap);
+    const w = Math.max(2, (it[valueKey]/max) * chartW);
+    const color = colorFn(it);
+    bars += `<text x="146" y="${y+barHeight/2+4}" text-anchor="end" font-size="12.5" fill="var(--text-secondary)">${esc(it[labelKey])}</text>`;
+    bars += `<rect x="152" y="${y+3}" width="${w}" height="${barHeight-6}" rx="4" fill="${color}"/>`;
+    bars += `<text x="${152+w+8}" y="${y+barHeight/2+4}" font-size="12.5" font-variant-numeric="tabular-nums" fill="var(--text-primary)">${it[valueKey]}</text>`;
+  });
+  return `<svg viewBox="0 0 ${width} ${h}" width="100%" height="${h}" role="img">${bars}</svg>`;
+}
+
+function sparkline(points, {width=560, height=90, color='var(--series-north)'}={}) {
+  if (points.length === 0) return '<div class="muted">No data</div>';
+  const xs = points.map(p=>p.x), ys = points.map(p=>p.y);
+  const minX = Math.min(...xs), maxX = Math.max(...xs);
+  const minY = 0, maxY = Math.max(...ys, 1);
+  const pad = 28;
+  const sx = x => pad + (maxX===minX ? 0 : (x-minX)/(maxX-minX)) * (width-pad*2);
+  const sy = y => (height-24) - (y-minY)/(maxY-minY) * (height-44);
+  const path = points.map((p,i) => `${i===0?'M':'L'}${sx(p.x).toFixed(1)},${sy(p.y).toFixed(1)}`).join(' ');
+  let dots = '', labels = '';
+  points.forEach(p => {
+    dots += `<circle cx="${sx(p.x).toFixed(1)}" cy="${sy(p.y).toFixed(1)}" r="3.5" fill="${color}"><title>${p.x}: ${p.y}</title></circle>`;
+    labels += `<text x="${sx(p.x).toFixed(1)}" y="${height-6}" font-size="10.5" text-anchor="middle" fill="var(--text-muted)">${p.x}</text>`;
+    labels += `<text x="${sx(p.x).toFixed(1)}" y="${(sy(p.y)-8).toFixed(1)}" font-size="10.5" text-anchor="middle" fill="var(--text-secondary)">${p.y}</text>`;
+  });
+  const gridY = height-24;
+  return `<svg viewBox="0 0 ${width} ${height}" width="100%" height="${height}">
+    <line x1="${pad}" y1="${gridY}" x2="${width-pad}" y2="${gridY}" stroke="var(--baseline)" stroke-width="1"/>
+    <path d="${path}" fill="none" stroke="${color}" stroke-width="2"/>
+    ${dots}${labels}
+  </svg>`;
+}
+
+// ---------- routing ----------
+function navigate() {
+  const hash = location.hash || '#/overview';
+  document.querySelectorAll('.nav-item').forEach(n => {
+    n.classList.toggle('active', hash.startsWith(n.dataset.route));
+  });
+  const [_, route, arg] = hash.split('/');
+  const main = document.getElementById('main');
+  try {
+    if (!route || route === 'overview') main.innerHTML = renderOverview();
+    else if (route === 'boats') main.innerHTML = renderBoatsList();
+    else if (route === 'boat') main.innerHTML = renderBoatProfile(parseInt(arg));
+    else if (route === 'regattas') main.innerHTML = renderRegattasList();
+    else if (route === 'regatta') main.innerHTML = renderRegattaProfile(parseInt(arg));
+    else if (route === 'race') main.innerHTML = renderRacePage(parseInt(arg));
+    else if (route === 'market-share') main.innerHTML = renderMarketShare();
+    else if (route === 'sales') main.innerHTML = renderSales();
+    else main.innerHTML = renderOverview();
+  } catch (err) {
+    main.innerHTML = `<div class="card">Something went wrong rendering this page: ${esc(err.message)}</div>`;
+    console.error(err);
+  }
+  attachBoatFilterHandlers();
+  window.scrollTo(0,0);
+}
+window.addEventListener('hashchange', navigate);
+document.addEventListener('click', e => {
+  const el = e.target.closest('[data-route]');
+  if (el && el.tagName !== 'A') { location.hash = el.dataset.route; }
+});
+
+// ---------- page: overview ----------
+function renderOverview() {
+  const s = DATA.stats;
+  const shareBoats = DATA.market_share_boats.map(x => ({sailmaker: x.sailmaker, entries: x.boats, bucket: bucketOf(x.sailmaker)}));
+  // fold into buckets
+  const byBucket = {};
+  shareBoats.forEach(x => { byBucket[x.bucket] = (byBucket[x.bucket]||0) + x.entries; });
+  const bucketItems = BUCKET_ORDER.filter(b => byBucket[b]).map(b => ({sailmaker: b, entries: byBucket[b]}));
+
+  // pick the regatta with the most seasons of history for the headline trend
+  const byRegatta = {};
+  DATA.entry_trends.forEach(t => { (byRegatta[t.regatta_name] ||= []).push(t); });
+  let bestRegatta = null, bestLen = 0;
+  Object.entries(byRegatta).forEach(([name, rows]) => { if (rows.length > bestLen) { bestLen = rows.length; bestRegatta = name; } });
+  const trendPts = (byRegatta[bestRegatta]||[]).sort((a,b)=>a.season_year-b.season_year).map(t=>({x:t.season_year,y:t.total}));
+
+  const northPct = byBucket['North Sails'] ? Math.round(100*byBucket['North Sails']/shareBoats.reduce((a,x)=>a+x.entries,0)) : 0;
+
+  return `
+    <h1>Overview</h1>
+    <p class="subtitle">Boat-centric race entry &amp; market-share database. Generated ${fmtDate(DATA.generated_at)}.</p>
+    <div class="stat-row">
+      <div class="stat-tile"><div class="v">${s.n_boats}</div><div class="l">Boats tracked</div></div>
+      <div class="stat-tile"><div class="v">${s.n_entries}</div><div class="l">Boat-level race entries</div></div>
+      <div class="stat-tile"><div class="v">${s.n_regattas}</div><div class="l">Regattas / races</div></div>
+      <div class="stat-tile"><div class="v">${s.n_class_count_rows}</div><div class="l">Historical class-count records</div></div>
+      <div class="stat-tile"><div class="v">${northPct}%</div><div class="l">Boats on North Sails (known fleet)</div></div>
+    </div>
+    <div class="card-row">
+      <div class="card">
+        <h2>Sailmaker share — distinct boats (known fleet)</h2>
+        ${svgBarChart(bucketItems, {colorFn: it => BUCKET_COLOR[it.sailmaker]})}
+        <p class="muted" style="font-size:12px;margin-top:10px;">Counts each boat once by its most recently observed sailmaker. "Other" groups low-volume brands (One, Elvstrom, Relling, GP, UK...). <a data-route="#/market-share">Full breakdown →</a></p>
+      </div>
+      <div class="card">
+        <h2>Entries over time — ${esc(bestRegatta||'')}</h2>
+        ${sparkline(trendPts)}
+        <p class="muted" style="font-size:12px;margin-top:6px;">Total entries per season. <a data-route="#/regattas">All regattas →</a></p>
+      </div>
+    </div>
+    <div class="card">
+      <h2>Where the data comes from</h2>
+      <p style="margin:0 0 8px;">Boat-level entries: your JOG fleet register + entry lists (manual), plus one proof-of-concept RORC race scraped live from rorc.org's legacy results archive. Aggregate historical entry counts (2007–2026, no boat-level detail): your IRC Solent Report, covering RORC Inshore, RSYC, Round the Island, Cowes Week, Warsash, ORC Worlds/Euros, and RORC offshore races.</p>
+      <p class="muted" style="font-size:12px;margin:0;">Note: the JOG entry-list sheets had no season year recorded, so they're filed under the current season (assumed) — flag to correct if wrong. See the README shipped alongside this file for the full scraping/automation notes.</p>
+    </div>
+  `;
+}
+
+// ---------- page: boats list ----------
+function attachBoatFilterHandlers() {
+  const search = document.getElementById('boat-search');
+  const filter = document.getElementById('boat-filter');
+  if (!search) return;
+  const apply = () => {
+    const q = search.value.trim().toLowerCase();
+    const f = filter.value;
+    document.querySelectorAll('#boats-tbody tr').forEach(tr => {
+      const hay = tr.dataset.hay;
+      const bucket = tr.dataset.bucket;
+      const show = (!q || hay.includes(q)) && (f==='all' || bucket===f);
+      tr.style.display = show ? '' : 'none';
+    });
+  };
+  search.addEventListener('input', apply);
+  filter.addEventListener('change', apply);
+}
+
+function renderBoatsList() {
+  const rows = DATA.boats.map(b => {
+    const bucket = bucketOf(b.current_sailmaker);
+    const hay = [b.boat_name,b.sail_no,b.owner_name,b.boat_type,b.current_sailmaker,b.tag].join(' ').toLowerCase();
+    return `<tr class="clickable" data-route="#/boat/${b.id}" data-hay="${esc(hay)}" data-bucket="${bucket}">
+      <td><strong>${esc(b.boat_name||'—')}</strong></td>
+      <td>${esc(b.sail_no||'')}</td>
+      <td>${esc(b.boat_type||'')}</td>
+      <td>${esc(b.owner_name||'')}</td>
+      <td><span class="pill" style="background:${BUCKET_COLOR[bucket]}">${esc(b.current_sailmaker||'Unknown')}</span></td>
+      <td>${esc(b.tag||'')}</td>
+      <td class="num">${b.entries.length}</td>
+    </tr>`;
+  }).join('');
+  const options = BUCKET_ORDER.map(b => `<option value="${b}">${b}</option>`).join('');
+  return `
+    <h1>Boats</h1>
+    <p class="subtitle">${DATA.boats.length} boats. The boat is the central record — click into one to see its owner, sailmaker history and every race it's entered.</p>
+    <div class="search-row">
+      <input type="text" id="boat-search" placeholder="Search by name, sail no, owner, type, tag…">
+      <select id="boat-filter"><option value="all">All sailmakers</option>${options}</select>
+    </div>
+    <div class="card" style="padding:0; overflow:auto;">
+      <table>
+        <thead><tr><th>Boat</th><th>Sail No</th><th>Type</th><th>Owner</th><th>Sailmaker</th><th>Tag</th><th class="num">Entries</th></tr></thead>
+        <tbody id="boats-tbody">${rows}</tbody>
+      </table>
+    </div>
+  `;
+}
+
+// ---------- page: boat profile ----------
+function renderBoatProfile(id) {
+  const b = boatsById[id];
+  if (!b) return `<div class="card">Boat not found.</div>`;
+  const bucket = bucketOf(b.current_sailmaker);
+  const smHistoryRows = b.sailmaker_history.map(h => `
+    <tr><td>${esc(h.sailmaker_name||'—')}</td><td>${esc(h.source||'')}</td><td>${esc(h.confidence||'')}</td></tr>
+  `).join('') || `<tr><td colspan="3" class="muted">No sailmaker history recorded.</td></tr>`;
+
+  const entryRows = b.entries.map(e => {
+    const result = e.position ? `${e.position}${e.corrected_time ? ' · '+e.corrected_time : ''}` : (e.status || '—');
+    return `<tr class="clickable" data-route="#/race/${e.race_id}">
+      <td>${esc(e.regatta_name)}</td>
+      <td class="num">${e.season_year||''}</td>
+      <td>${esc(e.race_name||'')}</td>
+      <td>${esc(e.class||'')}</td>
+      <td>${esc(result)}</td>
+      <td>${e.sailmaker_name ? `<span class="pill" style="background:${BUCKET_COLOR[bucketOf(e.sailmaker_name)]}">${esc(e.sailmaker_name)}</span>` : ''}</td>
+      <td class="muted" style="font-size:12px;">${esc(e.source)}</td>
+    </tr>`;
+  }).join('') || `<tr><td colspan="7" class="muted">No race entries on file.</td></tr>`;
+
+  const crm = `
+    <dl class="kv">
+      <dt>Lead rep</dt><dd>${esc(b.lead_rep||'—')}</dd>
+      <dt>Contacted by</dt><dd>${esc(b.contacted_by||'—')}</dd>
+      <dt>In customer system</dt><dd>${b.in_cs===1?'Yes':(b.in_cs===0?'No':'—')}</dd>
+      <dt>Tag</dt><dd>${esc(b.tag||'—')}</dd>
+      <dt>Notes</dt><dd>${esc(b.crm_notes||'—')}</dd>
+    </dl>`;
+
+  return `
+    <a class="back-link" data-route="#/boats">← All boats</a>
+    <h1>${esc(b.boat_name||'Unnamed boat')} <span class="pill" style="background:${BUCKET_COLOR[bucket]}">${esc(b.current_sailmaker||'Unknown')}</span></h1>
+    <p class="subtitle">${esc(b.sail_no||'')} · ${esc(b.boat_type||'')}${b.tcc ? ' · TCC '+b.tcc : ''}</p>
+    <div class="card-row">
+      <div class="card">
+        <h2>Owner &amp; boat</h2>
+        <dl class="kv">
+          <dt>Owner</dt><dd>${esc(b.owner_name||'—')}</dd>
+          <dt>Boat type</dt><dd>${esc(b.boat_type||'—')}</dd>
+          <dt>TCC (IRC rating)</dt><dd>${b.tcc||'—'}</dd>
+          <dt>Sail No</dt><dd>${esc(b.sail_no||'—')}</dd>
+        </dl>
+      </div>
+      <div class="card">
+        <h2>Sales / CRM</h2>
+        ${crm}
+      </div>
+    </div>
+    <div class="card">
+      <h2>Sailmaker history</h2>
+      <table><thead><tr><th>Sailmaker</th><th>Source</th><th>Confidence</th></tr></thead><tbody>${smHistoryRows}</tbody></table>
+    </div>
+    <div class="card" style="padding:0;overflow:auto;">
+      <h2 style="padding:18px 20px 0;">Race entries (${b.entries.length})</h2>
+      <table>
+        <thead><tr><th>Regatta</th><th>Year</th><th>Race</th><th>Class</th><th>Result</th><th>Sailmaker (that race)</th><th>Source</th></tr></thead>
+        <tbody>${entryRows}</tbody>
+      </table>
+    </div>
+  `;
+}
+
+// ---------- page: regattas list ----------
+function renderRegattasList() {
+  const byCat = {};
+  DATA.regattas.forEach(r => { (byCat[r.category||'Other'] ||= []).push(r); });
+  let html = `<h1>Regattas</h1><p class="subtitle">${DATA.regattas.length} regattas/races tracked, spanning ${DATA.stats.n_events} event-seasons.</p>`;
+  Object.keys(byCat).sort().forEach(cat => {
+    html += `<div class="card"><h2>${esc(cat)}</h2><table><thead><tr><th>Regatta</th><th class="num">Seasons on file</th><th class="num">Latest total entries</th></tr></thead><tbody>`;
+    byCat[cat].sort((a,b)=>a.name.localeCompare(b.name)).forEach(r => {
+      const trends = DATA.entry_trends.filter(t => t.regatta_id === r.id).sort((a,b)=>b.season_year-a.season_year);
+      const latest = trends[0];
+      html += `<tr class="clickable" data-route="#/regatta/${r.id}">
+        <td>${esc(r.name)}</td>
+        <td class="num">${trends.length}</td>
+        <td class="num">${latest ? latest.total+' ('+latest.season_year+')' : '—'}</td>
+      </tr>`;
+    });
+    html += `</tbody></table></div>`;
+  });
+  return html;
+}
+
+// ---------- page: regatta profile ----------
+function renderRegattaProfile(id) {
+  const r = regattasById[id];
+  if (!r) return `<div class="card">Regatta not found.</div>`;
+  const trends = DATA.entry_trends.filter(t => t.regatta_id === id).sort((a,b)=>a.season_year-b.season_year);
+  const pts = trends.map(t => ({x:t.season_year, y:t.total}));
+  const evs = DATA.events.filter(e => e.regatta_id === id).sort((a,b)=>b.season_year-a.season_year);
+  const raceRows = DATA.races.filter(ra => evs.some(e=>e.id===ra.event_id)).map(ra => {
+    const ev = eventsById[ra.event_id];
+    const n = DATA.boats.reduce((acc,b) => acc + b.entries.filter(e=>e.race_id===ra.id).length, 0);
+    return `<tr class="clickable" data-route="#/race/${ra.id}"><td>${esc(ra.race_name)}</td><td class="num">${ev.season_year}</td><td class="num">${n}</td></tr>`;
+  }).join('');
+
+  return `
+    <a class="back-link" data-route="#/regattas">← All regattas</a>
+    <h1>${esc(r.name)}</h1>
+    <p class="subtitle">${esc(r.category||'')} · ${esc(r.region||'')}</p>
+    <div class="card">
+      <h2>Entries over time</h2>
+      ${pts.length ? sparkline(pts) : '<p class="muted">No aggregate historical counts on file for this regatta.</p>'}
+    </div>
+    ${raceRows ? `<div class="card" style="padding:0;overflow:auto;">
+      <h2 style="padding:18px 20px 0;">Boat-level races on file</h2>
+      <table><thead><tr><th>Race</th><th class="num">Year</th><th class="num">Entries</th></tr></thead><tbody>${raceRows}</tbody></table>
+    </div>` : ''}
+  `;
+}
+
+// ---------- page: single race ----------
+function renderRacePage(raceId) {
+  const race = racesById[raceId];
+  if (!race) return `<div class="card">Race not found.</div>`;
+  const ev = eventsById[race.event_id];
+  const reg = regattasById[ev.regatta_id];
+  const entries = [];
+  DATA.boats.forEach(b => b.entries.forEach(e => { if (e.race_id === raceId) entries.push({...e, boat: b}); }));
+  entries.sort((a,b) => (a.position||9999) - (b.position||9999));
+  const rows = entries.map(e => `
+    <tr class="clickable" data-route="#/boat/${e.boat.id}">
+      <td>${e.position||''}</td>
+      <td>${esc(e.boat.boat_name)}</td>
+      <td>${esc(e.boat.sail_no)}</td>
+      <td>${esc(e.class||'')}</td>
+      <td>${esc(e.owner_name_used||e.boat.owner_name||'')}</td>
+      <td>${e.sailmaker_name ? `<span class="pill" style="background:${BUCKET_COLOR[bucketOf(e.sailmaker_name)]}">${esc(e.sailmaker_name)}</span>` : ''}</td>
+      <td>${esc(e.corrected_time||e.status||'')}</td>
+    </tr>`).join('');
+  return `
+    <a class="back-link" data-route="#/regatta/${reg.id}">← ${esc(reg.name)}</a>
+    <h1>${esc(race.race_name)}</h1>
+    <p class="subtitle">${esc(reg.name)} · ${ev.season_year}${race.source_url ? ' · <a href="'+esc(race.source_url)+'" target="_blank" rel="noopener">source</a>' : ''}</p>
+    <div class="card" style="padding:0;overflow:auto;">
+      <table>
+        <thead><tr><th>Pos</th><th>Boat</th><th>Sail No</th><th>Class</th><th>Owner</th><th>Sailmaker</th><th>Corrected / status</th></tr></thead>
+        <tbody>${rows || '<tr><td colspan="7" class="muted">No boat-level entries on file for this race.</td></tr>'}</tbody>
+      </table>
+    </div>
+  `;
+}
+
+// ---------- page: market share ----------
+function renderMarketShare() {
+  const byBucketEntries = {}; DATA.market_share_entries.forEach(x => { byBucketEntries[bucketOf(x.sailmaker)] = (byBucketEntries[bucketOf(x.sailmaker)]||0)+x.entries; });
+  const byBucketBoats = {}; DATA.market_share_boats.forEach(x => { byBucketBoats[bucketOf(x.sailmaker)] = (byBucketBoats[bucketOf(x.sailmaker)]||0)+x.boats; });
+  const itemsEntries = BUCKET_ORDER.filter(b=>byBucketEntries[b]).map(b=>({sailmaker:b, entries:byBucketEntries[b]}));
+  const itemsBoats = BUCKET_ORDER.filter(b=>byBucketBoats[b]).map(b=>({sailmaker:b, entries:byBucketBoats[b]}));
+
+  const rawRows = DATA.market_share_entries.map(x => `<tr><td>${esc(x.sailmaker)}</td><td class="num">${x.entries}</td></tr>`).join('');
+
+  return `
+    <h1>Market share</h1>
+    <p class="subtitle">Sailmaker share among boats where we have a signal (JOG fleet register + scraped race entries). Boats with no sailmaker recorded show as "Unknown" — that's your prospect list.</p>
+    <div class="card-row">
+      <div class="card">
+        <h2>By distinct boat</h2>
+        ${svgBarChart(itemsBoats, {colorFn: it => BUCKET_COLOR[it.sailmaker]})}
+      </div>
+      <div class="card">
+        <h2>By race entry (a boat can appear more than once)</h2>
+        ${svgBarChart(itemsEntries, {colorFn: it => BUCKET_COLOR[it.sailmaker]})}
+      </div>
+    </div>
+    <div class="card" style="padding:0;overflow:auto;">
+      <h2 style="padding:18px 20px 0;">Raw sailmaker labels (unbucketed)</h2>
+      <table><thead><tr><th>Sailmaker (as recorded)</th><th class="num">Entries</th></tr></thead><tbody>${rawRows}</tbody></table>
+    </div>
+  `;
+}
+
+// ---------- page: sales opportunities ----------
+function renderSales() {
+  const targets = DATA.boats.filter(b => bucketOf(b.current_sailmaker) !== 'North Sails');
+  targets.sort((a,b) => (b.entries.length - a.entries.length));
+  const rows = targets.map(b => `
+    <tr class="clickable" data-route="#/boat/${b.id}">
+      <td>${esc(b.boat_name)}</td>
+      <td>${esc(b.owner_name||'')}</td>
+      <td><span class="pill" style="background:${BUCKET_COLOR[bucketOf(b.current_sailmaker)]}">${esc(b.current_sailmaker||'Unknown')}</span></td>
+      <td>${esc(b.lead_rep||'')}</td>
+      <td>${esc(b.contacted_by||'')}</td>
+      <td class="${b.in_cs ? '' : 'tag-flag'}">${b.in_cs===1?'Yes':(b.in_cs===0?'No':'—')}</td>
+      <td class="num">${b.entries.length}</td>
+    </tr>`).join('');
+  return `
+    <h1>Sales opportunities</h1>
+    <p class="subtitle">Boats not currently on North Sails (competitor-flagged, partial, or unknown), sorted by how active they are — most races entered first. ${targets.length} boats.</p>
+    <div class="card" style="padding:0;overflow:auto;">
+      <table>
+        <thead><tr><th>Boat</th><th>Owner</th><th>Current sailmaker</th><th>Lead rep</th><th>Contacted by</th><th>In CS</th><th class="num">Entries</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+    <footer class="note">CRM fields here are read-only, exactly as imported from your fleet register — edit the source data and re-run the export to update them.</footer>
+  `;
+}
+
+navigate();
+</script>
+</body>
+</html>

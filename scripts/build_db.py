@@ -278,7 +278,7 @@ def year_from_header(v):
     return int(m.group(1)) if m else None
 
 
-def scan_sheet_blocks(ws, class_col=1, max_row=200):
+def scan_sheet_blocks(ws, class_col=1, max_row=200, title_col=None):
     """Scan an entire sheet for '<title row>, Class, <year>, <year>, ...' blocks
     (there can be several stacked vertically, e.g. RSYC's May/June/July/September
     regattas). Returns a list of dicts: {title, header_row, year_cols, data_rows}
@@ -290,6 +290,8 @@ def scan_sheet_blocks(ws, class_col=1, max_row=200):
         val = ws.cell(row=r, column=class_col).value
         if val is not None and str(val).strip().lower() == "class":
             title_val = ws.cell(row=r - 1, column=class_col).value
+            if not title_val and title_col:
+                title_val = ws.cell(row=r - 1, column=title_col).value
             title = norm(title_val) if title_val else None
             year_cols = {}
             c = class_col + 1
@@ -320,7 +322,8 @@ def scan_sheet_blocks(ws, class_col=1, max_row=200):
 
 
 def import_class_block(cur, ws, fallback_name, category, class_col=1, max_row=200,
-                        notes_by_year=None, title_prefix="", title_overrides=None):
+                        notes_by_year=None, title_prefix="", title_overrides=None,
+                        title_col=None, hint_overrides=None):
     """Parse every 'Class | year | year | ...' block in a sheet (there may be
     several stacked vertically, each its own race/regatta with its own title
     row directly above 'Class') and load them as event_class_counts.
@@ -332,18 +335,21 @@ def import_class_block(cur, ws, fallback_name, category, class_col=1, max_row=20
     is silently dropped - these need a manual rename once reviewed.
     """
     title_overrides = {k.lower(): v for k, v in (title_overrides or {}).items()}
-    blocks = scan_sheet_blocks(ws, class_col=class_col, max_row=max_row)
+    hint_overrides = {k.lower(): v for k, v in (hint_overrides or {}).items()}
+    blocks = scan_sheet_blocks(ws, class_col=class_col, max_row=max_row, title_col=title_col)
     total_cells = 0
     total_events = set()
     for block in blocks:
         title = block["title"]
+        hint = block["data_rows"][0][0] if block["data_rows"] else None
         if title and title.lower() in title_overrides:
             name = title_overrides[title.lower()]
         elif title:
             name = f"{title_prefix}{title}"
+        elif hint and hint.lower() in hint_overrides:
+            name = hint_overrides[hint.lower()]
         else:
-            hint = block["data_rows"][0][0] if block["data_rows"] else f"row {block['header_row']}"
-            name = f"{fallback_name} — {hint} group"
+            name = f"{fallback_name} — {hint or ('row '+str(block['header_row']))} group"
         regatta_id = get_or_create_regatta(cur, name, category)
         events_created = {}
         for class_label, rr in block["data_rows"]:
@@ -376,10 +382,18 @@ def import_class_block(cur, ws, fallback_name, category, class_col=1, max_row=20
 def import_irc_solent_report(cur, path):
     wb = openpyxl.load_workbook(path, data_only=True)
 
-    # RORC Inshore: block 1 is mislabeled "Easter challenge" in the source
-    # (copy/paste artifact) - it's actually the main Inshore Series classes.
+    # RORC Inshore: block 1's title ("Easter challenge", a copy/paste artifact)
+    # sits in column B instead of A on this sheet; blocks 2-4 have no title at
+    # all, so they're named from their first class label instead.
     import_class_block(cur, wb["RORC Inshore"], "RORC Inshore Series", "RORC",
-                        title_overrides={"easter challenge": "RORC Inshore Series"})
+                        title_col=2,
+                        title_overrides={"easter challenge": "RORC Inshore Series"},
+                        hint_overrides={
+                            "0 (cape 31)": "RORC Inshore Series",
+                            "2h": "RORC Inshore Series",
+                            "fast 40/ gp0 (irc)": "RORC Inshore Non-IRC Classes",
+                            "0": "RORC Inshore Series (extended classes, 0-4 banding)",
+                        })
 
     # RSYC: 4 stacked blocks (May/June/July/September Regatta) -> 4 distinct regattas
     import_class_block(cur, wb["RSYC"], "RSYC Regatta", "Club", title_prefix="RSYC ")
