@@ -122,11 +122,11 @@
 <div class="app">
   <nav class="sidebar" id="sidebar">
     <div class="brand">Marketshare<small>Race entry &amp; sailmaker tracker</small></div>
-    <a class="nav-item" data-route="#/overview">Overview</a>
-    <a class="nav-item" data-route="#/boats">Boats</a>
-    <a class="nav-item" data-route="#/regattas">Regattas</a>
-    <a class="nav-item" data-route="#/market-share">Market share</a>
-    <a class="nav-item" data-route="#/sales">Sales opportunities</a>
+    <a class="nav-item" href="#/overview" data-route="#/overview">Overview</a>
+    <a class="nav-item" href="#/boats" data-route="#/boats">Boats</a>
+    <a class="nav-item" href="#/regattas" data-route="#/regattas">Regattas</a>
+    <a class="nav-item" href="#/market-share" data-route="#/market-share">Market share</a>
+    <a class="nav-item" href="#/sales" data-route="#/sales">Sales opportunities</a>
   </nav>
   <main class="main" id="main"></main>
 </div>
@@ -260,12 +260,12 @@ function renderOverview() {
       <div class="card">
         <h2>Sailmaker share — distinct boats (known fleet)</h2>
         ${svgBarChart(bucketItems, {colorFn: it => BUCKET_COLOR[it.sailmaker]})}
-        <p class="muted" style="font-size:12px;margin-top:10px;">Counts each boat once by its most recently observed sailmaker. "Other" groups low-volume brands (One, Elvstrom, Relling, GP, UK...). <a data-route="#/market-share">Full breakdown →</a></p>
+        <p class="muted" style="font-size:12px;margin-top:10px;">Counts each boat once by its most recently observed sailmaker. "Other" groups low-volume brands (One, Elvstrom, Relling, GP, UK...). <a href="#/market-share" data-route="#/market-share">Full breakdown →</a></p>
       </div>
       <div class="card">
         <h2>Entries over time — ${esc(bestRegatta||'')}</h2>
         ${sparkline(trendPts)}
-        <p class="muted" style="font-size:12px;margin-top:6px;">Total entries per season. <a data-route="#/regattas">All regattas →</a></p>
+        <p class="muted" style="font-size:12px;margin-top:6px;">Total entries per season. <a href="#/regattas" data-route="#/regattas">All regattas →</a></p>
       </div>
     </div>
     <div class="card">
@@ -358,7 +358,7 @@ function renderBoatProfile(id) {
     </dl>`;
 
   return `
-    <a class="back-link" data-route="#/boats">← All boats</a>
+    <a class="back-link" href="#/boats" data-route="#/boats">← All boats</a>
     <h1>${esc(b.boat_name||'Unnamed boat')} <span class="pill" style="background:${BUCKET_COLOR[bucket]}">${esc(b.current_sailmaker||'Unknown')}</span></h1>
     <p class="subtitle">${esc(b.sail_no||'')} · ${esc(b.boat_type||'')}${b.tcc ? ' · TCC '+b.tcc : ''}</p>
     <div class="card-row">
@@ -425,7 +425,7 @@ function renderRegattaProfile(id) {
   }).join('');
 
   return `
-    <a class="back-link" data-route="#/regattas">← All regattas</a>
+    <a class="back-link" href="#/regattas" data-route="#/regattas">← All regattas</a>
     <h1>${esc(r.name)}</h1>
     <p class="subtitle">${esc(r.category||'')} · ${esc(r.region||'')}</p>
     <div class="card">
@@ -459,7 +459,7 @@ function renderRacePage(raceId) {
       <td>${esc(e.corrected_time||e.status||'')}</td>
     </tr>`).join('');
   return `
-    <a class="back-link" data-route="#/regatta/${reg.id}">← ${esc(reg.name)}</a>
+    <a class="back-link" href="#/regatta/${reg.id}" data-route="#/regatta/${reg.id}">← ${esc(reg.name)}</a>
     <h1>${esc(race.race_name)}</h1>
     <p class="subtitle">${esc(reg.name)} · ${ev.season_year}${race.source_url ? ' · <a href="'+esc(race.source_url)+'" target="_blank" rel="noopener">source</a>' : ''}</p>
     <div class="card" style="padding:0;overflow:auto;">
