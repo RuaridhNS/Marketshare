@@ -654,7 +654,7 @@ function renderPendingChanges() {
       <h2>Export as CSV</h2>
       <div class="btn-row">
         <button class="btn" type="button" id="copy-csv-btn">Copy CSV to clipboard</button>
-        <a class="btn secondary" id="download-csv-link" href="#" download="changes.csv" style="text-decoration:none;">Download changes.csv</a>
+        <button class="btn secondary" type="button" id="download-csv-btn">Download changes.csv</button>
         <button class="btn danger" type="button" id="clear-all-btn">Clear all pending edits</button>
       </div>
       <p class="muted" style="font-size:12px;margin:10px 0 6px;">If the download button doesn't do anything (e.g. viewing this in a sandboxed preview), copy the text below instead:</p>
@@ -679,10 +679,33 @@ function attachPendingChangesHandlers() {
       if (box) { box.focus(); box.select(); }
     }
   });
-  const dlLink = document.getElementById('download-csv-link');
-  if (dlLink) dlLink.addEventListener('click', (e) => {
+  const dlBtn = document.getElementById('download-csv-btn');
+  if (dlBtn) dlBtn.addEventListener('click', async () => {
     const text = pendingEditsToCSV();
-    dlLink.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(text);
+    // Prefer the Artifact "downloads" capability (a real save-file prompt);
+    // fall back to a plain <a download> for when this file is opened directly
+    // in a browser (not through the sandboxed Artifact viewer, which has
+    // neither window.claude nor the ability to trigger its own downloads).
+    let downloads = null;
+    try { downloads = window.claude ? await window.claude.use('downloads') : null; } catch (e) {}
+    if (downloads) {
+      try {
+        await downloads.save({ filename: 'changes.csv', data: text });
+        dlBtn.textContent = 'Saved ✓';
+        setTimeout(() => { dlBtn.textContent = 'Download changes.csv'; }, 1800);
+      } catch (err) {
+        console.error('downloads.save failed', err);
+        const box = document.getElementById('csv-box');
+        if (box) { box.focus(); box.select(); }
+      }
+      return;
+    }
+    const a = document.createElement('a');
+    a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(text);
+    a.download = 'changes.csv';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
   });
   const clearAllBtn = document.getElementById('clear-all-btn');
   if (clearAllBtn) clearAllBtn.addEventListener('click', () => {
