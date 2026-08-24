@@ -67,6 +67,18 @@ CREATE TABLE IF NOT EXISTS boat_sailmaker_history (
     confidence      TEXT DEFAULT 'manual'  -- 'manual' | 'inferred'
 );
 
+-- Who owns a boat, over time. Mirrors boat_sailmaker_history - "current"
+-- is the last-inserted row per boat, same convention as sailmaker history.
+CREATE TABLE IF NOT EXISTS boat_owner_history (
+    id              INTEGER PRIMARY KEY,
+    boat_id         INTEGER NOT NULL REFERENCES boats(id) ON DELETE CASCADE,
+    owner_id        INTEGER REFERENCES owners(id),
+    effective_from  TEXT,               -- season year the owner was first seen, or NULL if unknown
+    effective_to    TEXT,               -- season year the owner was last seen, NULL = current
+    source          TEXT,               -- 'inferred:race_entries', 'manual:dashboard-edit', etc.
+    confidence      TEXT DEFAULT 'manual'  -- 'manual' | 'inferred'
+);
+
 -- A regatta / race series "brand" (not year-specific).
 CREATE TABLE IF NOT EXISTS regattas (
     id          INTEGER PRIMARY KEY,

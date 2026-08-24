@@ -242,7 +242,13 @@ def main():
             print(f"  '{event['event_name']}' - matched 'summer' incidentally (not Summer Series) - skipping")
             continue
 
-        regatta = "Royal Southern Summer Series"
+        # "Summer Series" is a cumulative points competition across the May/
+        # June/July/September Regattas, not itself a place boats race - model
+        # each sub-regatta as its own regatta rather than merging them into
+        # one "Summer Series" event per year (which would wrongly combine
+        # 4 different regattas' races into a single event).
+        month_m = re.search(r"\b(May|June|July|September)\s+Regatta\b", event["event_name"], re.I)
+        regatta = f"Royal Southern {month_m.group(1).title()} Regatta" if month_m else "Royal Southern Summer Series"
         for race in event["races"]:
             rows = race_to_csv_rows(race)
             if not rows:

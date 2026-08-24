@@ -671,6 +671,10 @@ function renderBoatProfile(id) {
     <tr><td>${esc(h.sailmaker_name||'—')}</td><td>${esc(h.source||'')}</td><td>${esc(h.confidence||'')}</td></tr>
   `).join('') || `<tr><td colspan="3" class="muted">No sailmaker history recorded.</td></tr>`;
 
+  const ownerHistoryRows = b.owner_history.map(h => `
+    <tr><td>${esc(h.owner_name||'—')}</td><td>${esc(h.effective_from||'—')}</td><td>${esc(h.effective_to||'current')}</td><td>${esc(h.source||'')}</td></tr>
+  `).join('') || `<tr><td colspan="4" class="muted">No owner history recorded.</td></tr>`;
+
   const entryRows = b.entries.map(e => {
     const result = e.position || (e.status || '—');
     return `<tr class="clickable" data-route="#/race/${e.race_id}">
@@ -789,6 +793,10 @@ function renderBoatProfile(id) {
     <div class="card">
       <h2>Sailmaker history</h2>
       <table><thead><tr><th>Sailmaker</th><th>Source</th><th>Confidence</th></tr></thead><tbody>${smHistoryRows}</tbody></table>
+    </div>
+    <div class="card">
+      <h2>Owner history</h2>
+      <table><thead><tr><th>Owner</th><th>From</th><th>To</th><th>Source</th></tr></thead><tbody>${ownerHistoryRows}</tbody></table>
     </div>
     <div class="card" style="padding:0;overflow:auto;">
       <h2 style="padding:18px 20px 0;">Race entries (${b.entries.length})</h2>

@@ -18,6 +18,9 @@ def main():
     sailmakers = [dict(r) for r in cur.execute("SELECT id, name, is_us FROM sailmakers")]
     sm_by_id = {s["id"]: s for s in sailmakers}
 
+    owners = [dict(r) for r in cur.execute("SELECT id, name FROM owners")]
+    owner_by_id = {o["id"]: o for o in owners}
+
     regattas = [dict(r) for r in cur.execute("SELECT id, name, category, region FROM regattas ORDER BY name")]
 
     events = [dict(r) for r in cur.execute(
@@ -58,6 +61,11 @@ def main():
         FROM boat_sailmaker_history ORDER BY boat_id, id
     """).fetchall()
 
+    owner_history_rows = cur.execute("""
+        SELECT boat_id, owner_id, effective_from, effective_to, source, confidence
+        FROM boat_owner_history ORDER BY boat_id, id
+    """).fetchall()
+
     # ---- assemble boats with nested entries + sailmaker history ----
     entries_by_boat = {}
     for r in entries_rows:
@@ -71,12 +79,19 @@ def main():
         d["sailmaker_name"] = sm_by_id.get(d["sailmaker_id"], {}).get("name") if d["sailmaker_id"] else None
         smhist_by_boat.setdefault(d["boat_id"], []).append(d)
 
+    ownerhist_by_boat = {}
+    for r in owner_history_rows:
+        d = dict(r)
+        d["owner_name"] = owner_by_id.get(d["owner_id"], {}).get("name") if d["owner_id"] else None
+        ownerhist_by_boat.setdefault(d["boat_id"], []).append(d)
+
     boats = []
     for b in boats_rows:
         d = dict(b)
         d["entries"] = sorted(entries_by_boat.get(d["id"], []),
                                key=lambda e: (e["season_year"] or 0), reverse=True)
         d["sailmaker_history"] = smhist_by_boat.get(d["id"], [])
+        d["owner_history"] = ownerhist_by_boat.get(d["id"], [])
         # "current" sailmaker = most recent history row, else most recent entry's sailmaker
         current_sm = None
         if d["sailmaker_history"]:
