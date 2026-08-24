@@ -35,16 +35,30 @@ BASE = "https://www.rorc.org"
 USER_AGENT = "Mozilla/5.0 (compatible; MarketshareResearchBot/1.0)"
 CRAWL_DELAY = 10  # seconds, per rorc.org/robots.txt
 
-EXPECTED_HEADER = [
-    "Points", "Sail No", "Boat", "Type of Boat", "Owner", "Sailed by",
-    "Finish Time", "Elapsed", "Handicap", "Corrected", "FinishingPlace",
-    "Comments",
-]
+# Column-name normalization: RORC's page generator spells some headers
+# differently across years/classes (e.g. "FinishingPlace" vs "Finishing
+# Place" with a space) - compare on a whitespace/case-insensitive key.
+# Only SAIL NO and BOAT are truly required to trust a table as race results;
+# everything else (including Handicap/Corrected) is optional, since
+# non-IRC-rated one-design classes (Class40, MOCRA...) race level and
+# simply don't have a TCC/corrected-time column at all.
+COLUMN_ALIASES = {
+    "points": "Points", "sailno": "SailNo", "boat": "Boat",
+    "typeofboat": "BoatType", "owner": "Owner", "sailedby": "SailedBy",
+    "finishtime": "FinishTime", "elapsed": "Elapsed", "handicap": "Handicap",
+    "corrected": "Corrected", "finishingplace": "Position",
+    "comments": "Comments",
+}
+REQUIRED_FIELDS = {"SailNo", "Boat"}
+
+
+def normalize_header_name(name):
+    return re.sub(r"[^a-z0-9]", "", name.lower())
 
 KNOWN_CLASSES = [
     "IRC Super Zero", "IRC Zero", "IRC One", "IRC Two", "IRC Three",
     "IRC Four", "IRC Overall", "IRC Two Handed", "IRC2 Hand Nat",
-    "Class40", "MOCRA", "Multihull",
+    "Class40", "Class 40", "MOCRA", "Multihull",
 ]
 
 SCRIPT_DIR = __import__("pathlib").Path(__file__).resolve().parent
@@ -97,19 +111,26 @@ def parse_race_page(url):
     date_m = re.search(r"Start:\s*(.+)$", date_line)
     race_date_text = date_m.group(1).strip() if date_m else None
 
-    # Find the results table: the one whose header row contains every column
-    # we need (some races add extra columns, e.g. 'FactoredPoints' for the
-    # Middle Sea Race - we just ignore anything we don't recognise).
+    # Find the results table: the one whose header row contains at least
+    # SailNo + Boat once normalized. Everything else in COLUMN_ALIASES is
+    # picked up if present and left blank otherwise (see module docstring
+    # for why - one-design/box-rule classes have no TCC/Corrected column).
     target_table = None
-    header = None
+    field_index = None
     for table in soup.find_all("table"):
         rows = table.find_all("tr")
         if not rows:
             continue
         candidate_header = [c.get_text(strip=True) for c in rows[0].find_all(["th", "td"])]
-        if all(name in candidate_header for name in EXPECTED_HEADER):
+        normalized = [normalize_header_name(h) for h in candidate_header]
+        fi = {}
+        for i, key in enumerate(normalized):
+            field = COLUMN_ALIASES.get(key)
+            if field and field not in fi:  # first occurrence wins (some pages repeat Points at the end)
+                fi[field] = i
+        if REQUIRED_FIELDS.issubset(fi.keys()):
             target_table = table
-            header = candidate_header
+            field_index = fi
             break
 
     if target_table is None:
@@ -120,25 +141,14 @@ def parse_race_page(url):
         }
 
     data_rows = target_table.find_all("tr")[1:]
-    idx = {name: header.index(name) for name in EXPECTED_HEADER}
+    max_idx = max(field_index.values())
     parsed_rows = []
     for tr in data_rows:
         cells = [c.get_text(strip=True) for c in tr.find_all(["th", "td"])]
-        if len(cells) < len(header):
+        if len(cells) <= max_idx:
             continue
         parsed_rows.append({
-            "Position": cells[idx["FinishingPlace"]],
-            "Points": cells[idx["Points"]],
-            "SailNo": cells[idx["Sail No"]],
-            "Boat": cells[idx["Boat"]],
-            "BoatType": cells[idx["Type of Boat"]],
-            "Owner": cells[idx["Owner"]],
-            "SailedBy": cells[idx["Sailed by"]],
-            "FinishTime": cells[idx["Finish Time"]],
-            "Elapsed": cells[idx["Elapsed"]],
-            "Handicap": cells[idx["Handicap"]],
-            "Corrected": cells[idx["Corrected"]],
-            "Comments": cells[idx["Comments"]],
+            field: cells[i] for field, i in field_index.items()
         })
 
     return {
