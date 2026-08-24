@@ -18,14 +18,16 @@
     --success:        #006300;
     --card-shadow:    0 1px 2px rgba(11,11,11,0.06), 0 1px 1px rgba(11,11,11,0.04);
 
-    --series-north:   #2a78d6;
-    --series-doyle:   #eb6834;
-    --series-one:     #1baf7a;
-    --series-sanders: #eda100;
-    --series-quantum: #e87ba4;
-    --series-other:   #008300;
-    --series-partial: #4a3aa7;
-    --series-unknown: #e34948;
+    --series-north:    #2563eb;
+    --series-doyle:    #eab308;
+    --series-quantum:  #16a34a;
+    --series-one:      #dc2626;
+    --series-sanders:  #7c3aed;
+    --series-elvstrom: #ea580c;
+    --series-unknown:  #f5f5f4;
+    --series-other:    #71717a;
+    --series-partial:  #0d9488;
+    --series-unknown-text: #292524;
   }
   @media (prefers-color-scheme: dark) {
     :root {
@@ -41,14 +43,16 @@
       --success:        #0ca30c;
       --card-shadow:    0 1px 2px rgba(0,0,0,0.4);
 
-      --series-north:   #3987e5;
-      --series-doyle:   #d95926;
-      --series-one:     #199e70;
-      --series-sanders: #c98500;
-      --series-quantum: #d55181;
-      --series-other:   #008300;
-      --series-partial: #9085e9;
-      --series-unknown: #e66767;
+      --series-north:    #4f83f1;
+      --series-doyle:    #f0c33a;
+      --series-quantum:  #2fbf63;
+      --series-one:      #ef4444;
+      --series-sanders:  #9767f0;
+      --series-elvstrom: #fb7f36;
+      --series-unknown:  #e7e5e4;
+      --series-other:    #9a999a;
+      --series-partial:  #22b6a6;
+      --series-unknown-text: #1c1917;
     }
   }
   * { box-sizing: border-box; }
@@ -180,6 +184,7 @@
     <a class="nav-item" href="#/regattas" data-route="#/regattas">Regattas</a>
     <a class="nav-item" href="#/market-share" data-route="#/market-share">Market share</a>
     <a class="nav-item" href="#/sales" data-route="#/sales">Sales opportunities</a>
+    <a class="nav-item" href="#/duplicates" data-route="#/duplicates">Duplicates<span class="nav-badge" id="duplicates-badge" style="display:none;"></span></a>
     <a class="nav-item" href="#/changes" data-route="#/changes">Pending changes<span class="nav-badge" id="pending-badge" style="display:none;"></span></a>
   </nav>
   <main class="main" id="main"></main>
@@ -189,11 +194,15 @@
 const DATA = JSON.parse(document.getElementById('data-json').textContent);
 
 // ---------- sailmaker bucketing / colors ----------
-const BUCKET_ORDER = ['North Sails','Doyle','One','Sanders','Quantum','Other','Partial','Unknown'];
+const BUCKET_ORDER = ['North Sails','Doyle','Quantum','One','Sanders','Elvstrom','Other','Partial','Unknown'];
 const BUCKET_COLOR = {
   'North Sails':'var(--series-north)', 'Doyle':'var(--series-doyle)', 'One':'var(--series-one)',
-  'Sanders':'var(--series-sanders)', 'Quantum':'var(--series-quantum)', 'Other':'var(--series-other)',
-  'Partial':'var(--series-partial)', 'Unknown':'var(--series-unknown)'
+  'Sanders':'var(--series-sanders)', 'Quantum':'var(--series-quantum)', 'Elvstrom':'var(--series-elvstrom)',
+  'Other':'var(--series-other)', 'Partial':'var(--series-partial)', 'Unknown':'var(--series-unknown)'
+};
+const BUCKET_TEXT = {
+  'North Sails':'#fff', 'Doyle':'#292524', 'One':'#fff', 'Sanders':'#fff', 'Quantum':'#fff',
+  'Elvstrom':'#fff', 'Other':'#fff', 'Partial':'#fff', 'Unknown':'var(--series-unknown-text)'
 };
 function bucketOf(name) {
   if (!name) return 'Unknown';
@@ -201,6 +210,12 @@ function bucketOf(name) {
   if (name === 'Unknown') return 'Unknown';
   if (name === 'Partial') return 'Partial';
   return 'Other';
+}
+// inline style string for a sailmaker pill, incl. a border on the (near-white) Unknown pill so it stays visible
+function pillStyle(name) {
+  const b = bucketOf(name);
+  const border = b === 'Unknown' ? `border:1px solid var(--border);` : '';
+  return `background:${BUCKET_COLOR[b]};color:${BUCKET_TEXT[b]};${border}`;
 }
 function esc(s) { return (s===null||s===undefined) ? '' : String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 function fmtDate(iso) { return iso ? iso.slice(0,10) : ''; }
@@ -240,16 +255,20 @@ function setPendingEdit(boatId, patch) {
 function clearPendingEdit(boatId) { delete PENDING[boatId]; savePendingEdits(); updatePendingBadge(); }
 function clearAllPendingEdits() { PENDING = {}; savePendingEdits(); updatePendingBadge(); }
 function updatePendingBadge() {
-  const n = Object.keys(PENDING).length;
+  const n = Object.keys(PENDING).length + PENDING_MERGES.length;
   const badge = document.getElementById('pending-badge');
-  if (!badge) return;
-  badge.style.display = n ? '' : 'none';
-  badge.textContent = n;
+  if (badge) { badge.style.display = n ? '' : 'none'; badge.textContent = n; }
+  const dupBadge = document.getElementById('duplicates-badge');
+  if (dupBadge) {
+    const dn = findDuplicateGroups().length;
+    dupBadge.style.display = dn ? '' : 'none';
+    dupBadge.textContent = dn;
+  }
 }
+const csvEsc = v => { v = (v==null?'':String(v)); return /[",\n]/.test(v) ? '"'+v.replace(/"/g,'""')+'"' : v; };
 function pendingEditsToCSV() {
   const cols = ['SailNo', 'BoatName', 'NewSailmaker', 'NewOwner', 'NewTCC', 'Notes'];
   const lines = [cols.join(',')];
-  const csvEsc = v => { v = (v==null?'':String(v)); return /[",\n]/.test(v) ? '"'+v.replace(/"/g,'""')+'"' : v; };
   Object.keys(PENDING).forEach(boatId => {
     const b = boatsById[boatId];
     const p = PENDING[boatId];
@@ -260,6 +279,78 @@ function pendingEditsToCSV() {
     ].join(','));
   });
   return lines.join('\n') + '\n';
+}
+
+// ---------- pending boat merges (duplicate / rename cleanup) ----------
+const MERGES_KEY = 'marketshare_pending_merges_v1';
+function loadPendingMerges() {
+  try { return JSON.parse(localStorage.getItem(MERGES_KEY) || '[]'); }
+  catch (e) { return []; }
+}
+let PENDING_MERGES = loadPendingMerges();
+function savePendingMerges() { localStorage.setItem(MERGES_KEY, JSON.stringify(PENDING_MERGES)); }
+function addPendingMerge(keepId, mergeId, notes) {
+  PENDING_MERGES = PENDING_MERGES.filter(m => m.mergeId !== mergeId); // one pending merge per boat
+  PENDING_MERGES.push({ keepId, mergeId, notes: notes||'' });
+  savePendingMerges();
+  updatePendingBadge();
+}
+function removePendingMerge(mergeId) {
+  PENDING_MERGES = PENDING_MERGES.filter(m => m.mergeId !== mergeId);
+  savePendingMerges();
+  updatePendingBadge();
+}
+function isPendingMergeAway(boatId) { return PENDING_MERGES.some(m => String(m.mergeId) === String(boatId)); }
+function pendingMergesToCSV() {
+  const lines = ['KeepSailNo,MergeSailNo,Notes'];
+  PENDING_MERGES.forEach(m => {
+    const keep = boatsById[m.keepId], merge = boatsById[m.mergeId];
+    if (!keep || !merge) return;
+    lines.push([csvEsc(keep.sail_no), csvEsc(merge.sail_no), csvEsc(m.notes)].join(','));
+  });
+  return lines.join('\n') + '\n';
+}
+
+// ---------- duplicate-boat detection ----------
+// Heuristics only - always a human call before merging. Two signals:
+//  1. identical (normalized) boat name across 2+ boat records
+//  2. sail numbers that differ only by a trailing IRC endorsement letter
+//     (e.g. GBR9091R vs GBR9091 - the exact pattern that prompted this feature)
+function sailNoBase(s) { return (s||'').replace(/[A-Z]$/, ''); }
+function findDuplicateGroups() {
+  const byName = {};
+  const byBase = {};
+  DATA.boats.forEach(b => {
+    const nameKey = (b.boat_name||'').trim().toUpperCase();
+    if (nameKey) (byName[nameKey] ||= []).push(b);
+    const base = sailNoBase(b.sail_no);
+    if (base) (byBase[base] ||= []).push(b);
+  });
+  const groups = [];
+  const seen = new Set();
+  Object.entries(byName).forEach(([key, boats]) => {
+    if (boats.length < 2) return;
+    const ids = boats.map(b=>b.id).sort().join(',');
+    if (seen.has(ids)) return;
+    seen.add(ids);
+    groups.push({ key: 'name:'+key, reason: `Same boat name ("${boats[0].boat_name}")`, boats });
+  });
+  Object.entries(byBase).forEach(([base, boats]) => {
+    const distinctSailNos = new Set(boats.map(b=>b.sail_no));
+    if (distinctSailNos.size < 2) return;
+    const ids = boats.map(b=>b.id).sort().join(',');
+    if (seen.has(ids)) return;
+    seen.add(ids);
+    groups.push({ key: 'sailno:'+base, reason: `Sail numbers differ only by a trailing letter (${Array.from(distinctSailNos).join(' / ')})`, boats });
+  });
+  const dismissed = loadDismissedDupes();
+  return groups.filter(g => !dismissed.includes(g.key) && !g.boats.some(b => isPendingMergeAway(b.id)));
+}
+const DISMISSED_DUP_KEY = 'marketshare_dismissed_dupes_v1';
+function loadDismissedDupes() { try { return JSON.parse(localStorage.getItem(DISMISSED_DUP_KEY)||'[]'); } catch(e){ return []; } }
+function dismissDuplicateGroup(key) {
+  const d = loadDismissedDupes();
+  if (!d.includes(key)) { d.push(key); localStorage.setItem(DISMISSED_DUP_KEY, JSON.stringify(d)); }
 }
 
 // ---------- tiny SVG chart helpers ----------
@@ -319,6 +410,7 @@ function navigate() {
     else if (route === 'race') main.innerHTML = renderRacePage(parseInt(arg));
     else if (route === 'market-share') main.innerHTML = renderMarketShare();
     else if (route === 'sales') main.innerHTML = renderSales();
+    else if (route === 'duplicates') main.innerHTML = renderDuplicates();
     else if (route === 'changes') main.innerHTML = renderPendingChanges();
     else main.innerHTML = renderOverview();
   } catch (err) {
@@ -328,6 +420,7 @@ function navigate() {
   attachBoatFilterHandlers();
   attachBoatEditHandlers();
   attachPendingChangesHandlers();
+  attachDuplicatesHandlers();
   updatePendingBadge();
   window.scrollTo(0,0);
 }
@@ -442,7 +535,7 @@ function renderBoatsList() {
       <td>${esc(b.boat_type||'')}</td>
       <td class="num">${b.tcc||''}</td>
       <td>${esc(b.owner_name||'')}</td>
-      <td><span class="pill" style="background:${BUCKET_COLOR[bucket]}">${esc(b.current_sailmaker||'Unknown')}</span></td>
+      <td><span class="pill" style="${pillStyle(b.current_sailmaker)}">${esc(b.current_sailmaker||'Unknown')}</span></td>
       <td>${esc(b.tag||'')}</td>
       <td class="num">${b.entries.length}</td>
     </tr>`;
@@ -509,14 +602,14 @@ function renderBoatProfile(id) {
   `).join('') || `<tr><td colspan="3" class="muted">No sailmaker history recorded.</td></tr>`;
 
   const entryRows = b.entries.map(e => {
-    const result = e.position ? `${e.position}${e.corrected_time ? ' · '+e.corrected_time : ''}` : (e.status || '—');
+    const result = e.position || (e.status || '—');
     return `<tr class="clickable" data-route="#/race/${e.race_id}">
       <td>${esc(e.regatta_name)}</td>
       <td class="num">${e.season_year||''}</td>
       <td>${esc(e.race_name||'')}</td>
       <td>${esc(e.class||'')}</td>
       <td>${esc(result)}</td>
-      <td>${e.sailmaker_name ? `<span class="pill" style="background:${BUCKET_COLOR[bucketOf(e.sailmaker_name)]}">${esc(e.sailmaker_name)}</span>` : ''}</td>
+      <td>${e.sailmaker_name ? `<span class="pill" style="${pillStyle(e.sailmaker_name)}">${esc(e.sailmaker_name)}</span>` : ''}</td>
       <td class="muted" style="font-size:12px;">${esc(e.source)}</td>
     </tr>`;
   }).join('') || `<tr><td colspan="7" class="muted">No race entries on file.</td></tr>`;
@@ -535,6 +628,13 @@ function renderBoatProfile(id) {
     <div class="banner">
       <span>This boat has unsaved edits (${Object.keys(pending).filter(k=>k!=='notes').join(', ')||'notes'}) — not yet written to the database. See <a href="#/changes" data-route="#/changes">Pending changes</a> to export them.</span>
       <button class="btn secondary" type="button" data-discard-edit="${b.id}">Discard</button>
+    </div>` : '';
+
+  const pendingMerge = PENDING_MERGES.find(m => String(m.mergeId) === String(b.id));
+  const mergeBanner = pendingMerge ? `
+    <div class="banner">
+      <span>This boat is marked to be merged into <a href="#/boat/${pendingMerge.keepId}" data-route="#/boat/${pendingMerge.keepId}">${esc((boatsById[pendingMerge.keepId]||{}).boat_name||'another boat')}</a> and removed once applied.</span>
+      <button class="btn secondary" type="button" data-discard-merge="${b.id}">Discard</button>
     </div>` : '';
 
   const sailmakerOptions = DATA.sailmakers.map(s => s.name)
@@ -566,11 +666,28 @@ function renderBoatProfile(id) {
       </div>
     </div>`;
 
+  const mergeForm = pendingMerge ? '' : `
+    <div class="card">
+      <h2>Merge with another boat</h2>
+      <p class="muted" style="font-size:12px;margin-top:0;">Same boat under a different sail number, or renamed/re-registered? Pick the other record — all its race history moves onto whichever one you keep.</p>
+      <div class="field">
+        <label class="field-label">Other boat</label>
+        <input type="text" id="merge-target-search" list="all-boats-list" placeholder="Search by name or sail no…">
+        <datalist id="all-boats-list">${DATA.boats.filter(x=>x.id!==b.id).map(x=>`<option value="${esc(x.boat_name||x.sail_no)} (${esc(x.sail_no)})">`).join('')}</datalist>
+      </div>
+      <div class="mode-row" style="margin:2px 0 12px;">
+        <label><input type="radio" name="merge-direction" value="keep-this" checked> Keep THIS boat, merge the other one in</label>
+        <label><input type="radio" name="merge-direction" value="keep-other"> Keep the OTHER boat, merge this one in</label>
+      </div>
+      <button class="btn" type="button" id="mark-merge-btn" data-boat-id="${b.id}">Mark for merge</button>
+    </div>`;
+
   return `
     <a class="back-link" href="#/boats" data-route="#/boats">← All boats</a>
-    <h1>${esc(b.boat_name||'Unnamed boat')} <span class="pill" style="background:${BUCKET_COLOR[bucket]}">${esc(b.current_sailmaker||'Unknown')}</span>${pending?'<span class="edited-flag">Edited</span>':''}</h1>
+    <h1>${esc(b.boat_name||'Unnamed boat')} <span class="pill" style="${pillStyle(b.current_sailmaker)}">${esc(b.current_sailmaker||'Unknown')}</span>${pending?'<span class="edited-flag">Edited</span>':''}</h1>
     <p class="subtitle">${esc(b.sail_no||'')} · ${esc(b.boat_type||'')}${b.tcc ? ' · TCC '+b.tcc : ''}</p>
     ${pendingBanner}
+    ${mergeBanner}
     <div class="card-row">
       <div class="card">
         <h2>Owner &amp; boat</h2>
@@ -587,6 +704,7 @@ function renderBoatProfile(id) {
       </div>
     </div>
     ${editForm}
+    ${mergeForm}
     <div class="card">
       <h2>Sailmaker history</h2>
       <table><thead><tr><th>Sailmaker</th><th>Source</th><th>Confidence</th></tr></thead><tbody>${smHistoryRows}</tbody></table>
@@ -594,7 +712,7 @@ function renderBoatProfile(id) {
     <div class="card" style="padding:0;overflow:auto;">
       <h2 style="padding:18px 20px 0;">Race entries (${b.entries.length})</h2>
       <table>
-        <thead><tr><th>Regatta</th><th>Year</th><th>Race</th><th>Class</th><th>Result</th><th>Sailmaker (that race)</th><th>Source</th></tr></thead>
+        <thead><tr><th>Regatta</th><th>Year</th><th>Race</th><th>Class</th><th>Placing</th><th>Sailmaker (that race)</th><th>Source</th></tr></thead>
         <tbody>${entryRows}</tbody>
       </table>
     </div>
@@ -611,6 +729,22 @@ function attachBoatEditHandlers() {
       const tcc = document.getElementById('edit-tcc').value.trim();
       const notes = document.getElementById('edit-notes').value.trim();
       setPendingEdit(boatId, { sailmaker, owner, tcc, notes });
+      navigate();
+    });
+  }
+  const mergeBtn = document.getElementById('mark-merge-btn');
+  if (mergeBtn) {
+    mergeBtn.addEventListener('click', () => {
+      const thisId = parseInt(mergeBtn.dataset.boatId);
+      const searchVal = document.getElementById('merge-target-search').value.trim();
+      const m = searchVal.match(/\(([^)]+)\)\s*$/);
+      const sailNo = m ? m[1] : searchVal;
+      const other = DATA.boats.find(x => x.sail_no === sailNo)
+        || DATA.boats.find(x => (x.boat_name||'').toLowerCase() === searchVal.toLowerCase());
+      if (!other) { alert('Could not find that boat — pick one from the suggestions list.'); return; }
+      const direction = document.querySelector('input[name=merge-direction]:checked').value;
+      if (direction === 'keep-this') addPendingMerge(thisId, other.id, 'Merged from boat profile');
+      else addPendingMerge(other.id, thisId, 'Merged from boat profile');
       navigate();
     });
   }
@@ -638,12 +772,23 @@ function renderPendingChanges() {
 
   const csv = pendingEditsToCSV();
 
+  const mergeRows = PENDING_MERGES.map(m => {
+    const keep = boatsById[m.keepId], merge = boatsById[m.mergeId];
+    if (!keep || !merge) return '';
+    return `<tr>
+      <td><a href="#/boat/${keep.id}" data-route="#/boat/${keep.id}">${esc(keep.boat_name||keep.sail_no)}</a> (${esc(keep.sail_no)})</td>
+      <td>${esc(merge.boat_name||merge.sail_no)} (${esc(merge.sail_no)}) <span class="muted">— will be removed, history moved to the keeper</span></td>
+      <td>${esc(m.notes||'')}</td>
+      <td><button class="btn secondary" type="button" data-discard-merge="${merge.id}">Discard</button></td>
+    </tr>`;
+  }).join('');
+  const mergesCsv = pendingMergesToCSV();
+
   return `
     <h1>Pending changes</h1>
-    <p class="subtitle">${ids.length} boat(s) with unsaved edits, held in this browser only. Export them below and run
-      <code>python3 scripts/apply_boat_updates.py db/marketshare.db changes.csv</code> to write them into the database,
-      then rebuild the dashboard.</p>
+    <p class="subtitle">${ids.length} boat(s) with unsaved edits, ${PENDING_MERGES.length} pending merge(s), held in this browser only.</p>
     <div class="card" style="padding:0;overflow:auto;">
+      <h2 style="padding:18px 20px 0;">Field edits</h2>
       <table>
         <thead><tr><th>Boat</th><th>Sail No</th><th>Changes</th><th>Notes</th><th></th></tr></thead>
         <tbody>${rows || '<tr><td colspan="5" class="muted">No pending edits. Edit a sailmaker, owner or TCC from any boat profile to see it here.</td></tr>'}</tbody>
@@ -651,7 +796,8 @@ function renderPendingChanges() {
     </div>
     ${ids.length ? `
     <div class="card">
-      <h2>Export as CSV</h2>
+      <h2>Export field edits as CSV</h2>
+      <p class="muted" style="font-size:12px;margin:0 0 10px;">Run <code>python3 scripts/apply_boat_updates.py db/marketshare.db changes.csv</code> to apply, then rebuild the dashboard.</p>
       <div class="btn-row">
         <button class="btn" type="button" id="copy-csv-btn">Copy CSV to clipboard</button>
         <button class="btn secondary" type="button" id="download-csv-btn">Download changes.csv</button>
@@ -660,6 +806,24 @@ function renderPendingChanges() {
       <p class="muted" style="font-size:12px;margin:10px 0 6px;">If the download button doesn't do anything (e.g. viewing this in a sandboxed preview), copy the text below instead:</p>
       <textarea class="csv-box" id="csv-box" readonly>${esc(csv)}</textarea>
     </div>` : ''}
+    <div class="card" style="padding:0;overflow:auto;">
+      <h2 style="padding:18px 20px 0;">Boat merges</h2>
+      <table>
+        <thead><tr><th>Keep</th><th>Merge away</th><th>Notes</th><th></th></tr></thead>
+        <tbody>${mergeRows || '<tr><td colspan="4" class="muted">No pending merges. See <a href="#/duplicates" data-route="#/duplicates">Duplicates</a>, or use the Merge with another boat section on a boat profile.</td></tr>'}</tbody>
+      </table>
+    </div>
+    ${PENDING_MERGES.length ? `
+    <div class="card">
+      <h2>Export merges as CSV</h2>
+      <p class="muted" style="font-size:12px;margin:0 0 10px;">Run <code>python3 scripts/merge_boats.py db/marketshare.db merges.csv</code> to apply, then rebuild the dashboard.</p>
+      <div class="btn-row">
+        <button class="btn" type="button" id="copy-merges-csv-btn">Copy CSV to clipboard</button>
+        <button class="btn secondary" type="button" id="download-merges-csv-btn">Download merges.csv</button>
+        <button class="btn danger" type="button" id="clear-all-merges-btn">Clear all pending merges</button>
+      </div>
+      <textarea class="csv-box" id="merges-csv-box" readonly>${esc(mergesCsv)}</textarea>
+    </div>` : ''}
   `;
 }
 
@@ -667,21 +831,39 @@ function attachPendingChangesHandlers() {
   document.querySelectorAll('[data-discard-edit]').forEach(btn => {
     btn.addEventListener('click', () => { clearPendingEdit(btn.dataset.discardEdit); navigate(); });
   });
-  const copyBtn = document.getElementById('copy-csv-btn');
+  document.querySelectorAll('[data-discard-merge]').forEach(btn => {
+    btn.addEventListener('click', () => { removePendingMerge(btn.dataset.discardMerge); navigate(); });
+  });
+  wireCsvExportButtons('copy-csv-btn', 'download-csv-btn', 'csv-box', 'changes.csv', pendingEditsToCSV);
+  wireCsvExportButtons('copy-merges-csv-btn', 'download-merges-csv-btn', 'merges-csv-box', 'merges.csv', pendingMergesToCSV);
+  const clearAllBtn = document.getElementById('clear-all-btn');
+  if (clearAllBtn) clearAllBtn.addEventListener('click', () => {
+    if (confirm('Discard all pending edits? This cannot be undone.')) { clearAllPendingEdits(); navigate(); }
+  });
+  const clearAllMergesBtn = document.getElementById('clear-all-merges-btn');
+  if (clearAllMergesBtn) clearAllMergesBtn.addEventListener('click', () => {
+    if (confirm('Discard all pending merges? This cannot be undone.')) { PENDING_MERGES = []; savePendingMerges(); updatePendingBadge(); navigate(); }
+  });
+}
+
+// Copy-to-clipboard + Artifact-downloads-capability (with <a download> fallback)
+// wiring shared by the field-edits and boat-merges CSV exports.
+function wireCsvExportButtons(copyId, dlId, boxId, filename, toCsv) {
+  const copyBtn = document.getElementById(copyId);
   if (copyBtn) copyBtn.addEventListener('click', async () => {
-    const text = pendingEditsToCSV();
     try {
-      await navigator.clipboard.writeText(text);
+      await navigator.clipboard.writeText(toCsv());
+      const original = copyBtn.textContent;
       copyBtn.textContent = 'Copied ✓';
-      setTimeout(() => { copyBtn.textContent = 'Copy CSV to clipboard'; }, 1800);
+      setTimeout(() => { copyBtn.textContent = original; }, 1800);
     } catch (e) {
-      const box = document.getElementById('csv-box');
+      const box = document.getElementById(boxId);
       if (box) { box.focus(); box.select(); }
     }
   });
-  const dlBtn = document.getElementById('download-csv-btn');
+  const dlBtn = document.getElementById(dlId);
   if (dlBtn) dlBtn.addEventListener('click', async () => {
-    const text = pendingEditsToCSV();
+    const text = toCsv();
     // Prefer the Artifact "downloads" capability (a real save-file prompt);
     // fall back to a plain <a download> for when this file is opened directly
     // in a browser (not through the sandboxed Artifact viewer, which has
@@ -690,26 +872,71 @@ function attachPendingChangesHandlers() {
     try { downloads = window.claude ? await window.claude.use('downloads') : null; } catch (e) {}
     if (downloads) {
       try {
-        await downloads.save({ filename: 'changes.csv', data: text });
+        await downloads.save({ filename, data: text });
+        const original = dlBtn.textContent;
         dlBtn.textContent = 'Saved ✓';
-        setTimeout(() => { dlBtn.textContent = 'Download changes.csv'; }, 1800);
+        setTimeout(() => { dlBtn.textContent = original; }, 1800);
       } catch (err) {
         console.error('downloads.save failed', err);
-        const box = document.getElementById('csv-box');
+        const box = document.getElementById(boxId);
         if (box) { box.focus(); box.select(); }
       }
       return;
     }
     const a = document.createElement('a');
     a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(text);
-    a.download = 'changes.csv';
+    a.download = filename;
     document.body.appendChild(a);
     a.click();
     a.remove();
   });
-  const clearAllBtn = document.getElementById('clear-all-btn');
-  if (clearAllBtn) clearAllBtn.addEventListener('click', () => {
-    if (confirm('Discard all pending edits? This cannot be undone.')) { clearAllPendingEdits(); navigate(); }
+}
+
+// ---------- page: duplicates ----------
+function renderDuplicates() {
+  const groups = findDuplicateGroups();
+  const groupHtml = groups.map(g => {
+    const boatOptions = g.boats.map(b => `
+      <label style="display:flex;align-items:center;gap:8px;padding:6px 0;">
+        <input type="radio" name="keep-${esc(g.key)}" value="${b.id}" ${b===g.boats[0]?'checked':''}>
+        <span><strong>${esc(b.boat_name||'—')}</strong> · ${esc(b.sail_no||'')} · ${esc(b.boat_type||'')} · ${b.entries.length} entries · owner: ${esc(b.owner_name||'—')}</span>
+      </label>`).join('');
+    return `
+    <div class="card">
+      <h2 style="margin-bottom:4px;">${g.boats.map(b=>esc(b.boat_name||b.sail_no)).join(' / ')}</h2>
+      <p class="muted" style="font-size:13px;margin-top:0;">${esc(g.reason)}</p>
+      <p style="font-size:13px;margin:10px 0 4px;">Pick which record to keep — the other(s) will be merged into it and removed, with all race history moved over:</p>
+      ${boatOptions}
+      <div class="btn-row">
+        <button class="btn" type="button" data-merge-group="${esc(g.key)}">Merge into selected</button>
+        <button class="btn secondary" type="button" data-dismiss-group="${esc(g.key)}">Not a duplicate — dismiss</button>
+      </div>
+    </div>`;
+  }).join('');
+
+  return `
+    <h1>Possible duplicate boats</h1>
+    <p class="subtitle">${groups.length} candidate group(s), found by matching identical boat names or sail numbers that
+      differ only by a trailing IRC endorsement letter (e.g. GBR9091R vs GBR9091). Always a human call — dismiss
+      anything that isn't really a duplicate.</p>
+    ${groupHtml || `<div class="card muted">No candidates found right now.</div>`}
+  `;
+}
+
+function attachDuplicatesHandlers() {
+  document.querySelectorAll('[data-merge-group]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const key = btn.dataset.mergeGroup;
+      const radios = document.querySelectorAll(`input[name="keep-${CSS.escape(key)}"]`);
+      const checked = Array.from(radios).find(r => r.checked);
+      if (!checked) return;
+      const keepId = parseInt(checked.value);
+      radios.forEach(r => { const id = parseInt(r.value); if (id !== keepId) addPendingMerge(keepId, id, 'From Duplicates page: ' + key); });
+      location.hash = '#/changes';
+    });
+  });
+  document.querySelectorAll('[data-dismiss-group]').forEach(btn => {
+    btn.addEventListener('click', () => { dismissDuplicateGroup(btn.dataset.dismissGroup); navigate(); });
   });
 }
 
@@ -738,8 +965,6 @@ function renderRegattasList() {
 function renderRegattaProfile(id) {
   const r = regattasById[id];
   if (!r) return `<div class="card">Regatta not found.</div>`;
-  const trends = DATA.entry_trends.filter(t => t.regatta_id === id).sort((a,b)=>a.season_year-b.season_year);
-  const pts = trends.map(t => ({x:t.season_year, y:t.total}));
   const evs = DATA.events.filter(e => e.regatta_id === id).sort((a,b)=>b.season_year-a.season_year);
   const raceRows = DATA.races.filter(ra => evs.some(e=>e.id===ra.event_id)).map(ra => {
     const ev = eventsById[ra.event_id];
@@ -752,9 +977,12 @@ function renderRegattaProfile(id) {
   // boat-level race_entries.class where we have it.
   const evIds = new Set(evs.map(e => e.id));
   const aggByClass = {};
+  const aggByClassYear = {}; // class -> { year: count }
   DATA.class_counts.forEach(c => {
     if (!evIds.has(c.event_id) || c.class_label.toLowerCase() === 'total') return;
     aggByClass[c.class_label] = (aggByClass[c.class_label] || 0) + (c.entry_count || 0);
+    const year = eventsById[c.event_id].season_year;
+    (aggByClassYear[c.class_label] ||= {})[year] = c.entry_count;
   });
   const boatLevelByClass = {};
   DATA.boats.forEach(b => b.entries.forEach(e => {
@@ -770,14 +998,23 @@ function renderRegattaProfile(id) {
       <td class="num">${boatLevelByClass[cls] ? boatLevelByClass[cls].size : '—'}</td>
     </tr>`).join('');
 
+  // class sizes over time: a Season x Class matrix from the aggregate counts
+  const allYears = Array.from(new Set(Object.values(aggByClassYear).flatMap(o => Object.keys(o).map(Number)))).sort((a,b)=>a-b);
+  const classesWithYearData = Object.keys(aggByClassYear).sort();
+  const classTrendTable = classesWithYearData.length && allYears.length ? `
+    <div class="card" style="padding:0;overflow:auto;">
+      <h2 style="padding:18px 20px 0;">Class sizes over time</h2>
+      <table>
+        <thead><tr><th>Season</th>${classesWithYearData.map(c=>`<th class="num">${esc(c)}</th>`).join('')}</tr></thead>
+        <tbody>${allYears.map(y => `<tr><td>${y}</td>${classesWithYearData.map(c => `<td class="num">${aggByClassYear[c][y] != null ? aggByClassYear[c][y] : '—'}</td>`).join('')}</tr>`).join('')}</tbody>
+      </table>
+    </div>` : '';
+
   return `
     <a class="back-link" href="#/regattas" data-route="#/regattas">← All regattas</a>
     <h1>${esc(r.name)}</h1>
     <p class="subtitle">${esc(r.category||'')} · ${esc(r.region||'')}</p>
-    <div class="card">
-      <h2>Entries over time</h2>
-      ${pts.length ? sparkline(pts) : '<p class="muted">No aggregate historical counts on file for this regatta.</p>'}
-    </div>
+    ${classTrendTable}
     ${classRows ? `<div class="card" style="padding:0;overflow:auto;">
       <h2 style="padding:18px 20px 0;">Breakdown by class</h2>
       <table>
@@ -809,7 +1046,7 @@ function renderRacePage(raceId) {
       <td>${esc(e.class||'')}</td>
       <td class="num">${e.tcc!=null ? e.tcc : (e.boat.tcc||'')}</td>
       <td>${esc(e.owner_name_used||e.boat.owner_name||'')}</td>
-      <td>${e.sailmaker_name ? `<span class="pill" style="background:${BUCKET_COLOR[bucketOf(e.sailmaker_name)]}">${esc(e.sailmaker_name)}</span>` : ''}</td>
+      <td>${e.sailmaker_name ? `<span class="pill" style="${pillStyle(e.sailmaker_name)}">${esc(e.sailmaker_name)}</span>` : ''}</td>
       <td>${esc(e.corrected_time||e.status||'')}</td>
       <td class="num">${e.points!=null ? e.points : ''}</td>
     </tr>`).join('');
@@ -863,7 +1100,7 @@ function renderSales() {
     <tr class="clickable" data-route="#/boat/${b.id}">
       <td>${esc(b.boat_name)}</td>
       <td>${esc(b.owner_name||'')}</td>
-      <td><span class="pill" style="background:${BUCKET_COLOR[bucketOf(b.current_sailmaker)]}">${esc(b.current_sailmaker||'Unknown')}</span></td>
+      <td><span class="pill" style="${pillStyle(b.current_sailmaker)}">${esc(b.current_sailmaker||'Unknown')}</span></td>
       <td>${esc(b.lead_rep||'')}</td>
       <td>${esc(b.contacted_by||'')}</td>
       <td class="${b.in_cs ? '' : 'tag-flag'}">${b.in_cs===1?'Yes':(b.in_cs===0?'No':'—')}</td>
