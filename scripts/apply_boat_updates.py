@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 """
-Apply boat-level edits (sailmaker / owner / IRC TCC) made in the dashboard
-back into the database. The dashboard can't write to the DB itself (it's a
-static file) - instead it lets you make edits in the browser, then export
-them as a CSV in this shape:
+Apply boat-level edits (sailmaker / owner / IRC TCC / lead rep / contacted by)
+made in the dashboard back into the database. The dashboard can't write to
+the DB itself (it's a static file) - instead it lets you make edits in the
+browser, then export them as a CSV in this shape:
 
-    SailNo,BoatName,NewSailmaker,NewOwner,NewTCC,Notes
+    SailNo,BoatName,NewSailmaker,NewOwner,NewTCC,NewLeadRep,NewContactedBy,Notes
 
-Any of NewSailmaker/NewOwner/NewTCC may be blank (= no change to that field).
-One row per boat. Matched by SailNo.
+Any of the New* columns may be blank (= no change to that field). One row
+per boat. Matched by SailNo.
 
 Usage:
   python3 apply_boat_updates.py <db.sqlite> <changes.csv>
@@ -40,7 +40,7 @@ def main():
         lines = [l for l in f if not l.startswith("#")]
     reader = csv.DictReader(lines)
 
-    n_sailmaker = n_owner = n_tcc = 0
+    n_sailmaker = n_owner = n_tcc = n_crm = 0
     skipped = []
 
     for row in reader:
@@ -85,9 +85,26 @@ def main():
             except ValueError:
                 print(f"  Skipping bad TCC value for {sail_no}: {new_tcc!r}")
 
+        new_lead_rep = norm(row.get("NewLeadRep"))
+        new_contacted_by = norm(row.get("NewContactedBy"))
+        if new_lead_rep or new_contacted_by:
+            cur.execute("SELECT boat_id FROM boat_crm WHERE boat_id = ?", (boat_id,))
+            if cur.fetchone():
+                if new_lead_rep:
+                    cur.execute("UPDATE boat_crm SET lead_rep = ?, last_updated = ? WHERE boat_id = ?",
+                                (new_lead_rep, datetime.datetime.now().isoformat(), boat_id))
+                if new_contacted_by:
+                    cur.execute("UPDATE boat_crm SET contacted_by = ?, last_updated = ? WHERE boat_id = ?",
+                                (new_contacted_by, datetime.datetime.now().isoformat(), boat_id))
+            else:
+                cur.execute(
+                    "INSERT INTO boat_crm (boat_id, lead_rep, contacted_by) VALUES (?, ?, ?)",
+                    (boat_id, new_lead_rep, new_contacted_by))
+            n_crm += 1
+
     conn.commit()
     print(f"Applied: {n_sailmaker} sailmaker change(s), {n_owner} owner change(s), "
-          f"{n_tcc} TCC change(s).")
+          f"{n_tcc} TCC change(s), {n_crm} lead-rep/contacted-by change(s).")
     if skipped:
         print(f"Skipped (sail number not found in DB): {', '.join(skipped)}")
     conn.close()

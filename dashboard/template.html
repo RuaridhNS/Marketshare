@@ -173,6 +173,28 @@
     background: var(--gridline); border-radius: 8px; padding: 10px 14px; font-size: 13px; margin-bottom: 16px;
     display:flex; align-items:center; justify-content:space-between; gap: 10px; flex-wrap: wrap;
   }
+  th.clickable-axis, td.clickable-axis {
+    cursor: pointer; text-decoration: underline dotted; text-underline-offset: 3px;
+  }
+  th.clickable-axis:hover, td.clickable-axis:hover { color: var(--series-north); }
+  /* <dialog> centers itself via a top/right/bottom/left inset trick in the UA
+     stylesheet that author CSS can't cleanly override once showModal() promotes
+     it to the top layer - so instead the dialog itself is a transparent,
+     full-viewport flex container, and .modal-box (inside it) is the actual
+     visible, centered card. */
+  dialog#chart-modal[open] {
+    display: flex; align-items: center; justify-content: center;
+    width: 100vw; height: 100vh; max-width: 100vw; max-height: 100vh;
+    margin: 0; padding: 0; border: none; background: transparent;
+  }
+  dialog#chart-modal::backdrop { background: rgba(0,0,0,0.5); }
+  dialog#chart-modal .modal-box {
+    border: 1px solid var(--border); border-radius: 12px; padding: 20px 24px 24px;
+    background: var(--surface-1); color: var(--text-primary); box-shadow: var(--card-shadow);
+    width: min(640px, 92vw); max-width: 92vw;
+  }
+  dialog#chart-modal .modal-head { display:flex; align-items:center; justify-content:space-between; gap: 16px; margin-bottom: 16px; }
+  dialog#chart-modal .modal-head h2 { margin: 0; }
 </style>
 </head>
 <body>
@@ -188,6 +210,15 @@
     <a class="nav-item" href="#/changes" data-route="#/changes">Pending changes<span class="nav-badge" id="pending-badge" style="display:none;"></span></a>
   </nav>
   <main class="main" id="main"></main>
+  <dialog id="chart-modal">
+    <div class="modal-box">
+      <div class="modal-head">
+        <h2 id="chart-modal-title"></h2>
+        <button class="btn secondary" type="button" id="chart-modal-close">Close</button>
+      </div>
+      <div id="chart-modal-body"></div>
+    </div>
+  </dialog>
 </div>
 <script id="data-json" type="application/json">/*__DATA_JSON__*/</script>
 <script>
@@ -210,6 +241,24 @@ function bucketOf(name) {
   if (name === 'Unknown') return 'Unknown';
   if (name === 'Partial') return 'Partial';
   return 'Other';
+}
+// Dropdown option list for Lead rep / Contacted by - the union of names
+// already used anywhere in the CRM data, since there's no separate "team
+// members" table. New names can still be typed into a boat's Notes field
+// and added properly on the next data refresh.
+function teamOptions() {
+  const names = new Set();
+  DATA.boats.forEach(b => { if (b.lead_rep) names.add(b.lead_rep); if (b.contacted_by) names.add(b.contacted_by); });
+  return Array.from(names).sort();
+}
+// Bucket counts across every tracked boat (unlike DATA.market_share_boats,
+// which is precomputed server-side and silently drops boats with no
+// sailmaker signal at all instead of bucketing them as "Unknown" - this
+// keeps the Overview/Market-share totals matching the actual boat count).
+function boatBucketCounts() {
+  const counts = {};
+  DATA.boats.forEach(b => { const bucket = bucketOf(b.current_sailmaker); counts[bucket] = (counts[bucket]||0) + 1; });
+  return counts;
 }
 // inline style string for a sailmaker pill, incl. a border on the (near-white) Unknown pill so it stays visible
 function pillStyle(name) {
@@ -267,7 +316,7 @@ function updatePendingBadge() {
 }
 const csvEsc = v => { v = (v==null?'':String(v)); return /[",\n]/.test(v) ? '"'+v.replace(/"/g,'""')+'"' : v; };
 function pendingEditsToCSV() {
-  const cols = ['SailNo', 'BoatName', 'NewSailmaker', 'NewOwner', 'NewTCC', 'Notes'];
+  const cols = ['SailNo', 'BoatName', 'NewSailmaker', 'NewOwner', 'NewTCC', 'NewLeadRep', 'NewContactedBy', 'Notes'];
   const lines = [cols.join(',')];
   Object.keys(PENDING).forEach(boatId => {
     const b = boatsById[boatId];
@@ -275,7 +324,8 @@ function pendingEditsToCSV() {
     if (!b) return;
     lines.push([
       csvEsc(b.sail_no), csvEsc(b.boat_name), csvEsc(p.sailmaker||''),
-      csvEsc(p.owner||''), csvEsc(p.tcc||''), csvEsc(p.notes||''),
+      csvEsc(p.owner||''), csvEsc(p.tcc||''), csvEsc(p.leadRep||''),
+      csvEsc(p.contactedBy||''), csvEsc(p.notes||''),
     ].join(','));
   });
   return lines.join('\n') + '\n';
@@ -317,14 +367,24 @@ function pendingMergesToCSV() {
 //  2. sail numbers that differ only by a trailing IRC endorsement letter
 //     (e.g. GBR9091R vs GBR9091 - the exact pattern that prompted this feature)
 function sailNoBase(s) { return (s||'').replace(/[A-Z]$/, ''); }
+// Boat type strings carry a trailing IRC rating suffix that varies slightly
+// between sources for the very same boat (e.g. "J 109 2.10" vs "J 109 2.08",
+// "SUN FAST 3300 1.95 WB" vs "SUN FAST 3300 1.95") - strip it before comparing
+// so real matches aren't missed, without being so loose it stops meaning
+// anything. Boats with no type at all deliberately DON'T match each other
+// (empty string only equals empty string via the caller's own name/base
+// grouping, not across groups), since "no type recorded" isn't a match signal.
+function normType(t) { return (t||'').toUpperCase().replace(/\s+\d+\.\d+.*$/, '').trim(); }
+
 function findDuplicateGroups() {
   const byName = {};
   const byBase = {};
   DATA.boats.forEach(b => {
     const nameKey = (b.boat_name||'').trim().toUpperCase();
-    if (nameKey) (byName[nameKey] ||= []).push(b);
+    const typeKey = normType(b.boat_type);
+    if (nameKey) (byName[nameKey+'||'+typeKey] ||= []).push(b);
     const base = sailNoBase(b.sail_no);
-    if (base) (byBase[base] ||= []).push(b);
+    if (base) (byBase[base+'||'+typeKey] ||= []).push(b);
   });
   const groups = [];
   const seen = new Set();
@@ -333,15 +393,16 @@ function findDuplicateGroups() {
     const ids = boats.map(b=>b.id).sort().join(',');
     if (seen.has(ids)) return;
     seen.add(ids);
-    groups.push({ key: 'name:'+key, reason: `Same boat name ("${boats[0].boat_name}")`, boats });
+    const typeNote = normType(boats[0].boat_type) ? ` and boat type ("${boats[0].boat_type}")` : '';
+    groups.push({ key: 'name:'+key, reason: `Same boat name ("${boats[0].boat_name}")${typeNote}`, boats });
   });
-  Object.entries(byBase).forEach(([base, boats]) => {
+  Object.entries(byBase).forEach(([key, boats]) => {
     const distinctSailNos = new Set(boats.map(b=>b.sail_no));
     if (distinctSailNos.size < 2) return;
     const ids = boats.map(b=>b.id).sort().join(',');
     if (seen.has(ids)) return;
     seen.add(ids);
-    groups.push({ key: 'sailno:'+base, reason: `Sail numbers differ only by a trailing letter (${Array.from(distinctSailNos).join(' / ')})`, boats });
+    groups.push({ key: 'sailno:'+key, reason: `Sail numbers differ only by a trailing letter (${Array.from(distinctSailNos).join(' / ')}), same boat type`, boats });
   });
   const dismissed = loadDismissedDupes();
   return groups.filter(g => !dismissed.includes(g.key) && !g.boats.some(b => isPendingMergeAway(b.id)));
@@ -421,6 +482,8 @@ function navigate() {
   attachBoatEditHandlers();
   attachPendingChangesHandlers();
   attachDuplicatesHandlers();
+  attachRegattaHandlers();
+  attachSalesHandlers();
   updatePendingBadge();
   window.scrollTo(0,0);
 }
@@ -433,20 +496,23 @@ document.addEventListener('click', e => {
 // ---------- page: overview ----------
 function renderOverview() {
   const s = DATA.stats;
-  const shareBoats = DATA.market_share_boats.map(x => ({sailmaker: x.sailmaker, entries: x.boats, bucket: bucketOf(x.sailmaker)}));
-  // fold into buckets
-  const byBucket = {};
-  shareBoats.forEach(x => { byBucket[x.bucket] = (byBucket[x.bucket]||0) + x.entries; });
+  const byBucket = boatBucketCounts();
   const bucketItems = BUCKET_ORDER.filter(b => byBucket[b]).map(b => ({sailmaker: b, entries: byBucket[b]}));
 
-  // pick the regatta with the most seasons of history for the headline trend
-  const byRegatta = {};
-  DATA.entry_trends.forEach(t => { (byRegatta[t.regatta_name] ||= []).push(t); });
-  let bestRegatta = null, bestLen = 0;
-  Object.entries(byRegatta).forEach(([name, rows]) => { if (rows.length > bestLen) { bestLen = rows.length; bestRegatta = name; } });
-  const trendPts = (byRegatta[bestRegatta]||[]).sort((a,b)=>a.season_year-b.season_year).map(t=>({x:t.season_year,y:t.total}));
+  // distinct boats per season, Solent regattas only, deduped (a boat racing
+  // three times in a season still counts once) - built from boat-level
+  // race_entries, since that's the only source with actual boat identity
+  // (the aggregate historical class-count rows have no boat-level detail).
+  const yearBoats = {};
+  DATA.boats.forEach(b => b.entries.forEach(e => {
+    if (!e.season_year) return;
+    const reg = regattasById[e.regatta_id];
+    if (!reg || reg.region !== 'Solent') return;
+    (yearBoats[e.season_year] ||= new Set()).add(b.id);
+  }));
+  const distinctPts = Object.keys(yearBoats).map(Number).sort((a,b)=>a-b).map(y => ({x:y, y:yearBoats[y].size}));
 
-  const northPct = byBucket['North Sails'] ? Math.round(100*byBucket['North Sails']/shareBoats.reduce((a,x)=>a+x.entries,0)) : 0;
+  const northPct = byBucket['North Sails'] ? Math.round(100*byBucket['North Sails']/s.n_boats) : 0;
 
   return `
     <h1>Overview</h1>
@@ -456,18 +522,18 @@ function renderOverview() {
       <div class="stat-tile"><div class="v">${s.n_entries}</div><div class="l">Boat-level race entries</div></div>
       <div class="stat-tile"><div class="v">${s.n_regattas}</div><div class="l">Regattas / races</div></div>
       <div class="stat-tile"><div class="v">${s.n_class_count_rows}</div><div class="l">Historical class-count records</div></div>
-      <div class="stat-tile"><div class="v">${northPct}%</div><div class="l">Boats on North Sails (known fleet)</div></div>
+      <div class="stat-tile"><div class="v">${northPct}%</div><div class="l">Boats on North Sails</div></div>
     </div>
     <div class="card-row">
       <div class="card">
-        <h2>Sailmaker share — distinct boats (known fleet)</h2>
+        <h2>Sailmaker share — distinct boats</h2>
         ${svgBarChart(bucketItems, {colorFn: it => BUCKET_COLOR[it.sailmaker]})}
-        <p class="muted" style="font-size:12px;margin-top:10px;">Counts each boat once by its most recently observed sailmaker. "Other" groups low-volume brands (One, Elvstrom, Relling, GP, UK...). <a href="#/market-share" data-route="#/market-share">Full breakdown →</a></p>
+        <p class="muted" style="font-size:12px;margin-top:10px;">Every tracked boat, counted once by its most recently observed sailmaker (no signal at all = "Unknown"). "Other" groups low-volume brands (Relling, GP, UK...). <a href="#/market-share" data-route="#/market-share">Full breakdown →</a></p>
       </div>
       <div class="card">
-        <h2>Entries over time — ${esc(bestRegatta||'')}</h2>
-        ${sparkline(trendPts)}
-        <p class="muted" style="font-size:12px;margin-top:6px;">Total entries per season. <a href="#/regattas" data-route="#/regattas">All regattas →</a></p>
+        <h2>Solent IRC entries over time</h2>
+        ${distinctPts.length ? sparkline(distinctPts) : '<p class="muted">No boat-level Solent entries with a season year on file yet.</p>'}
+        <p class="muted" style="font-size:12px;margin-top:6px;">Distinct boats that raced at least once that season — a boat entering multiple races only counts once. <a href="#/boats" data-route="#/boats">All boats →</a></p>
       </div>
     </div>
     <div class="card">
@@ -512,6 +578,9 @@ function attachBoatFilterHandlers() {
       }
       tr.style.display = show ? '' : 'none';
     });
+    const shown = document.querySelectorAll('#boats-tbody tr:not([style*="display: none"])').length;
+    const countEl = document.getElementById('boat-count');
+    if (countEl) countEl.textContent = shown === DATA.boats.length ? `${shown} boats` : `${shown} of ${DATA.boats.length} boats`;
   };
   search.addEventListener('input', apply);
   filter.addEventListener('change', apply);
@@ -522,6 +591,7 @@ function attachBoatFilterHandlers() {
     document.querySelectorAll('.cat-chip, .regatta-box').forEach(el => el.checked = false);
     apply();
   });
+  apply();
 }
 
 function renderBoatsList() {
@@ -557,7 +627,7 @@ function renderBoatsList() {
 
   return `
     <h1>Boats</h1>
-    <p class="subtitle">${DATA.boats.length} boats. The boat is the central record — click into one to see its owner, sailmaker history and every race it's entered.</p>
+    <p class="subtitle"><span id="boat-count">${DATA.boats.length} boats</span>. The boat is the central record — click into one to see its owner, sailmaker history and every race it's entered.</p>
     <div class="search-row">
       <input type="text" id="boat-search" placeholder="Search by name, sail no, owner, type, tag…">
       <select id="boat-filter"><option value="all">All sailmakers</option>${options}</select>
@@ -640,6 +710,9 @@ function renderBoatProfile(id) {
   const sailmakerOptions = DATA.sailmakers.map(s => s.name)
     .concat(BUCKET_ORDER).filter((v,i,a) => a.indexOf(v)===i).sort()
     .map(name => `<option value="${esc(name)}" ${((pending&&pending.sailmaker)||b.current_sailmaker)===name?'selected':''}>${esc(name)}</option>`).join('');
+  const team = teamOptions();
+  const leadRepOptions = team.map(name => `<option value="${esc(name)}" ${((pending&&pending.leadRep)||b.lead_rep)===name?'selected':''}>${esc(name)}</option>`).join('');
+  const contactedByOptions = team.map(name => `<option value="${esc(name)}" ${((pending&&pending.contactedBy)||b.contacted_by)===name?'selected':''}>${esc(name)}</option>`).join('');
 
   const editForm = `
     <div class="card" id="edit-card">
@@ -655,6 +728,14 @@ function renderBoatProfile(id) {
       <div class="field">
         <label class="field-label">TCC (IRC rating)</label>
         <input type="number" step="0.001" id="edit-tcc" placeholder="${b.tcc||''}" value="${esc((pending&&pending.tcc)||'')}">
+      </div>
+      <div class="field">
+        <label class="field-label">Lead rep</label>
+        <select id="edit-lead-rep"><option value="">— no change —</option>${leadRepOptions}</select>
+      </div>
+      <div class="field">
+        <label class="field-label">Contacted by</label>
+        <select id="edit-contacted-by"><option value="">— no change —</option>${contactedByOptions}</select>
       </div>
       <div class="field">
         <label class="field-label">Notes (optional, for whoever applies this change)</label>
@@ -727,8 +808,10 @@ function attachBoatEditHandlers() {
       const sailmaker = document.getElementById('edit-sailmaker').value;
       const owner = document.getElementById('edit-owner').value.trim();
       const tcc = document.getElementById('edit-tcc').value.trim();
+      const leadRep = document.getElementById('edit-lead-rep').value;
+      const contactedBy = document.getElementById('edit-contacted-by').value;
       const notes = document.getElementById('edit-notes').value.trim();
-      setPendingEdit(boatId, { sailmaker, owner, tcc, notes });
+      setPendingEdit(boatId, { sailmaker, owner, tcc, leadRep, contactedBy, notes });
       navigate();
     });
   }
@@ -761,6 +844,8 @@ function renderPendingChanges() {
     if (p.sailmaker) changes.push(`Sailmaker: <strong>${esc(b.current_sailmaker||'—')}</strong> → <strong>${esc(p.sailmaker)}</strong>`);
     if (p.owner) changes.push(`Owner: <strong>${esc(b.owner_name||'—')}</strong> → <strong>${esc(p.owner)}</strong>`);
     if (p.tcc) changes.push(`TCC: <strong>${esc(b.tcc||'—')}</strong> → <strong>${esc(p.tcc)}</strong>`);
+    if (p.leadRep) changes.push(`Lead rep: <strong>${esc(b.lead_rep||'—')}</strong> → <strong>${esc(p.leadRep)}</strong>`);
+    if (p.contactedBy) changes.push(`Contacted by: <strong>${esc(b.contacted_by||'—')}</strong> → <strong>${esc(p.contactedBy)}</strong>`);
     return `<tr>
       <td><a href="#/boat/${b.id}" data-route="#/boat/${b.id}">${esc(b.boat_name||b.sail_no)}</a></td>
       <td>${esc(b.sail_no||'')}</td>
@@ -786,18 +871,23 @@ function renderPendingChanges() {
 
   return `
     <h1>Pending changes</h1>
-    <p class="subtitle">${ids.length} boat(s) with unsaved edits, ${PENDING_MERGES.length} pending merge(s), held in this browser only.</p>
+    <p class="subtitle">${ids.length} boat(s) with unsaved edits, ${PENDING_MERGES.length} pending merge(s), held only in this browser — nothing is written to the database yet.</p>
+    <div class="card" style="border-left: 3px solid var(--series-north);">
+      <h2 style="margin-bottom:8px;">What happens next</h2>
+      <p style="margin:0 0 8px;">Edits made in the dashboard (sailmaker, owner, TCC, merges, ...) only live in <em>this browser's</em> local storage until they're applied to the real database. Nothing here is final yet — that's why nothing seems to "happen" after you save one.</p>
+      <p style="margin:0 0 8px;"><strong>Easiest path:</strong> click "Copy CSV to clipboard" below, then paste that CSV into your chat with Claude and ask it to apply the changes. Claude runs the matching script against the live database and rebuilds the dashboard for you.</p>
+      <p class="muted" style="margin:0;font-size:12.5px;">Prefer to do it yourself? Save the CSV, then run <code>python3 scripts/apply_boat_updates.py db/marketshare.db changes.csv</code> (or <code>merge_boats.py</code> for merges), and rebuild with <code>export_dashboard_data.py</code> + <code>build_dashboard.py</code>.</p>
+    </div>
     <div class="card" style="padding:0;overflow:auto;">
       <h2 style="padding:18px 20px 0;">Field edits</h2>
       <table>
         <thead><tr><th>Boat</th><th>Sail No</th><th>Changes</th><th>Notes</th><th></th></tr></thead>
-        <tbody>${rows || '<tr><td colspan="5" class="muted">No pending edits. Edit a sailmaker, owner or TCC from any boat profile to see it here.</td></tr>'}</tbody>
+        <tbody>${rows || '<tr><td colspan="5" class="muted">No pending edits. Edit a sailmaker, owner, TCC, lead rep or contacted-by from a boat profile or the Sales opportunities page to see it here.</td></tr>'}</tbody>
       </table>
     </div>
     ${ids.length ? `
     <div class="card">
       <h2>Export field edits as CSV</h2>
-      <p class="muted" style="font-size:12px;margin:0 0 10px;">Run <code>python3 scripts/apply_boat_updates.py db/marketshare.db changes.csv</code> to apply, then rebuild the dashboard.</p>
       <div class="btn-row">
         <button class="btn" type="button" id="copy-csv-btn">Copy CSV to clipboard</button>
         <button class="btn secondary" type="button" id="download-csv-btn">Download changes.csv</button>
@@ -972,41 +1062,26 @@ function renderRegattaProfile(id) {
     return `<tr class="clickable" data-route="#/race/${ra.id}"><td>${esc(ra.race_name)}</td><td class="num">${ev.season_year}</td><td class="num">${n}</td></tr>`;
   }).join('');
 
-  // -- breakdown by class: prefer per-season aggregate counts (event_class_counts),
-  // which cover years with no boat-level breakdown; fall back to/augment with
-  // boat-level race_entries.class where we have it.
-  const evIds = new Set(evs.map(e => e.id));
-  const aggByClass = {};
-  const aggByClassYear = {}; // class -> { year: count }
-  DATA.class_counts.forEach(c => {
-    if (!evIds.has(c.event_id) || c.class_label.toLowerCase() === 'total') return;
-    aggByClass[c.class_label] = (aggByClass[c.class_label] || 0) + (c.entry_count || 0);
-    const year = eventsById[c.event_id].season_year;
-    (aggByClassYear[c.class_label] ||= {})[year] = c.entry_count;
-  });
-  const boatLevelByClass = {};
-  DATA.boats.forEach(b => b.entries.forEach(e => {
-    if (e.regatta_id !== id) return;
-    const cls = e.class || 'Unclassed';
-    (boatLevelByClass[cls] ||= new Set()).add(b.id);
-  }));
-  const classNames = Array.from(new Set([...Object.keys(aggByClass), ...Object.keys(boatLevelByClass)])).sort();
-  const classRows = classNames.map(cls => `
-    <tr>
-      <td>${esc(cls)}</td>
-      <td class="num">${aggByClass[cls] != null ? aggByClass[cls] : '—'}</td>
-      <td class="num">${boatLevelByClass[cls] ? boatLevelByClass[cls].size : '—'}</td>
-    </tr>`).join('');
-
-  // class sizes over time: a Season x Class matrix from the aggregate counts
-  const allYears = Array.from(new Set(Object.values(aggByClassYear).flatMap(o => Object.keys(o).map(Number)))).sort((a,b)=>a-b);
-  const classesWithYearData = Object.keys(aggByClassYear).sort();
+  const classData = getClassYearData(id);
+  const { aggByClassYear, allYears, classesWithYearData } = classData;
   const classTrendTable = classesWithYearData.length && allYears.length ? `
     <div class="card" style="padding:0;overflow:auto;">
       <h2 style="padding:18px 20px 0;">Class sizes over time</h2>
+      <p class="muted" style="padding:0 20px;font-size:12px;">Click a season or a class to see it graphed.</p>
       <table>
-        <thead><tr><th>Season</th>${classesWithYearData.map(c=>`<th class="num">${esc(c)}</th>`).join('')}</tr></thead>
-        <tbody>${allYears.map(y => `<tr><td>${y}</td>${classesWithYearData.map(c => `<td class="num">${aggByClassYear[c][y] != null ? aggByClassYear[c][y] : '—'}</td>`).join('')}</tr>`).join('')}</tbody>
+        <thead><tr>
+          <th>Season</th>
+          ${classesWithYearData.map(c=>`<th class="num clickable-axis" data-chart-class="${esc(c)}" data-regatta-id="${id}">${esc(c)}</th>`).join('')}
+          <th class="num">Total</th>
+        </tr></thead>
+        <tbody>${allYears.map(y => {
+          const total = classesWithYearData.reduce((acc,c) => acc + (aggByClassYear[c][y]||0), 0);
+          return `<tr>
+            <td class="clickable-axis" data-chart-season="${y}" data-regatta-id="${id}">${y}</td>
+            ${classesWithYearData.map(c => `<td class="num">${aggByClassYear[c][y] != null ? aggByClassYear[c][y] : '—'}</td>`).join('')}
+            <td class="num"><strong>${total}</strong></td>
+          </tr>`;
+        }).join('')}</tbody>
       </table>
     </div>` : '';
 
@@ -1015,18 +1090,57 @@ function renderRegattaProfile(id) {
     <h1>${esc(r.name)}</h1>
     <p class="subtitle">${esc(r.category||'')} · ${esc(r.region||'')}</p>
     ${classTrendTable}
-    ${classRows ? `<div class="card" style="padding:0;overflow:auto;">
-      <h2 style="padding:18px 20px 0;">Breakdown by class</h2>
-      <table>
-        <thead><tr><th>Class</th><th class="num">Aggregate entries (all seasons on file)</th><th class="num">Distinct boats (boat-level races on file)</th></tr></thead>
-        <tbody>${classRows}</tbody>
-      </table>
-    </div>` : ''}
     ${raceRows ? `<div class="card" style="padding:0;overflow:auto;">
       <h2 style="padding:18px 20px 0;">Results by race</h2>
       <table><thead><tr><th>Race</th><th class="num">Year</th><th class="num">Entries</th></tr></thead><tbody>${raceRows}</tbody></table>
     </div>` : ''}
   `;
+}
+
+// Season x Class aggregate counts for one regatta (event_class_counts, the
+// only source that covers years with no boat-level breakdown). Shared by
+// the regatta page render and the click-to-chart modal so both always
+// agree with each other.
+function getClassYearData(regattaId) {
+  const evIds = new Set(DATA.events.filter(e => e.regatta_id === regattaId).map(e => e.id));
+  const aggByClassYear = {}; // class -> { year: count }
+  DATA.class_counts.forEach(c => {
+    if (!evIds.has(c.event_id) || c.class_label.toLowerCase() === 'total') return;
+    const year = eventsById[c.event_id].season_year;
+    (aggByClassYear[c.class_label] ||= {})[year] = c.entry_count;
+  });
+  const allYears = Array.from(new Set(Object.values(aggByClassYear).flatMap(o => Object.keys(o).map(Number)))).sort((a,b)=>a-b);
+  const classesWithYearData = Object.keys(aggByClassYear).sort();
+  return { aggByClassYear, allYears, classesWithYearData };
+}
+
+function attachRegattaHandlers() {
+  document.querySelectorAll('[data-chart-season]').forEach(el => el.addEventListener('click', (e) => {
+    e.stopPropagation();
+    openClassChart(parseInt(el.dataset.regattaId), 'season', el.dataset.chartSeason);
+  }));
+  document.querySelectorAll('[data-chart-class]').forEach(el => el.addEventListener('click', (e) => {
+    e.stopPropagation();
+    openClassChart(parseInt(el.dataset.regattaId), 'class', el.dataset.chartClass);
+  }));
+}
+
+function openClassChart(regattaId, mode, key) {
+  const { aggByClassYear, allYears, classesWithYearData } = getClassYearData(regattaId);
+  const reg = regattasById[regattaId];
+  const title = document.getElementById('chart-modal-title');
+  const body = document.getElementById('chart-modal-body');
+  if (mode === 'season') {
+    const year = parseInt(key);
+    title.textContent = `${reg.name} — ${year} by class`;
+    const items = classesWithYearData.map(c => ({ cls: c, entries: aggByClassYear[c][year] || 0 })).filter(x => x.entries > 0);
+    body.innerHTML = items.length ? svgBarChart(items, { valueKey: 'entries', labelKey: 'cls', colorFn: () => 'var(--series-north)' }) : '<p class="muted">No entries recorded for this season.</p>';
+  } else {
+    title.textContent = `${reg.name} — Class ${key} over time`;
+    const pts = allYears.map(y => ({ x: y, y: aggByClassYear[key][y] || 0 }));
+    body.innerHTML = sparkline(pts, { color: 'var(--series-north)' });
+  }
+  document.getElementById('chart-modal').showModal();
 }
 
 // ---------- page: single race ----------
@@ -1066,7 +1180,7 @@ function renderRacePage(raceId) {
 // ---------- page: market share ----------
 function renderMarketShare() {
   const byBucketEntries = {}; DATA.market_share_entries.forEach(x => { byBucketEntries[bucketOf(x.sailmaker)] = (byBucketEntries[bucketOf(x.sailmaker)]||0)+x.entries; });
-  const byBucketBoats = {}; DATA.market_share_boats.forEach(x => { byBucketBoats[bucketOf(x.sailmaker)] = (byBucketBoats[bucketOf(x.sailmaker)]||0)+x.boats; });
+  const byBucketBoats = boatBucketCounts();
   const itemsEntries = BUCKET_ORDER.filter(b=>byBucketEntries[b]).map(b=>({sailmaker:b, entries:byBucketEntries[b]}));
   const itemsBoats = BUCKET_ORDER.filter(b=>byBucketBoats[b]).map(b=>({sailmaker:b, entries:byBucketBoats[b]}));
 
@@ -1096,16 +1210,25 @@ function renderMarketShare() {
 function renderSales() {
   const targets = DATA.boats.filter(b => bucketOf(b.current_sailmaker) !== 'North Sails');
   targets.sort((a,b) => (b.entries.length - a.entries.length));
-  const rows = targets.map(b => `
-    <tr class="clickable" data-route="#/boat/${b.id}">
-      <td>${esc(b.boat_name)}</td>
-      <td>${esc(b.owner_name||'')}</td>
-      <td><span class="pill" style="${pillStyle(b.current_sailmaker)}">${esc(b.current_sailmaker||'Unknown')}</span></td>
-      <td>${esc(b.lead_rep||'')}</td>
-      <td>${esc(b.contacted_by||'')}</td>
+  const sailmakerNames = DATA.sailmakers.map(s => s.name).concat(BUCKET_ORDER).filter((v,i,a) => a.indexOf(v)===i).sort();
+  const team = teamOptions();
+  const selectOptions = (options, current) => `<option value="">— no change —</option>` +
+    options.map(name => `<option value="${esc(name)}" ${current===name?'selected':''}>${esc(name)}</option>`).join('');
+
+  const rows = targets.map(b => {
+    const p = PENDING[b.id] || {};
+    const edited = PENDING[b.id] ? '<span class="edited-flag">Edited</span>' : '';
+    return `
+    <tr data-boat-id="${b.id}">
+      <td><a href="#/boat/${b.id}" data-route="#/boat/${b.id}">${esc(b.boat_name)}</a>${edited}</td>
+      <td><input type="text" class="sales-edit-owner" data-boat-id="${b.id}" value="${esc(p.owner!=null?p.owner:(b.owner_name||''))}"></td>
+      <td><select class="sales-edit-sailmaker" data-boat-id="${b.id}">${selectOptions(sailmakerNames, p.sailmaker||b.current_sailmaker)}</select></td>
+      <td><select class="sales-edit-leadrep" data-boat-id="${b.id}">${selectOptions(team, p.leadRep||b.lead_rep)}</select></td>
+      <td><select class="sales-edit-contactedby" data-boat-id="${b.id}">${selectOptions(team, p.contactedBy||b.contacted_by)}</select></td>
       <td class="${b.in_cs ? '' : 'tag-flag'}">${b.in_cs===1?'Yes':(b.in_cs===0?'No':'—')}</td>
       <td class="num">${b.entries.length}</td>
-    </tr>`).join('');
+    </tr>`;
+  }).join('');
   return `
     <h1>Sales opportunities</h1>
     <p class="subtitle">Boats not currently on North Sails (competitor-flagged, partial, or unknown), sorted by how active they are — most races entered first. ${targets.length} boats.</p>
@@ -1115,9 +1238,31 @@ function renderSales() {
         <tbody>${rows}</tbody>
       </table>
     </div>
-    <footer class="note">CRM fields here are read-only, exactly as imported from your fleet register — edit the source data and re-run the export to update them.</footer>
+    <footer class="note">Owner, sailmaker, lead rep and contacted-by are editable here — edits are saved locally (see <a href="#/changes" data-route="#/changes">Pending changes</a> to export and apply them). In CS is read-only, exactly as imported from your fleet register.</footer>
   `;
 }
+
+function attachSalesHandlers() {
+  document.querySelectorAll('.sales-edit-owner').forEach(el => el.addEventListener('change', () => {
+    setPendingEdit(el.dataset.boatId, { owner: el.value.trim() }); navigate();
+  }));
+  document.querySelectorAll('.sales-edit-sailmaker').forEach(el => el.addEventListener('change', () => {
+    setPendingEdit(el.dataset.boatId, { sailmaker: el.value }); navigate();
+  }));
+  document.querySelectorAll('.sales-edit-leadrep').forEach(el => el.addEventListener('change', () => {
+    setPendingEdit(el.dataset.boatId, { leadRep: el.value }); navigate();
+  }));
+  document.querySelectorAll('.sales-edit-contactedby').forEach(el => el.addEventListener('change', () => {
+    setPendingEdit(el.dataset.boatId, { contactedBy: el.value }); navigate();
+  }));
+}
+
+// one-time modal wiring - #chart-modal lives outside #main, so it's never
+// re-rendered/re-bound by navigate()
+document.getElementById('chart-modal-close').addEventListener('click', () => document.getElementById('chart-modal').close());
+document.getElementById('chart-modal').addEventListener('click', (e) => {
+  if (e.target.id === 'chart-modal') e.target.close(); // backdrop click
+});
 
 navigate();
 </script>
