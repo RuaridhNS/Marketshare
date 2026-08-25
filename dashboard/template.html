@@ -396,16 +396,19 @@ function pendingMergesToCSV() {
 // ---------- duplicate-boat detection ----------
 // Heuristics only - always a human call before merging. Two signals:
 //  1. identical (normalized) boat name across 2+ boat records
-//  2. sail numbers that differ only by a trailing IRC endorsement letter
-//     (e.g. GBR9091R vs GBR9091 - the exact pattern that prompted this feature)
-function sailNoBase(s) { return (s||'').replace(/[A-Z]$/, ''); }
+//  2. sail numbers that differ only by trailing IRC endorsement letter(s)
+//     (e.g. GBR9091R vs GBR9091, or GBR8368RC vs GBR8368 - one boat's sail
+//     number gaining/losing an endorsement suffix over time)
+// Both paths require a matching, KNOWN boat type as corroboration. A blank/
+// unrecorded type is deliberately never treated as a match signal - it's not
+// evidence the boats are the same, so pairs where neither side has a real
+// type on file are excluded rather than surfaced as low-confidence noise.
+function sailNoBase(s) { return (s||'').replace(/[A-Z]+$/, ''); }
 // Boat type strings carry a trailing IRC rating suffix that varies slightly
 // between sources for the very same boat (e.g. "J 109 2.10" vs "J 109 2.08",
 // "SUN FAST 3300 1.95 WB" vs "SUN FAST 3300 1.95") - strip it before comparing
 // so real matches aren't missed, without being so loose it stops meaning
-// anything. Boats with no type at all deliberately DON'T match each other
-// (empty string only equals empty string via the caller's own name/base
-// grouping, not across groups), since "no type recorded" isn't a match signal.
+// anything.
 function normType(t) { return (t||'').toUpperCase().replace(/\s+\d+\.\d+.*$/, '').trim(); }
 
 function findDuplicateGroups() {
@@ -414,6 +417,7 @@ function findDuplicateGroups() {
   DATA.boats.forEach(b => {
     const nameKey = (b.boat_name||'').trim().toUpperCase();
     const typeKey = normType(b.boat_type);
+    if (!typeKey) return; // no recorded type = no corroborating signal, skip entirely
     if (nameKey) (byName[nameKey+'||'+typeKey] ||= []).push(b);
     const base = sailNoBase(b.sail_no);
     if (base) (byBase[base+'||'+typeKey] ||= []).push(b);
@@ -425,8 +429,7 @@ function findDuplicateGroups() {
     const ids = boats.map(b=>b.id).sort().join(',');
     if (seen.has(ids)) return;
     seen.add(ids);
-    const typeNote = normType(boats[0].boat_type) ? ` and boat type ("${boats[0].boat_type}")` : '';
-    groups.push({ key: 'name:'+key, reason: `Same boat name ("${boats[0].boat_name}")${typeNote}`, boats });
+    groups.push({ key: 'name:'+key, reason: `Same boat name ("${boats[0].boat_name}") and boat type ("${boats[0].boat_type}")`, boats });
   });
   Object.entries(byBase).forEach(([key, boats]) => {
     const distinctSailNos = new Set(boats.map(b=>b.sail_no));
@@ -434,7 +437,7 @@ function findDuplicateGroups() {
     const ids = boats.map(b=>b.id).sort().join(',');
     if (seen.has(ids)) return;
     seen.add(ids);
-    groups.push({ key: 'sailno:'+key, reason: `Sail numbers differ only by a trailing letter (${Array.from(distinctSailNos).join(' / ')}), same boat type`, boats });
+    groups.push({ key: 'sailno:'+key, reason: `Sail numbers differ only by trailing letter(s) (${Array.from(distinctSailNos).join(' / ')}), same boat type ("${boats[0].boat_type}")`, boats });
   });
   const dismissed = loadDismissedDupes();
   return groups.filter(g => !dismissed.includes(g.key) && !g.boats.some(b => isPendingMergeAway(b.id)));
