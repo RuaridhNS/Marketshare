@@ -275,10 +275,17 @@ const regattasById = {}; DATA.regattas.forEach(r => regattasById[r.id] = r);
 const eventsById = {}; DATA.events.forEach(e => eventsById[e.id] = e);
 const racesById = {}; DATA.races.forEach(r => racesById[r.id] = r);
 
+// Entries only carry race_id (see export_dashboard_data.py for why) - these
+// derive the regatta/event/season a race_entry belongs to via that FK chain,
+// same information, without duplicating it onto every single entry.
+function entryEvent(e) { const race = racesById[e.race_id]; return race ? eventsById[race.event_id] : null; }
+function entryRegatta(e) { const ev = entryEvent(e); return ev ? regattasById[ev.regatta_id] : null; }
+function entrySeasonYear(e) { const ev = entryEvent(e); return ev ? ev.season_year : null; }
+
 // per-boat set of regatta ids / categories it has entries in, for the boats-list filter
 DATA.boats.forEach(b => {
-  b.regattaIds = new Set(b.entries.map(e => e.regatta_id));
-  b.regattaCategories = new Set(b.entries.map(e => e.regatta_category));
+  b.regattaIds = new Set(b.entries.map(e => entryEvent(e)?.regatta_id).filter(x => x != null));
+  b.regattaCategories = new Set(b.entries.map(e => entryRegatta(e)?.category).filter(x => x != null));
 });
 
 // ---------- pending edits (sailmaker / owner / TCC changes made in-browser) ----------
@@ -505,10 +512,11 @@ function renderOverview() {
   // (the aggregate historical class-count rows have no boat-level detail).
   const yearBoats = {};
   DATA.boats.forEach(b => b.entries.forEach(e => {
-    if (!e.season_year) return;
-    const reg = regattasById[e.regatta_id];
+    const year = entrySeasonYear(e);
+    if (!year) return;
+    const reg = entryRegatta(e);
     if (!reg || reg.region !== 'Solent') return;
-    (yearBoats[e.season_year] ||= new Set()).add(b.id);
+    (yearBoats[year] ||= new Set()).add(b.id);
   }));
   const distinctPts = Object.keys(yearBoats).map(Number).sort((a,b)=>a-b).map(y => ({x:y, y:yearBoats[y].size}));
 
@@ -677,10 +685,12 @@ function renderBoatProfile(id) {
 
   const entryRows = b.entries.map(e => {
     const result = e.position || (e.status || '—');
+    const race = racesById[e.race_id];
+    const reg = entryRegatta(e);
     return `<tr class="clickable" data-route="#/race/${e.race_id}">
-      <td>${esc(e.regatta_name)}</td>
-      <td class="num">${e.season_year||''}</td>
-      <td>${esc(e.race_name||'')}</td>
+      <td>${esc(reg?.name)}</td>
+      <td class="num">${entrySeasonYear(e)||''}</td>
+      <td>${esc(race?.race_name||'')}</td>
       <td>${esc(e.class||'')}</td>
       <td>${esc(result)}</td>
       <td>${e.sailmaker_name ? `<span class="pill" style="${pillStyle(e.sailmaker_name)}">${esc(e.sailmaker_name)}</span>` : ''}</td>

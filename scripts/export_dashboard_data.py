@@ -42,18 +42,18 @@ def main():
         ORDER BY b.boat_name
     """).fetchall()
 
+    # Deliberately NOT denormalizing race_name/season_year/regatta_id/
+    # regatta_name/regatta_category onto every entry here - the dashboard
+    # already ships DATA.races/DATA.events/DATA.regattas as lookup tables
+    # (racesById/eventsById/regattasById), so entries just carry race_id and
+    # derive the rest client-side. At tens of thousands of entries this was
+    # a meaningful chunk of the embedded JSON's size for zero new information.
     entries_rows = cur.execute("""
         SELECT re.boat_id, re.race_id, re.class, re.sail_no_used, re.boat_name_used, re.boat_type_used,
                re.tcc, re.owner_name_used, re.skipper_name_used, re.sailmaker_id, re.status,
                re.finish_time, re.elapsed_time, re.corrected_time, re.position, re.points,
-               re.comments, re.tag, re.source,
-               r.race_name, r.event_id, r.status AS race_status,
-               e.season_year, e.regatta_id,
-               reg.name AS regatta_name, reg.category AS regatta_category
+               re.comments, re.tag, re.source
         FROM race_entries re
-        JOIN races r ON r.id = re.race_id
-        JOIN events e ON e.id = r.event_id
-        JOIN regattas reg ON reg.id = e.regatta_id
     """).fetchall()
 
     sm_history_rows = cur.execute("""
@@ -67,6 +67,14 @@ def main():
     """).fetchall()
 
     # ---- assemble boats with nested entries + sailmaker history ----
+    races_by_id = {r["id"]: r for r in races}
+    events_by_id = {e["id"]: e for e in events}
+
+    def entry_season_year(entry):
+        race = races_by_id.get(entry["race_id"])
+        ev = events_by_id.get(race["event_id"]) if race else None
+        return ev["season_year"] if ev else None
+
     entries_by_boat = {}
     for r in entries_rows:
         d = dict(r)
@@ -89,7 +97,7 @@ def main():
     for b in boats_rows:
         d = dict(b)
         d["entries"] = sorted(entries_by_boat.get(d["id"], []),
-                               key=lambda e: (e["season_year"] or 0), reverse=True)
+                               key=lambda e: (entry_season_year(e) or 0), reverse=True)
         d["sailmaker_history"] = smhist_by_boat.get(d["id"], [])
         d["owner_history"] = ownerhist_by_boat.get(d["id"], [])
         # "current" sailmaker = most recent history row, else most recent entry's sailmaker
@@ -117,7 +125,6 @@ def main():
     market_share_boats = [{"sailmaker": k, "boats": v} for k, v in sorted(boat_sm_counts.items(), key=lambda x: -x[1])]
 
     # ---- entry trends: per regatta, per year, total entries (from event_class_counts) ----
-    events_by_id = {e["id"]: e for e in events}
     cc_by_event = defaultdict(list)
     for c in class_counts:
         cc_by_event[c["event_id"]].append(c)
@@ -162,6 +169,20 @@ def main():
         "entry_trends": trend_rows,
         "class_counts": class_counts,
     }
+
+    # Most entry/history fields are null on any given row (RORC/Cowes/Royal
+    # Southern don't all publish the same columns) - at tens of thousands of
+    # rows, the null VALUES cost little, but the repeated null KEY NAMES add
+    # up fast in JSON. Dropping null keys is safe: every JS read of these is
+    # already `e.field` / `e.field || x` / `e.field ? ... `, and a missing
+    # key reads as undefined, which behaves identically to null there.
+    def strip_nulls(d):
+        return {k: v for k, v in d.items() if v is not None}
+
+    for b in data["boats"]:
+        b["entries"] = [strip_nulls(e) for e in b["entries"]]
+        b["sailmaker_history"] = [strip_nulls(h) for h in b["sailmaker_history"]]
+        b["owner_history"] = [strip_nulls(h) for h in b["owner_history"]]
 
     with open(out_path, "w") as f:
         json.dump(data, f, default=str)
