@@ -259,13 +259,14 @@ function teamOptions() {
   DATA.boats.forEach(b => { if (b.lead_rep) names.add(b.lead_rep); if (b.contacted_by) names.add(b.contacted_by); });
   return Array.from(names).sort();
 }
-// Bucket counts across every tracked boat (unlike DATA.market_share_boats,
-// which is precomputed server-side and silently drops boats with no
-// sailmaker signal at all instead of bucketing them as "Unknown" - this
-// keeps the Overview/Market-share totals matching the actual boat count).
-function boatBucketCounts() {
+// Bucket counts across tracked boats (unlike DATA.market_share_boats, which
+// is precomputed server-side and silently drops boats with no sailmaker
+// signal at all instead of bucketing them as "Unknown" - this keeps the
+// Overview/Market-share totals matching the actual boat count). Defaults to
+// the active fleet (last 5 seasons) - pass DATA.boats explicitly for all-time.
+function boatBucketCounts(boats) {
   const counts = {};
-  DATA.boats.forEach(b => { const bucket = bucketOf(b.current_sailmaker); counts[bucket] = (counts[bucket]||0) + 1; });
+  (boats || DATA.boats.filter(b => b.active)).forEach(b => { const bucket = bucketOf(b.current_sailmaker); counts[bucket] = (counts[bucket]||0) + 1; });
   return counts;
 }
 // inline style string for a sailmaker pill, incl. a border on the (near-white) Unknown pill so it stays visible
@@ -295,6 +296,22 @@ DATA.boats.forEach(b => {
   b.regattaIds = new Set(b.entries.map(e => entryEvent(e)?.regatta_id).filter(x => x != null));
   b.regattaCategories = new Set(b.entries.map(e => entryRegatta(e)?.category).filter(x => x != null));
 });
+
+// ---------- active / inactive (last-5-season activity window) ----------
+// A boat with no race entry in the last 5 seasons is treated as inactive -
+// Overview/Market-share default to the active fleet, since a boat that left
+// the sport years ago shouldn't count toward "current" market share.
+DATA.boats.forEach(b => {
+  b.lastActiveYear = null;
+  b.entries.forEach(e => {
+    const y = entrySeasonYear(e);
+    if (y != null && (b.lastActiveYear == null || y > b.lastActiveYear)) b.lastActiveYear = y;
+  });
+});
+let MAX_SEASON_YEAR = 0;
+DATA.boats.forEach(b => { if (b.lastActiveYear != null && b.lastActiveYear > MAX_SEASON_YEAR) MAX_SEASON_YEAR = b.lastActiveYear; });
+const ACTIVE_CUTOFF_YEAR = MAX_SEASON_YEAR - 4;
+DATA.boats.forEach(b => { b.active = b.lastActiveYear != null && b.lastActiveYear >= ACTIVE_CUTOFF_YEAR; });
 
 // ---------- pending edits (sailmaker / owner / TCC changes made in-browser) ----------
 // The dashboard is a static file with no backend, so edits are held here (persisted to
@@ -519,43 +536,48 @@ document.addEventListener('click', e => {
 // ---------- page: overview ----------
 function renderOverview() {
   const s = DATA.stats;
-  const byBucket = boatBucketCounts();
+  const activeBoats = DATA.boats.filter(b => b.active);
+  const byBucket = boatBucketCounts(activeBoats);
   const bucketItems = BUCKET_ORDER.filter(b => byBucket[b]).map(b => ({sailmaker: b, entries: byBucket[b]}));
 
   // distinct boats per season, Solent regattas only, deduped (a boat racing
   // three times in a season still counts once) - built from boat-level
   // race_entries, since that's the only source with actual boat identity
   // (the aggregate historical class-count rows have no boat-level detail).
+  // Limited to the last 5 seasons to match the active-fleet window used
+  // everywhere else on the dashboard.
   const yearBoats = {};
   DATA.boats.forEach(b => b.entries.forEach(e => {
     const year = entrySeasonYear(e);
-    if (!year) return;
+    if (!year || year < ACTIVE_CUTOFF_YEAR) return;
     const reg = entryRegatta(e);
     if (!reg || reg.region !== 'Solent') return;
     (yearBoats[year] ||= new Set()).add(b.id);
   }));
   const distinctPts = Object.keys(yearBoats).map(Number).sort((a,b)=>a-b).map(y => ({x:y, y:yearBoats[y].size}));
 
-  const northPct = byBucket['North Sails'] ? Math.round(100*byBucket['North Sails']/s.n_boats) : 0;
+  const northPct = byBucket['North Sails'] ? Math.round(100*byBucket['North Sails']/activeBoats.length) : 0;
 
   return `
     <h1>Overview</h1>
-    <p class="subtitle">Boat-centric race entry &amp; market-share database. Generated ${fmtDate(DATA.generated_at)}.</p>
+    <p class="subtitle">Boat-centric race entry &amp; market-share database. Generated ${fmtDate(DATA.generated_at)}.
+      Figures below cover the <strong>active fleet</strong> — boats with at least one race entry in ${ACTIVE_CUTOFF_YEAR}–${MAX_SEASON_YEAR}
+      (last 5 seasons). <a href="#/boats" data-route="#/boats">${s.n_boats} boats</a> are tracked in total, including inactive ones.</p>
     <div class="stat-row">
-      <div class="stat-tile"><div class="v">${s.n_boats}</div><div class="l">Boats tracked</div></div>
-      <div class="stat-tile"><div class="v">${s.n_entries}</div><div class="l">Boat-level race entries</div></div>
+      <div class="stat-tile"><div class="v">${activeBoats.length}</div><div class="l">Active boats (last 5 seasons)</div></div>
+      <div class="stat-tile"><div class="v">${s.n_entries}</div><div class="l">Boat-level race entries (all-time)</div></div>
       <div class="stat-tile"><div class="v">${s.n_regattas}</div><div class="l">Regattas / races</div></div>
       <div class="stat-tile"><div class="v">${s.n_class_count_rows}</div><div class="l">Historical class-count records</div></div>
-      <div class="stat-tile"><div class="v">${northPct}%</div><div class="l">Boats on North Sails</div></div>
+      <div class="stat-tile"><div class="v">${northPct}%</div><div class="l">Active boats on North Sails</div></div>
     </div>
     <div class="card-row">
       <div class="card">
-        <h2>Sailmaker share — distinct boats</h2>
+        <h2>Sailmaker share — distinct boats (active fleet)</h2>
         ${svgBarChart(bucketItems, {colorFn: it => BUCKET_COLOR[it.sailmaker]})}
-        <p class="muted" style="font-size:12px;margin-top:10px;">Every tracked boat, counted once by its most recently observed sailmaker (no signal at all = "Unknown"). "Other" groups low-volume brands (Relling, GP, UK...). <a href="#/market-share" data-route="#/market-share">Full breakdown →</a></p>
+        <p class="muted" style="font-size:12px;margin-top:10px;">Boats active in the last 5 seasons, counted once by their most recently observed sailmaker (no signal at all = "Unknown"). "Other" groups low-volume brands (Relling, GP, UK...). <a href="#/market-share" data-route="#/market-share">Full breakdown →</a></p>
       </div>
       <div class="card">
-        <h2>Solent IRC entries over time</h2>
+        <h2>Solent IRC entries — last 5 seasons</h2>
         ${distinctPts.length ? sparkline(distinctPts) : '<p class="muted">No boat-level Solent entries with a season year on file yet.</p>'}
         <p class="muted" style="font-size:12px;margin-top:6px;">Distinct boats that raced at least once that season — a boat entering multiple races only counts once. <a href="#/boats" data-route="#/boats">All boats →</a></p>
       </div>
@@ -572,12 +594,14 @@ function renderOverview() {
 function attachBoatFilterHandlers() {
   const search = document.getElementById('boat-search');
   const filter = document.getElementById('boat-filter');
+  const activityFilter = document.getElementById('boat-activity-filter');
   if (!search) return;
   const catBoxes = () => Array.from(document.querySelectorAll('.cat-chip:checked'));
   const regattaBoxes = () => Array.from(document.querySelectorAll('.regatta-box:checked'));
   const apply = () => {
     const q = search.value.trim().toLowerCase();
     const f = filter.value;
+    const af = activityFilter ? activityFilter.value : 'all';
     const selectedCats = new Set(catBoxes().map(b => b.value));
     const catMode = (document.querySelector('input[name=cat-mode]:checked') || {}).value || 'and';
     const selectedRegattas = new Set(regattaBoxes().map(b => parseInt(b.value)));
@@ -587,7 +611,8 @@ function attachBoatFilterHandlers() {
       const hay = tr.dataset.hay;
       const bucket = tr.dataset.bucket;
       const b = boatsById[tr.dataset.boatId];
-      let show = (!q || hay.includes(q)) && (f==='all' || bucket===f);
+      let show = (!q || hay.includes(q)) && (f==='all' || bucket===f)
+        && (af==='all' || (af==='active' && tr.dataset.active==='1') || (af==='inactive' && tr.dataset.active==='0'));
 
       if (show && selectedCats.size) {
         const cats = b.regattaCategories;
@@ -608,6 +633,7 @@ function attachBoatFilterHandlers() {
   };
   search.addEventListener('input', apply);
   filter.addEventListener('change', apply);
+  if (activityFilter) activityFilter.addEventListener('change', apply);
   document.querySelectorAll('.cat-chip, .regatta-box').forEach(el => el.addEventListener('change', apply));
   document.querySelectorAll('input[name=cat-mode], input[name=reg-mode]').forEach(el => el.addEventListener('change', apply));
   const clearBtn = document.getElementById('clear-regatta-filter');
@@ -623,13 +649,17 @@ function renderBoatsList() {
     const bucket = bucketOf(b.current_sailmaker);
     const hay = [b.boat_name,b.sail_no,b.owner_name,b.boat_type,b.current_sailmaker,b.tag].join(' ').toLowerCase();
     const edited = PENDING[b.id] ? '<span class="edited-flag">Edited</span>' : '';
-    return `<tr class="clickable" data-route="#/boat/${b.id}" data-hay="${esc(hay)}" data-bucket="${bucket}" data-boat-id="${b.id}">
+    const statusPill = b.active
+      ? `<span class="pill" style="background:var(--series-north);color:#fff;">Active</span>`
+      : `<span class="pill" style="background:var(--surface-2, #eee);color:var(--text-muted);border:1px solid var(--border);">Inactive</span>`;
+    return `<tr class="clickable" data-route="#/boat/${b.id}" data-hay="${esc(hay)}" data-bucket="${bucket}" data-active="${b.active?1:0}" data-boat-id="${b.id}">
       <td><strong>${esc(b.boat_name||'—')}</strong>${edited}</td>
       <td>${esc(b.sail_no||'')}</td>
       <td>${esc(b.boat_type||'')}</td>
       <td class="num">${b.tcc||''}</td>
       <td>${esc(b.owner_name||'')}</td>
       <td><span class="pill" style="${pillStyle(b.current_sailmaker)}">${esc(b.current_sailmaker||'Unknown')}</span></td>
+      <td>${statusPill}${b.lastActiveYear ? ` <span class="muted" style="font-size:11px;">(${b.lastActiveYear})</span>` : ''}</td>
       <td>${esc(b.tag||'')}</td>
       <td class="num">${b.entries.length}</td>
     </tr>`;
@@ -652,9 +682,15 @@ function renderBoatsList() {
   return `
     <h1>Boats</h1>
     <p class="subtitle"><span id="boat-count">${DATA.boats.length} boats</span>. The boat is the central record — click into one to see its owner, sailmaker history and every race it's entered.</p>
+    <p class="muted" style="font-size:12px;margin-top:-8px;">"Active" = raced at least once in ${ACTIVE_CUTOFF_YEAR}–${MAX_SEASON_YEAR}. Boats with no entry in the last 5 seasons are marked Inactive.</p>
     <div class="search-row">
       <input type="text" id="boat-search" placeholder="Search by name, sail no, owner, type, tag…">
       <select id="boat-filter"><option value="all">All sailmakers</option>${options}</select>
+      <select id="boat-activity-filter">
+        <option value="active" selected>Active only (last 5 seasons)</option>
+        <option value="inactive">Inactive only</option>
+        <option value="all">All boats</option>
+      </select>
     </div>
     <details class="filter-panel card">
       <summary>Filter by regatta / series</summary>
@@ -679,7 +715,7 @@ function renderBoatsList() {
     </details>
     <div class="card" style="padding:0; overflow:auto;">
       <table>
-        <thead><tr><th>Boat</th><th>Sail No</th><th>Type</th><th class="num">TCC</th><th>Owner</th><th>Sailmaker</th><th>Tag</th><th class="num">Entries</th></tr></thead>
+        <thead><tr><th>Boat</th><th>Sail No</th><th>Type</th><th class="num">TCC</th><th>Owner</th><th>Sailmaker</th><th>Status</th><th>Tag</th><th class="num">Entries</th></tr></thead>
         <tbody id="boats-tbody">${rows}</tbody>
       </table>
     </div>
@@ -795,8 +831,11 @@ function renderBoatProfile(id) {
 
   return `
     <a class="back-link" href="#/boats" data-route="#/boats">← All boats</a>
-    <h1>${esc(b.boat_name||'Unnamed boat')} <span class="pill" style="${pillStyle(b.current_sailmaker)}">${esc(b.current_sailmaker||'Unknown')}</span>${pending?'<span class="edited-flag">Edited</span>':''}</h1>
-    <p class="subtitle">${esc(b.sail_no||'')} · ${esc(b.boat_type||'')}${b.tcc ? ' · TCC '+b.tcc : ''}</p>
+    <h1>${esc(b.boat_name||'Unnamed boat')} <span class="pill" style="${pillStyle(b.current_sailmaker)}">${esc(b.current_sailmaker||'Unknown')}</span> ${b.active
+        ? `<span class="pill" style="background:var(--series-north);color:#fff;">Active</span>`
+        : `<span class="pill" style="background:var(--surface-2, #eee);color:var(--text-muted);border:1px solid var(--border);">Inactive</span>`
+      }${pending?'<span class="edited-flag">Edited</span>':''}</h1>
+    <p class="subtitle">${esc(b.sail_no||'')} · ${esc(b.boat_type||'')}${b.tcc ? ' · TCC '+b.tcc : ''}${b.lastActiveYear ? ' · last raced '+b.lastActiveYear : ' · no dated race entries on file'}</p>
     ${pendingBanner}
     ${mergeBanner}
     <div class="card-row">
@@ -1023,7 +1062,7 @@ function renderDuplicates() {
     const boatOptions = g.boats.map(b => `
       <label style="display:flex;align-items:center;gap:8px;padding:6px 0;">
         <input type="radio" name="keep-${esc(g.key)}" value="${b.id}" ${b===g.boats[0]?'checked':''}>
-        <span><strong>${esc(b.boat_name||'—')}</strong> · ${esc(b.sail_no||'')} · ${esc(b.boat_type||'')} · ${b.entries.length} entries · owner: ${esc(b.owner_name||'—')}</span>
+        <span><strong>${esc(b.boat_name||'—')}</strong> · ${esc(b.sail_no||'—')} · type: <strong>${esc(b.boat_type||'unknown')}</strong> · ${b.entries.length} entries · owner: ${esc(b.owner_name||'—')}</span>
       </label>`).join('');
     return `
     <div class="card">
@@ -1213,7 +1252,16 @@ function renderRacePage(raceId) {
 
 // ---------- page: market share ----------
 function renderMarketShare() {
-  const byBucketEntries = {}; DATA.market_share_entries.forEach(x => { byBucketEntries[bucketOf(x.sailmaker)] = (byBucketEntries[bucketOf(x.sailmaker)]||0)+x.entries; });
+  // "By race entry" is recomputed from raw entries (rather than the
+  // server-precomputed all-time DATA.market_share_entries) so it can be
+  // scoped to the same last-5-season active window as everything else here.
+  const byBucketEntries = {};
+  DATA.boats.forEach(b => b.entries.forEach(e => {
+    const year = entrySeasonYear(e);
+    if (year == null || year < ACTIVE_CUTOFF_YEAR || !e.sailmaker_name) return;
+    const bucket = bucketOf(e.sailmaker_name);
+    byBucketEntries[bucket] = (byBucketEntries[bucket]||0) + 1;
+  }));
   const byBucketBoats = boatBucketCounts();
   const itemsEntries = BUCKET_ORDER.filter(b=>byBucketEntries[b]).map(b=>({sailmaker:b, entries:byBucketEntries[b]}));
   const itemsBoats = BUCKET_ORDER.filter(b=>byBucketBoats[b]).map(b=>({sailmaker:b, entries:byBucketBoats[b]}));
@@ -1222,19 +1270,20 @@ function renderMarketShare() {
 
   return `
     <h1>Market share</h1>
-    <p class="subtitle">Sailmaker share among boats where we have a signal (JOG fleet register + scraped race entries). Boats with no sailmaker recorded show as "Unknown" — that's your prospect list.</p>
+    <p class="subtitle">Sailmaker share among the active fleet — boats with at least one race entry in ${ACTIVE_CUTOFF_YEAR}–${MAX_SEASON_YEAR}
+      (last 5 seasons). Boats with no sailmaker recorded show as "Unknown" — that's your prospect list.</p>
     <div class="card-row">
       <div class="card">
-        <h2>By distinct boat</h2>
+        <h2>By distinct boat (active fleet)</h2>
         ${svgBarChart(itemsBoats, {colorFn: it => BUCKET_COLOR[it.sailmaker]})}
       </div>
       <div class="card">
-        <h2>By race entry (a boat can appear more than once)</h2>
+        <h2>By race entry, last 5 seasons (a boat can appear more than once)</h2>
         ${svgBarChart(itemsEntries, {colorFn: it => BUCKET_COLOR[it.sailmaker]})}
       </div>
     </div>
     <div class="card" style="padding:0;overflow:auto;">
-      <h2 style="padding:18px 20px 0;">Raw sailmaker labels (unbucketed)</h2>
+      <h2 style="padding:18px 20px 0;">Raw sailmaker labels (unbucketed, all-time)</h2>
       <table><thead><tr><th>Sailmaker (as recorded)</th><th class="num">Entries</th></tr></thead><tbody>${rawRows}</tbody></table>
     </div>
   `;
@@ -1242,7 +1291,9 @@ function renderMarketShare() {
 
 // ---------- page: sales opportunities ----------
 function renderSales() {
-  const targets = DATA.boats.filter(b => bucketOf(b.current_sailmaker) !== 'North Sails');
+  const allTargets = DATA.boats.filter(b => bucketOf(b.current_sailmaker) !== 'North Sails');
+  const targets = allTargets.filter(b => b.active);
+  const inactiveCount = allTargets.length - targets.length;
   targets.sort((a,b) => (b.entries.length - a.entries.length));
   const sailmakerNames = DATA.sailmakers.map(s => s.name).concat(BUCKET_ORDER).filter((v,i,a) => a.indexOf(v)===i).sort();
   const team = teamOptions();
@@ -1265,7 +1316,8 @@ function renderSales() {
   }).join('');
   return `
     <h1>Sales opportunities</h1>
-    <p class="subtitle">Boats not currently on North Sails (competitor-flagged, partial, or unknown), sorted by how active they are — most races entered first. ${targets.length} boats.</p>
+    <p class="subtitle">Boats not currently on North Sails (competitor-flagged, partial, or unknown), sorted by how active they are — most races entered first. ${targets.length} active boats
+      (raced in ${ACTIVE_CUTOFF_YEAR}–${MAX_SEASON_YEAR}).${inactiveCount ? ` ${inactiveCount} more are inactive (no entry in the last 5 seasons) and hidden here — see <a href="#/boats" data-route="#/boats">Boats</a> and filter to Inactive to find them.` : ''}</p>
     <div class="card" style="padding:0;overflow:auto;">
       <table>
         <thead><tr><th>Boat</th><th>Owner</th><th>Current sailmaker</th><th>Lead rep</th><th>Contacted by</th><th>In CS</th><th class="num">Entries</th></tr></thead>
