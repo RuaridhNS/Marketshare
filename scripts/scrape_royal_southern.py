@@ -113,6 +113,12 @@ def regatta_name_for(event_name, slug=""):
     blob = f"{event_name} {slug}".lower()
     if re.search(r"\bjunior\b|\bcadet\b|\bdinghy\b|\bicebreaker\b|\byouth\b", blob):
         return None
+    # One-design class championships the club hosts. The tool is scoped to the
+    # IRC fleet, so these are not regattas we track - the handful of their
+    # boats that also hold IRC certs still appear via their IRC racing.
+    if re.search(r"\b(sb\s?20|j/?70|j/?80|xod|x one design|squib|dragon|etchells|"
+                 r"flying\s?15|sonata|folkboat|rs\s?21|rs\s?elite)\b.*\b(national|championship)", blob):
+        return None
     month_m = re.search(r"\b(May|June|July|September)\s+Regatta\b", event_name, re.I)
     if month_m:
         return f"Royal Southern {month_m.group(1).title()} Regatta"
@@ -137,10 +143,15 @@ def regatta_name_for(event_name, slug=""):
     for pat, name in NAMED:
         if re.search(pat, blob):
             return name
-    # anything else: strip a trailing year and any "- Series II" style suffix
+    # anything else: strip sponsors, a trailing year, and "- Series II" or
+    # "- IRC Class" style suffixes, so one event doesn't fragment into several
+    # regattas across seasons.
     name = re.sub(r"\s+", " ", event_name).strip()
-    name = re.sub(r"\s*[-–]\s*series\s+[ivx0-9]+\s*$", "", name, flags=re.I)
+    name = re.sub(r"^(key yachting|x-yachts|salcombe gin|north sails|champagne charlie|"
+                  r"compareyachtinsure|henri[- ]lloyd)\s+", "", name, flags=re.I)
+    name = re.sub(r"\s*[-–]\s*(series\s+[ivx0-9]+|irc(\s+class)?|black group|white group)\s*$", "", name, flags=re.I)
     name = re.sub(r"\s*20\d\d\s*$", "", name).strip()
+    name = re.sub(r"\bChampionships\b", "Championship", name)   # singular/plural drift
     if not name:
         return None
     return name if name.lower().startswith("royal southern") else f"Royal Southern {name}"

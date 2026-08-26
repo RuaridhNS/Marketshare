@@ -10,3 +10,14 @@ __pycache__/
 # export_dashboard_data.py from the DB. dashboard.html already embeds the
 # same data gzipped (~2.9MB), so tracking both made every rebuild push 40MB+.
 dashboard/data.json
+
+# Scraper intermediates: one CSV per race, written on the way into the DB and
+# never read again. ~3,750 files / 27MB of pure regenerable output. The DB and
+# the scrapers are the sources of truth. Decisions and hand-made inputs
+# (merges_*, pending_edits_*) are deliberately still tracked below.
+exports/cowes_*.csv
+exports/rorc_*.csv
+exports/rsyc_*.csv
+exports/warsash_*.csv
+exports/hamble_*.csv
+exports/jog_*.csv

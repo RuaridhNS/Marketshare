@@ -85,8 +85,18 @@ def main():
     # Second clause: holds an IRC rating and isn't a one-design. This rescues
     # boats whose entries carry no class label at all (~13k rows, mostly RORC),
     # which would otherwise be dropped despite plainly being IRC boats.
+    # ...and the rating has to look like an IRC TCC. Some sources put a
+    # Portsmouth Yardstick number in this column instead (Folkboats carrying
+    # "1081"), which was qualifying a whole one-design fleet as IRC. Real TCCs
+    # run ~0.7-1.4 for monohulls, up to ~2.25 for MOD70s and super-maxis.
+    def is_irc_tcc(v):
+        try:
+            return 0.6 <= float(v) <= 3.0
+        except (TypeError, ValueError):
+            return False
+
     irc_boat_ids |= {b["id"] for b in boats_rows
-                     if b["tcc"] is not None and not OD_TYPE_RE.match(b["boat_type"] or "")}
+                     if is_irc_tcc(b["tcc"]) and not OD_TYPE_RE.match(b["boat_type"] or "")}
     # Override: a one-design hull is not an IRC boat even when it has started an
     # IRC race. A handful do (an XOD with 28 "IRC Class 7" starts at Cowes, a
     # J/70 with 11) - those entries are real, but the fleet is not one we rate

@@ -534,13 +534,14 @@ function navigate() {
   const [arg, queryStr] = (rawArg || '').split('?');
   const query = new URLSearchParams(queryStr || '');
   const qYear = query.has('year') ? parseInt(query.get('year'), 10) : null;
+  const qCls = query.get('cls') || null;
   const main = document.getElementById('main');
   try {
     if (!route || route === 'overview') main.innerHTML = renderOverview();
     else if (route === 'boats') main.innerHTML = renderBoatsList();
     else if (route === 'boat') main.innerHTML = renderBoatProfile(parseInt(arg));
     else if (route === 'regattas') main.innerHTML = renderRegattasList();
-    else if (route === 'regatta') main.innerHTML = renderRegattaProfile(parseInt(arg), qYear);
+    else if (route === 'regatta') main.innerHTML = renderRegattaProfile(parseInt(arg), qYear, qCls);
     else if (route === 'race') main.innerHTML = renderRacePage(parseInt(arg));
     else if (route === 'market-share') main.innerHTML = renderMarketShare();
     else if (route === 'sales') main.innerHTML = renderSales();
@@ -556,6 +557,7 @@ function navigate() {
   attachPendingChangesHandlers();
   attachDuplicatesHandlers();
   attachRegattaHandlers();
+  attachRegattaListHandlers();
   attachSalesHandlers();
   updatePendingBadge();
   lastHash = hash;
@@ -1140,31 +1142,140 @@ function attachDuplicatesHandlers() {
 }
 
 // ---------- page: regattas list ----------
+// Series sits above regatta: the Royal Southern Summer Series is four month
+// regattas, Warsash runs a Series and a Championship, and so on. It is derived
+// from the regatta name rather than stored, so it needs no migration and no
+// second place to keep in sync.
+function seriesOf(r) {
+  const n = r.name || '';
+  if (/^Royal Southern (May|June|July|September) Regatta$/i.test(n)) return 'Royal Southern Summer Series';
+  if (/^Royal Southern/i.test(n)) return 'Royal Southern — other';
+  if (/^Warsash/i.test(n)) return 'Warsash Spring';
+  if (/^Hamble/i.test(n)) return 'Hamble';
+  if (/^Cowes Week$/i.test(n)) return 'Cowes Week';
+  if (/^Round the Island/i.test(n)) return 'Round the Island';
+  if (/vice admiral|RTYC/i.test(n)) return "Vice Admiral's Cup";
+  if (/^IRC (National|Nationals|Two-Handed)/i.test(n)) return 'IRC Championships';
+  if (/^ORC /i.test(n)) return 'ORC Championships';
+  if (/fastnet|myth of malham|cervantes|north sea race|roschier|caribbean|transatlantic/i.test(n)) return 'RORC Offshore';
+  if (/^RORC|^NSR|easter challenge|inshore series/i.test(n)) return 'RORC';
+  if (/^JOG/i.test(n)) return 'JOG';
+  return r.category || 'Other';
+}
+
+// Per-regatta rollup used by the list: seasons covered and distinct boats,
+// counted from boat-level entries where we have them and falling back to the
+// aggregate class-count total where we don't.
+function regattaSummary(r) {
+  const evs = DATA.events.filter(e => e.regatta_id === r.id);
+  const years = evs.map(e => e.season_year).filter(y => y != null).sort((a,b)=>a-b);
+  const evIds = new Set(evs.map(e => e.id));
+  const boatsByYear = {};
+  DATA.boats.forEach(b => b.entries.forEach(e => {
+    const ra = racesById[e.race_id];
+    if (!ra || !evIds.has(ra.event_id)) return;
+    const y = eventsById[ra.event_id].season_year;
+    (boatsByYear[y] ||= new Set()).add(b.id);
+  }));
+  const trends = DATA.entry_trends.filter(t => t.regatta_id === r.id);
+  const pts = years.map(y => ({
+    x: y,
+    y: boatsByYear[y] ? boatsByYear[y].size : ((trends.find(t=>t.season_year===y)||{}).total || 0),
+    real: !!boatsByYear[y],
+  }));
+  const recent = pts.filter(p => p.x >= ACTIVE_CUTOFF_YEAR);
+  return {
+    years, pts,
+    nSeasons: years.length,
+    nRecent: recent.length,
+    latest: pts.length ? pts[pts.length-1] : null,
+    hasBoatLevel: Object.keys(boatsByYear).length > 0,
+    recentTotal: recent.reduce((a,p)=>a+p.y, 0),
+  };
+}
+
 function renderRegattasList() {
-  const byCat = {};
-  DATA.regattas.forEach(r => { (byCat[r.category||'Other'] ||= []).push(r); });
-  let html = `<h1>Regattas</h1><p class="subtitle">${DATA.regattas.length} regattas/races tracked, spanning ${DATA.stats.n_events} event-seasons.</p>`;
-  Object.keys(byCat).sort().forEach(cat => {
-    html += `<div class="card"><h2>${esc(cat)}</h2><table><thead><tr><th>Regatta</th><th class="num">Seasons on file</th><th class="num">Latest total entries</th></tr></thead><tbody>`;
-    byCat[cat].sort((a,b)=>a.name.localeCompare(b.name)).forEach(r => {
-      const trends = DATA.entry_trends.filter(t => t.regatta_id === r.id).sort((a,b)=>b.season_year-a.season_year);
-      const latest = trends[0];
-      html += `<tr class="clickable" data-route="#/regatta/${r.id}">
+  const bySeries = {};
+  DATA.regattas.forEach(r => { (bySeries[seriesOf(r)] ||= []).push(r); });
+
+  const cards = Object.keys(bySeries).sort().map(series => {
+    const rows = bySeries[series].map(r => {
+      const s = regattaSummary(r);
+      const spark = s.pts.length > 1
+        ? `<span class="muted" style="font-size:11px;">${s.pts.slice(-6).map(p=>p.y).join(' · ')}</span>` : '';
+      return { r, s, html: `<tr class="clickable regatta-row"
+          data-route="#/regatta/${r.id}"
+          data-name="${esc((r.name+' '+series).toLowerCase())}"
+          data-recent="${s.nRecent}" data-boatlevel="${s.hasBoatLevel?1:0}">
         <td>${esc(r.name)}</td>
-        <td class="num">${trends.length}</td>
-        <td class="num">${latest ? latest.total+' ('+latest.season_year+')' : '—'}</td>
-      </tr>`;
+        <td class="num">${s.nSeasons}</td>
+        <td class="num">${s.nRecent}</td>
+        <td class="num">${s.latest ? s.latest.y + ' <span class="muted" style="font-size:11px;">(' + s.latest.x + ')</span>' : '—'}</td>
+        <td>${spark}</td>
+        <td>${s.hasBoatLevel
+              ? '<span class="pill" style="background:var(--series-north);color:#fff;">boat-level</span>'
+              : '<span class="pill" style="background:var(--surface-2,#eee);color:var(--text-muted);border:1px solid var(--border);">aggregate</span>'}</td>
+      </tr>` };
+    }).sort((a,b) => b.s.nRecent - a.s.nRecent || a.r.name.localeCompare(b.r.name));
+
+    return `<div class="card regatta-series" style="padding:0;overflow:auto;" data-series="${esc(series.toLowerCase())}">
+      <h2 style="padding:18px 20px 0;">${esc(series)} <span class="muted" style="font-weight:400;font-size:13px;">· ${rows.length} regatta${rows.length===1?'':'s'}</span></h2>
+      <table>
+        <thead><tr><th>Regatta</th><th class="num">Seasons</th><th class="num">Last 5yr</th><th class="num">Latest boats</th><th>Recent trend</th><th>Data</th></tr></thead>
+        <tbody>${rows.map(x=>x.html).join('')}</tbody>
+      </table>
+    </div>`;
+  }).join('');
+
+  return `
+    <h1>Regattas</h1>
+    <p class="subtitle"><span id="regatta-count">${DATA.regattas.length}</span> regattas across ${Object.keys(bySeries).length} series,
+      spanning ${DATA.stats.n_events} regatta-seasons. Click a regatta for its seasons, classes and races.</p>
+    <div class="search-row">
+      <input type="text" id="regatta-search" placeholder="Search regatta or series…">
+      <select id="regatta-filter">
+        <option value="recent">Active in last 5 seasons</option>
+        <option value="boatlevel">Has boat-level results</option>
+        <option value="all">All regattas</option>
+      </select>
+    </div>
+    ${cards}
+  `;
+}
+
+function attachRegattaListHandlers() {
+  const search = document.getElementById('regatta-search');
+  const filter = document.getElementById('regatta-filter');
+  if (!search) return;
+  const apply = () => {
+    const q = search.value.trim().toLowerCase();
+    const f = filter.value;
+    let shown = 0;
+    document.querySelectorAll('.regatta-row').forEach(tr => {
+      let ok = (!q || tr.dataset.name.includes(q));
+      if (ok && f === 'recent') ok = parseInt(tr.dataset.recent) > 0;
+      if (ok && f === 'boatlevel') ok = tr.dataset.boatlevel === '1';
+      tr.style.display = ok ? '' : 'none';
+      if (ok) shown++;
     });
-    html += `</tbody></table></div>`;
-  });
-  return html;
+    // hide a series card entirely once nothing in it matches
+    document.querySelectorAll('.regatta-series').forEach(card => {
+      const any = Array.from(card.querySelectorAll('.regatta-row')).some(tr => tr.style.display !== 'none');
+      card.style.display = any ? '' : 'none';
+    });
+    const c = document.getElementById('regatta-count');
+    if (c) c.textContent = shown;
+  };
+  search.addEventListener('input', apply);
+  filter.addEventListener('change', apply);
+  apply();
 }
 
 // ---------- page: regatta profile ----------
 // Distinct boats that entered one regatta in one season, with their races
 // rolled up. This is the "regatta entry" - the unit that matters commercially;
 // individual race results hang off it rather than the other way round.
-function regattaEntriesFor(regattaId, year) {
+function regattaEntriesFor(regattaId, year, classFilter) {
   const evIds = new Set(DATA.events
     .filter(e => e.regatta_id === regattaId && (year == null || e.season_year === year))
     .map(e => e.id));
@@ -1175,6 +1286,7 @@ function regattaEntriesFor(regattaId, year) {
     b.entries.forEach(e => {
       const ra = racesById[e.race_id];
       if (!ra || !evIds.has(ra.event_id)) return;
+      if (classFilter && normClass(e.class) !== classFilter) return;
       races++;
       if (e.class) cls.add(e.class);
       const pos = parseInt(e.position, 10);
@@ -1187,7 +1299,41 @@ function regattaEntriesFor(regattaId, year) {
                             (a.boat.boat_name || '').localeCompare(b.boat.boat_name || ''));
 }
 
-function renderRegattaProfile(id, year) {
+// Sources label the same division inconsistently ("IRC 1", "IRC Class 1",
+// "IRC One", "1"), and Cowes appends the race number to every label
+// ("J/70 (Race 8)"). Collapse those so a class groups as one thing.
+function normClass(raw) {
+  let s = (raw || '').trim();
+  if (!s) return 'Unclassified';
+  s = s.replace(/\s*\(race\s*\d+\)\s*$/i, '');
+  const WORDS = {one:'1', two:'2', three:'3', four:'4', five:'5', six:'6', seven:'7', zero:'0'};
+  let m = s.match(/^IRC\s*(?:class\s*)?([0-9]+|zero|one|two|three|four|five|six|seven)([A-Z])?$/i);
+  if (m) return 'IRC ' + (WORDS[m[1].toLowerCase()] ?? m[1]) + (m[2] || '');
+  if (/^[0-7]$/.test(s)) return 'IRC ' + s;
+  return s.replace(/\s+/g, ' ');
+}
+
+// Classes raced within one regatta-season, with boats and races per class.
+function regattaClassesFor(regattaId, year) {
+  const evIds = new Set(DATA.events
+    .filter(e => e.regatta_id === regattaId && (year == null || e.season_year === year))
+    .map(e => e.id));
+  const byClass = new Map();
+  DATA.boats.forEach(b => b.entries.forEach(e => {
+    const ra = racesById[e.race_id];
+    if (!ra || !evIds.has(ra.event_id)) return;
+    const key = normClass(e.class);
+    let g = byClass.get(key);
+    if (!g) { g = { cls: key, boats: new Set(), races: new Set() }; byClass.set(key, g); }
+    g.boats.add(b.id);
+    g.races.add(e.race_id);
+  }));
+  return Array.from(byClass.values())
+    .map(g => ({ cls: g.cls, nBoats: g.boats.size, nRaces: g.races.size }))
+    .sort((a, b) => b.nBoats - a.nBoats || a.cls.localeCompare(b.cls));
+}
+
+function renderRegattaProfile(id, year, cls) {
   const r = regattasById[id];
   if (!r) return `<div class="card">Regatta not found.</div>`;
   const evs = DATA.events.filter(e => e.regatta_id === id).sort((a,b)=>b.season_year-a.season_year);
@@ -1208,7 +1354,14 @@ function renderRegattaProfile(id, year) {
 
   // the selected season's actual entry list
   const focus = year != null ? year : (evs.length ? evs[0].season_year : null);
-  const entries = focus != null ? regattaEntriesFor(id, focus) : [];
+  const classes = focus != null ? regattaClassesFor(id, focus) : [];
+  const classRows = classes.map(g => {
+    const sel = (cls === g.cls) ? ' style="background:var(--surface-2,#f3f4f6);font-weight:600;"' : '';
+    const href = `#/regatta/${id}?year=${focus}` + (cls === g.cls ? '' : `&cls=${encodeURIComponent(g.cls)}`);
+    return `<tr class="clickable"${sel} data-route="${esc(href)}">
+      <td>${esc(g.cls)}</td><td class="num">${g.nBoats}</td><td class="num">${g.nRaces}</td></tr>`;
+  }).join('');
+  const entries = focus != null ? regattaEntriesFor(id, focus, cls) : [];
   const entryRows = entries.map(g => `
     <tr class="clickable" data-route="#/boat/${g.boat.id}">
       <td><strong>${esc(g.boat.boat_name||'—')}</strong></td>
@@ -1221,13 +1374,20 @@ function renderRegattaProfile(id, year) {
       <td>${g.best!=null ? (g.best===1?'1st':g.best===2?'2nd':g.best===3?'3rd':g.best+'th') : '—'}</td>
     </tr>`).join('');
 
-  // races for the focused season only, kept subsidiary to the entry list
+  // races for the focused season (and class, if one is selected), kept
+  // subsidiary to the entry list
   const focusEvIds = new Set(evs.filter(e => focus == null || e.season_year === focus).map(e => e.id));
-  const raceRows = DATA.races.filter(ra => focusEvIds.has(ra.event_id)).map(ra => {
-    const ev = eventsById[ra.event_id];
-    const n = DATA.boats.reduce((acc,b) => acc + b.entries.filter(e=>e.race_id===ra.id).length, 0);
-    return `<tr class="clickable" data-route="#/race/${ra.id}"><td>${esc(ra.race_name)}</td><td class="num">${ev.season_year}</td><td class="num">${n}</td></tr>`;
-  }).join('');
+  const raceClass = {};   // race_id -> normalised class, for filtering
+  DATA.boats.forEach(b => b.entries.forEach(e => {
+    if (raceClass[e.race_id] === undefined) raceClass[e.race_id] = normClass(e.class);
+  }));
+  const raceRows = DATA.races
+    .filter(ra => focusEvIds.has(ra.event_id) && (!cls || raceClass[ra.id] === cls))
+    .map(ra => {
+      const ev = eventsById[ra.event_id];
+      const n = DATA.boats.reduce((acc,b) => acc + b.entries.filter(e=>e.race_id===ra.id).length, 0);
+      return `<tr class="clickable" data-route="#/race/${ra.id}"><td>${esc(ra.race_name)}</td><td>${esc(raceClass[ra.id]||'')}</td><td class="num">${n}</td></tr>`;
+    }).join('');
 
   const classData = getClassYearData(id);
   const { aggByClassYear, allYears, classesWithYearData } = classData;
@@ -1264,10 +1424,19 @@ function renderRegattaProfile(id, year) {
         <tbody>${seasonRows || '<tr><td colspan="3" class="muted">No seasons on file.</td></tr>'}</tbody>
       </table>
     </div>
-    ${focus != null ? `<div class="card" style="padding:0;overflow:auto;">
-      <h2 style="padding:18px 20px 0;">Entries — ${focus} (${entries.length} boat${entries.length===1?'':'s'})</h2>
+    ${classes.length ? `<div class="card" style="padding:0;overflow:auto;">
+      <h2 style="padding:18px 20px 0;">Classes — ${focus}</h2>
       <p class="muted" style="font-size:12px;padding:0 20px;margin:4px 0 0;">
-        Distinct boats that raced this regatta in ${focus}, best placing first. Click a boat for its full record.</p>
+        Click a class to narrow the entries and races below${cls ? ` — showing <strong>${esc(cls)}</strong>, click again to clear` : ''}.</p>
+      <table>
+        <thead><tr><th>Class</th><th class="num">Boats</th><th class="num">Races</th></tr></thead>
+        <tbody>${classRows}</tbody>
+      </table>
+    </div>` : ''}
+    ${focus != null ? `<div class="card" style="padding:0;overflow:auto;">
+      <h2 style="padding:18px 20px 0;">Entries — ${focus}${cls ? ' · ' + esc(cls) : ''} (${entries.length} boat${entries.length===1?'':'s'})</h2>
+      <p class="muted" style="font-size:12px;padding:0 20px;margin:4px 0 0;">
+        Distinct boats${cls ? ' in this class' : ''}, best placing first. Click a boat for its full record.</p>
       <table>
         <thead><tr><th>Boat</th><th>Sail No</th><th>Type</th><th>Class</th><th>Owner</th><th>Sailmaker</th><th class="num">Races</th><th>Best</th></tr></thead>
         <tbody>${entryRows || '<tr><td colspan="8" class="muted">No boat-level entries on file for this season — only aggregate class counts.</td></tr>'}</tbody>
@@ -1275,9 +1444,9 @@ function renderRegattaProfile(id, year) {
     </div>` : ''}
     ${classTrendTable}
     ${raceRows ? `<details class="card">
-      <summary><strong>Races in ${focus}</strong> — individual results</summary>
+      <summary><strong>Races in ${focus}${cls ? ' · ' + esc(cls) : ''}</strong> — individual results</summary>
       <div style="overflow:auto;margin-top:10px;">
-        <table><thead><tr><th>Race</th><th class="num">Year</th><th class="num">Entries</th></tr></thead><tbody>${raceRows}</tbody></table>
+        <table><thead><tr><th>Race</th><th>Class</th><th class="num">Entries</th></tr></thead><tbody>${raceRows}</tbody></table>
       </div>
     </details>` : ''}
   `;
