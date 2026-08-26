@@ -99,6 +99,53 @@ def discover_result_slugs(keyword=None):
     return sorted(slugs)
 
 
+def regatta_name_for(event_name, slug=""):
+    """Map a results page to the regatta it belongs to, or None to skip it.
+
+    The Summer Series regattas are sponsored, and the sponsor changes year to
+    year (North Sails May Regatta, Champagne Charlie June Regatta, Salcombe Gin
+    / Key Yachting July Regatta), so they are matched on the month rather than
+    the full title. Everything else that is a real IRC keelboat regatta gets
+    its own name; junior, dinghy and one-design-only events are skipped, as is
+    the "Summer Series" cumulative standing, which is an aggregate of the four
+    month regattas rather than a regatta boats enter.
+    """
+    blob = f"{event_name} {slug}".lower()
+    if re.search(r"\bjunior\b|\bcadet\b|\bdinghy\b|\bicebreaker\b|\byouth\b", blob):
+        return None
+    month_m = re.search(r"\b(May|June|July|September)\s+Regatta\b", event_name, re.I)
+    if month_m:
+        return f"Royal Southern {month_m.group(1).title()} Regatta"
+    if re.search(r"summer series", blob):
+        return None          # cumulative standing across the month regattas
+    if re.search(r"charity|match racing", blob):
+        return None
+    # Named events are matched on a keyword rather than their full title,
+    # because the title carries a sponsor that changes year to year
+    # ("CompareYachtInsure 4x4 Championships" vs plain "4x4 Championships",
+    # "Key Yachting J-Cup"). Without this each sponsor spawned its own regatta
+    # and the same event's history fragmented across several records.
+    NAMED = [
+        (r"\b4\s*x\s*4\b",                 "Royal Southern 4x4 Championships"),
+        (r"j[- ]?cup",                     "Royal Southern J-Cup"),
+        (r"ancient mariner",               "Royal Southern Ancient Mariners Race"),
+        (r"round the isle of wight|rtiw",  "Royal Southern Round the Isle of Wight Double-Handed"),
+        (r"early bird",                    "Royal Southern Early Bird Series"),
+        (r"spring championship",           "Royal Southern Spring Championship"),
+        (r"winter series",                 "Royal Southern Winter Series"),
+    ]
+    for pat, name in NAMED:
+        if re.search(pat, blob):
+            return name
+    # anything else: strip a trailing year and any "- Series II" style suffix
+    name = re.sub(r"\s+", " ", event_name).strip()
+    name = re.sub(r"\s*[-–]\s*series\s+[ivx0-9]+\s*$", "", name, flags=re.I)
+    name = re.sub(r"\s*20\d\d\s*$", "", name).strip()
+    if not name:
+        return None
+    return name if name.lower().startswith("royal southern") else f"Royal Southern {name}"
+
+
 def parse_event_page(slug):
     page_url = f"{BASE}/racing-results/{slug}"
     html = fetch(page_url)
@@ -250,17 +297,16 @@ def main():
         if not event["season_year"]:
             print(f"  '{event['event_name']}' - couldn't determine a season year - skipping")
             continue
-        if args.keyword and args.keyword.lower() == "summer" and "summer series" not in event["event_name"].lower():
-            print(f"  '{event['event_name']}' - matched 'summer' incidentally (not Summer Series) - skipping")
-            continue
 
         # "Summer Series" is a cumulative points competition across the May/
         # June/July/September Regattas, not itself a place boats race - model
         # each sub-regatta as its own regatta rather than merging them into
         # one "Summer Series" event per year (which would wrongly combine
         # 4 different regattas' races into a single event).
-        month_m = re.search(r"\b(May|June|July|September)\s+Regatta\b", event["event_name"], re.I)
-        regatta = f"Royal Southern {month_m.group(1).title()} Regatta" if month_m else "Royal Southern Summer Series"
+        regatta = regatta_name_for(event["event_name"], slug)
+        if regatta is None:
+            print(f"  '{event['event_name']}' - not an IRC keelboat regatta - skipping")
+            continue
         for race in event["races"]:
             rows = race_to_csv_rows(race)
             if not rows:
