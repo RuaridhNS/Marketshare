@@ -36,6 +36,10 @@ def parse_args():
     p.add_argument("--race-name", required=True)
     p.add_argument("--class", dest="class_label", default=None)
     p.add_argument("--source-url", default=None)
+    # Provenance tag written onto every race_entries row. Defaults to the
+    # RORC value this loader was originally written for; every other
+    # scraper (Cowes, Royal Southern, Warsash, Hamble) passes its own.
+    p.add_argument("--source", default="scrape:rorc")
     p.add_argument("--category", default="RORC")
     return p.parse_args()
 
@@ -102,12 +106,12 @@ def main():
             " owner_id, owner_name_used, skipper_name_used, status, finish_time, elapsed_time, "
             " corrected_time, position, points, comments, source) VALUES ("
             " (SELECT id FROM race_entries WHERE race_id = ? AND boat_id = ?),"
-            " ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'scrape:rorc')",
+            " ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (race_id, boat_id,
              race_id, boat_id, args.class_label, norm_upper(sail_no), norm_upper(boat_name),
              norm(boat_type), tcc, owner_id, norm_upper(owner_name), norm_upper(skipper),
              status, norm(row.get("FinishTime")), norm(row.get("Elapsed")), corrected,
-             position, points, norm(comments)),
+             position, points, norm(comments), args.source),
         )
         n += 1
 

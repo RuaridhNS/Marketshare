@@ -198,7 +198,7 @@ def load_into_db(db, csv_path, regatta, year, race_name, class_label, source_url
     cmd = [
         sys.executable, str(SCRIPT_DIR / "load_rorc_csv.py"), db, str(csv_path),
         "--regatta", regatta, "--year", str(year), "--race-name", race_name,
-        "--source-url", source_url, "--category", "Club",
+        "--source-url", source_url, "--source", "scrape:warsash", "--category", "Club",
     ]
     if class_label:
         cmd += ["--class", class_label]

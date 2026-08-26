@@ -60,13 +60,25 @@ def norm_sailno(raw, mna=None):
     return s
 
 
-def fetch(url, referer=None):
+def fetch(url, referer=None, attempts=4):
+    """Retried with backoff: this network drops DNS/SSL/connections often
+    enough that a single blip was costing whole scrape runs elsewhere."""
     headers = dict(BROWSER_HEADERS)
     if referer:
         headers["Referer"] = referer
-    r = requests.get(url, timeout=30, headers=headers)
-    r.raise_for_status()
-    return r.text
+    last = None
+    for n in range(attempts):
+        try:
+            r = requests.get(url, timeout=30, headers=headers)
+            r.raise_for_status()
+            return r.text
+        except Exception as e:
+            last = e
+            if n < attempts - 1:
+                wait = 3 * (2 ** n)
+                print(f"    (retry {n+1}/{attempts-1} in {wait}s: {type(e).__name__})", flush=True)
+                time.sleep(wait)
+    raise last
 
 
 def discover_result_slugs(keyword=None):
@@ -190,7 +202,7 @@ def load_into_db(db, csv_path, regatta, year, race_name, class_label, source_url
     cmd = [
         sys.executable, str(SCRIPT_DIR / "load_rorc_csv.py"), db, str(csv_path),
         "--regatta", regatta, "--year", str(year), "--race-name", race_name,
-        "--source-url", source_url, "--category", "Club",
+        "--source-url", source_url, "--source", "scrape:royal-southern", "--category", "Club",
     ]
     if class_label:
         cmd += ["--class", class_label]
