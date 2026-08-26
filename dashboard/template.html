@@ -291,6 +291,33 @@ function entryEvent(e) { const race = racesById[e.race_id]; return race ? events
 function entryRegatta(e) { const ev = entryEvent(e); return ev ? regattasById[ev.regatta_id] : null; }
 function entrySeasonYear(e) { const ev = entryEvent(e); return ev ? ev.season_year : null; }
 
+// Roll a boat's race entries up into one row per regatta-season - the unit a
+// campaign is actually planned and sold in. Individual races stay available
+// on the regatta page rather than flooding the boat profile.
+function boatRegattaEntries(boat) {
+  const byKey = new Map();
+  boat.entries.forEach(e => {
+    const ev = entryEvent(e);
+    if (!ev) return;
+    const key = ev.regatta_id + '|' + ev.season_year;
+    let g = byKey.get(key);
+    if (!g) {
+      g = { regattaId: ev.regatta_id, year: ev.season_year,
+            regattaName: (regattasById[ev.regatta_id] || {}).name || '—',
+            classes: new Set(), races: 0, best: null, sailmaker: null };
+      byKey.set(key, g);
+    }
+    g.races++;
+    if (e.class) g.classes.add(e.class);
+    // finishing positions only - DNF/DNC/RET and the like aren't placings
+    const pos = parseInt(e.position, 10);
+    if (!isNaN(pos) && pos > 0 && (g.best === null || pos < g.best)) g.best = pos;
+    if (!g.sailmaker && e.sailmaker_name) g.sailmaker = e.sailmaker_name;
+  });
+  return Array.from(byKey.values())
+    .sort((a, b) => (b.year || 0) - (a.year || 0) || a.regattaName.localeCompare(b.regattaName));
+}
+
 // per-boat set of regatta ids / categories it has entries in, for the boats-list filter
 DATA.boats.forEach(b => {
   b.regattaIds = new Set(b.entries.map(e => entryEvent(e)?.regatta_id).filter(x => x != null));
@@ -502,14 +529,18 @@ function navigate() {
   document.querySelectorAll('.nav-item').forEach(n => {
     n.classList.toggle('active', hash.startsWith(n.dataset.route));
   });
-  const [_, route, arg] = hash.split('/');
+  const [_, route, rawArg] = hash.split('/');
+  // routes may carry a query, e.g. #/regatta/49?year=2025
+  const [arg, queryStr] = (rawArg || '').split('?');
+  const query = new URLSearchParams(queryStr || '');
+  const qYear = query.has('year') ? parseInt(query.get('year'), 10) : null;
   const main = document.getElementById('main');
   try {
     if (!route || route === 'overview') main.innerHTML = renderOverview();
     else if (route === 'boats') main.innerHTML = renderBoatsList();
     else if (route === 'boat') main.innerHTML = renderBoatProfile(parseInt(arg));
     else if (route === 'regattas') main.innerHTML = renderRegattasList();
-    else if (route === 'regatta') main.innerHTML = renderRegattaProfile(parseInt(arg));
+    else if (route === 'regatta') main.innerHTML = renderRegattaProfile(parseInt(arg), qYear);
     else if (route === 'race') main.innerHTML = renderRacePage(parseInt(arg));
     else if (route === 'market-share') main.innerHTML = renderMarketShare();
     else if (route === 'sales') main.innerHTML = renderSales();
@@ -738,20 +769,19 @@ function renderBoatProfile(id) {
     <tr><td>${esc(h.owner_name||'—')}</td><td>${esc(h.effective_from||'—')}</td><td>${esc(h.effective_to||'current')}</td><td>${esc(h.source||'')}</td></tr>
   `).join('') || `<tr><td colspan="4" class="muted">No owner history recorded.</td></tr>`;
 
-  const entryRows = b.entries.map(e => {
-    const result = e.position || (e.status || '—');
-    const race = racesById[e.race_id];
-    const reg = entryRegatta(e);
-    return `<tr class="clickable" data-route="#/race/${e.race_id}">
-      <td>${esc(reg?.name)}</td>
-      <td class="num">${entrySeasonYear(e)||''}</td>
-      <td>${esc(race?.race_name||'')}</td>
-      <td>${esc(e.class||'')}</td>
-      <td>${esc(result)}</td>
-      <td>${e.sailmaker_name ? `<span class="pill" style="${pillStyle(e.sailmaker_name)}">${esc(e.sailmaker_name)}</span>` : ''}</td>
-      <td class="muted" style="font-size:12px;">${esc(e.source)}</td>
-    </tr>`;
-  }).join('') || `<tr><td colspan="7" class="muted">No race entries on file.</td></tr>`;
+  // A boat's history reads as the regattas it has entered, not the hundreds of
+  // individual races inside them (a single Cowes Week is ~15 rows on its own).
+  // Races are still there, one level down, on the regatta page.
+  const regattaEntries = boatRegattaEntries(b);
+  const entryRows = regattaEntries.map(g => `
+    <tr class="clickable" data-route="#/regatta/${g.regattaId}?year=${g.year}">
+      <td>${esc(g.regattaName)}</td>
+      <td class="num">${g.year||''}</td>
+      <td>${esc(Array.from(g.classes).join(', '))}</td>
+      <td class="num">${g.races}</td>
+      <td>${g.best!=null ? (g.best===1?'1st':g.best===2?'2nd':g.best===3?'3rd':g.best+'th') : '—'}</td>
+      <td>${g.sailmaker ? `<span class="pill" style="${pillStyle(g.sailmaker)}">${esc(g.sailmaker)}</span>` : ''}</td>
+    </tr>`).join('') || `<tr><td colspan="6" class="muted">No regatta entries on file.</td></tr>`;
 
   const crm = `
     <dl class="kv">
@@ -867,9 +897,12 @@ function renderBoatProfile(id) {
       <table><thead><tr><th>Owner</th><th>From</th><th>To</th><th>Source</th></tr></thead><tbody>${ownerHistoryRows}</tbody></table>
     </div>
     <div class="card" style="padding:0;overflow:auto;">
-      <h2 style="padding:18px 20px 0;">Race entries (${b.entries.length})</h2>
+      <h2 style="padding:18px 20px 0;">Regatta entries (${regattaEntries.length})</h2>
+      <p class="muted" style="font-size:12px;padding:0 20px;margin:4px 0 0;">
+        One row per regatta entered, newest first — ${b.entries.length} individual race results sit behind these.
+        Click through to a regatta to see its races.</p>
       <table>
-        <thead><tr><th>Regatta</th><th>Year</th><th>Race</th><th>Class</th><th>Placing</th><th>Sailmaker (that race)</th><th>Source</th></tr></thead>
+        <thead><tr><th>Regatta</th><th class="num">Year</th><th>Class(es)</th><th class="num">Races</th><th>Best</th><th>Sailmaker</th></tr></thead>
         <tbody>${entryRows}</tbody>
       </table>
     </div>
@@ -1128,11 +1161,69 @@ function renderRegattasList() {
 }
 
 // ---------- page: regatta profile ----------
-function renderRegattaProfile(id) {
+// Distinct boats that entered one regatta in one season, with their races
+// rolled up. This is the "regatta entry" - the unit that matters commercially;
+// individual race results hang off it rather than the other way round.
+function regattaEntriesFor(regattaId, year) {
+  const evIds = new Set(DATA.events
+    .filter(e => e.regatta_id === regattaId && (year == null || e.season_year === year))
+    .map(e => e.id));
+  if (!evIds.size) return [];
+  const out = [];
+  DATA.boats.forEach(b => {
+    let races = 0, best = null, cls = new Set(), sm = null;
+    b.entries.forEach(e => {
+      const ra = racesById[e.race_id];
+      if (!ra || !evIds.has(ra.event_id)) return;
+      races++;
+      if (e.class) cls.add(e.class);
+      const pos = parseInt(e.position, 10);
+      if (!isNaN(pos) && pos > 0 && (best === null || pos < best)) best = pos;
+      if (!sm && e.sailmaker_name) sm = e.sailmaker_name;
+    });
+    if (races) out.push({ boat: b, races, best, classes: cls, sailmaker: sm || b.current_sailmaker });
+  });
+  return out.sort((a, b) => (a.best ?? 9999) - (b.best ?? 9999) ||
+                            (a.boat.boat_name || '').localeCompare(b.boat.boat_name || ''));
+}
+
+function renderRegattaProfile(id, year) {
   const r = regattasById[id];
   if (!r) return `<div class="card">Regatta not found.</div>`;
   const evs = DATA.events.filter(e => e.regatta_id === id).sort((a,b)=>b.season_year-a.season_year);
-  const raceRows = DATA.races.filter(ra => evs.some(e=>e.id===ra.event_id)).map(ra => {
+
+  // per-season summary: how many distinct boats entered, and how many races
+  const seasonRows = evs.map(ev => {
+    const entries = regattaEntriesFor(id, ev.season_year);
+    const nRaces = DATA.races.filter(ra => ra.event_id === ev.id).length;
+    const totalRow = DATA.class_counts.find(c => c.event_id === ev.id && c.class_label.toLowerCase() === 'total');
+    const agg = totalRow ? totalRow.entry_count : null;
+    const sel = (year === ev.season_year) ? ' style="background:var(--surface-2,#f3f4f6);font-weight:600;"' : '';
+    return `<tr class="clickable"${sel} data-route="#/regatta/${id}?year=${ev.season_year}">
+      <td class="num">${ev.season_year}</td>
+      <td class="num">${entries.length || (agg != null ? '<span class="muted">'+agg+' (aggregate)</span>' : '—')}</td>
+      <td class="num">${nRaces || '—'}</td>
+    </tr>`;
+  }).join('');
+
+  // the selected season's actual entry list
+  const focus = year != null ? year : (evs.length ? evs[0].season_year : null);
+  const entries = focus != null ? regattaEntriesFor(id, focus) : [];
+  const entryRows = entries.map(g => `
+    <tr class="clickable" data-route="#/boat/${g.boat.id}">
+      <td><strong>${esc(g.boat.boat_name||'—')}</strong></td>
+      <td>${esc(g.boat.sail_no||'')}</td>
+      <td>${esc(g.boat.boat_type||'')}</td>
+      <td>${esc(Array.from(g.classes).join(', '))}</td>
+      <td>${esc(g.boat.owner_name||'')}</td>
+      <td><span class="pill" style="${pillStyle(g.sailmaker)}">${esc(g.sailmaker||'Unknown')}</span></td>
+      <td class="num">${g.races}</td>
+      <td>${g.best!=null ? (g.best===1?'1st':g.best===2?'2nd':g.best===3?'3rd':g.best+'th') : '—'}</td>
+    </tr>`).join('');
+
+  // races for the focused season only, kept subsidiary to the entry list
+  const focusEvIds = new Set(evs.filter(e => focus == null || e.season_year === focus).map(e => e.id));
+  const raceRows = DATA.races.filter(ra => focusEvIds.has(ra.event_id)).map(ra => {
     const ev = eventsById[ra.event_id];
     const n = DATA.boats.reduce((acc,b) => acc + b.entries.filter(e=>e.race_id===ra.id).length, 0);
     return `<tr class="clickable" data-route="#/race/${ra.id}"><td>${esc(ra.race_name)}</td><td class="num">${ev.season_year}</td><td class="num">${n}</td></tr>`;
@@ -1165,11 +1256,30 @@ function renderRegattaProfile(id) {
     <a class="back-link" href="#/regattas" data-route="#/regattas">← All regattas</a>
     <h1>${esc(r.name)}</h1>
     <p class="subtitle">${esc(r.category||'')} · ${esc(r.region||'')}</p>
-    ${classTrendTable}
-    ${raceRows ? `<div class="card" style="padding:0;overflow:auto;">
-      <h2 style="padding:18px 20px 0;">Results by race</h2>
-      <table><thead><tr><th>Race</th><th class="num">Year</th><th class="num">Entries</th></tr></thead><tbody>${raceRows}</tbody></table>
+    <div class="card" style="padding:0;overflow:auto;">
+      <h2 style="padding:18px 20px 0;">Seasons</h2>
+      <p class="muted" style="font-size:12px;padding:0 20px;margin:4px 0 0;">Click a season to see who entered it.</p>
+      <table>
+        <thead><tr><th class="num">Season</th><th class="num">Boats entered</th><th class="num">Races</th></tr></thead>
+        <tbody>${seasonRows || '<tr><td colspan="3" class="muted">No seasons on file.</td></tr>'}</tbody>
+      </table>
+    </div>
+    ${focus != null ? `<div class="card" style="padding:0;overflow:auto;">
+      <h2 style="padding:18px 20px 0;">Entries — ${focus} (${entries.length} boat${entries.length===1?'':'s'})</h2>
+      <p class="muted" style="font-size:12px;padding:0 20px;margin:4px 0 0;">
+        Distinct boats that raced this regatta in ${focus}, best placing first. Click a boat for its full record.</p>
+      <table>
+        <thead><tr><th>Boat</th><th>Sail No</th><th>Type</th><th>Class</th><th>Owner</th><th>Sailmaker</th><th class="num">Races</th><th>Best</th></tr></thead>
+        <tbody>${entryRows || '<tr><td colspan="8" class="muted">No boat-level entries on file for this season — only aggregate class counts.</td></tr>'}</tbody>
+      </table>
     </div>` : ''}
+    ${classTrendTable}
+    ${raceRows ? `<details class="card">
+      <summary><strong>Races in ${focus}</strong> — individual results</summary>
+      <div style="overflow:auto;margin-top:10px;">
+        <table><thead><tr><th>Race</th><th class="num">Year</th><th class="num">Entries</th></tr></thead><tbody>${raceRows}</tbody></table>
+      </div>
+    </details>` : ''}
   `;
 }
 
