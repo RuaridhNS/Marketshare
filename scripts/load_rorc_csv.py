@@ -70,7 +70,8 @@ def main():
 
     regatta_id = get_or_create_regatta(cur, args.regatta, args.category)
     event_id = get_or_create_event(cur, regatta_id, args.year, source_url=args.source_url)
-    race_id = create_race(cur, event_id, args.race_name, status="confirmed")
+    race_id = create_race(cur, event_id, args.race_name, status="confirmed",
+                          class_label=args.class_label)
 
     n = 0
     for row in reader:

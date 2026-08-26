@@ -133,7 +133,30 @@ def get_or_create_event(cur, regatta_id, season_year, notes=None, source_url=Non
     return cur.lastrowid
 
 
-def create_race(cur, event_id, race_name, race_number=None, status=None):
+def create_race(cur, event_id, race_name, race_number=None, status=None, class_label=None):
+    """Get-or-create, keyed on (event, race name, class).
+
+    This used to insert unconditionally, so every re-run of a scraper minted a
+    fresh set of race rows and their entries were counted again alongside the
+    originals - 4,138 duplicate races had built up that way, badly inflating
+    entry totals.
+
+    Class has to be part of the key because it is genuinely part of a race's
+    identity here: RORC publishes one race under "IRC Overall" AND under each
+    class, and those are legitimately separate result sets. Class lives on
+    race_entries rather than races, so an existing race is matched by looking
+    at the class its entries already carry; a race with no entries yet is
+    treated as a match so an interrupted load can be resumed.
+    """
+    candidates = cur.execute(
+        "SELECT id FROM races WHERE event_id = ? AND IFNULL(race_name,'') = IFNULL(?,'')",
+        (event_id, race_name),
+    ).fetchall()
+    for (rid,) in candidates:
+        existing = {r[0] for r in cur.execute(
+            "SELECT DISTINCT class FROM race_entries WHERE race_id = ?", (rid,))}
+        if not existing or existing == {class_label}:
+            return rid
     cur.execute(
         "INSERT INTO races (event_id, race_name, race_number, status) VALUES (?, ?, ?, ?)",
         (event_id, race_name, race_number, status),
