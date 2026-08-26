@@ -2,6 +2,7 @@
 """Export the SQLite database to a single JSON file consumed by the
 self-contained dashboard.html. Run this after any DB update, then run
 build_dashboard.py to bake the fresh JSON into the HTML file."""
+import re
 import sys
 import json
 import sqlite3
@@ -55,6 +56,69 @@ def main():
                re.comments, re.tag, re.source
         FROM race_entries re
     """).fetchall()
+
+    # ---- IRC-only scope ----------------------------------------------------
+    # This tool tracks the IRC fleet. Pure one-design boats (XOD, Squib,
+    # Sunbeam, SB20, most J/70s) are filtered out here rather than deleted, so
+    # the call stays reversible and a mis-classified boat can be recovered by
+    # re-running the export.
+    #
+    # A boat counts as IRC if it has EITHER raced in an IRC-labelled class at
+    # some point, OR has an IRC TCC on file. Classifying by boat rather than by
+    # class label matters: J/109s, J/111s, Cape 31s and Quarter Tonners hold IRC
+    # certs and are core customers, but often get their own one-design start at
+    # Cowes and Royal Southern. Those one-design races still count as fleet
+    # activity for a boat that qualifies - only boats with no IRC signal at all
+    # are dropped.
+    irc_class_re = re.compile(r"\bIRC\b", re.I)
+    # Boat types that are pure one-design fleets. A TCC on its own does NOT
+    # qualify one of these: a handful of SB20s and J/70s carry a stray rating
+    # yet have never started an IRC race, and they were leaking through.
+    OD_TYPE_RE = re.compile(
+        r"^\s*(sb\s?20|j\s?/?70|j\s?/?80|x\s?od|x one design|squib|sunbeam|dragon|"
+        r"etchells|daring|sonar|mermaid|redwing|victory|flying\s?15|swallow|"
+        r"rs\s?elite|rs\s?21|cork\s?1720|contessa\s?32|sonata|folkboat)\b", re.I)
+
+    # First clause: actually started an IRC race - the strongest possible signal.
+    irc_boat_ids = {e["boat_id"] for e in entries_rows
+                    if e["class"] and irc_class_re.search(e["class"])}
+    # Second clause: holds an IRC rating and isn't a one-design. This rescues
+    # boats whose entries carry no class label at all (~13k rows, mostly RORC),
+    # which would otherwise be dropped despite plainly being IRC boats.
+    irc_boat_ids |= {b["id"] for b in boats_rows
+                     if b["tcc"] is not None and not OD_TYPE_RE.match(b["boat_type"] or "")}
+    # Override: a one-design hull is not an IRC boat even when it has started an
+    # IRC race. A handful do (an XOD with 28 "IRC Class 7" starts at Cowes, a
+    # J/70 with 11) - those entries are real, but the fleet is not one we rate
+    # or sell IRC sails into, and this tool is scoped to the IRC fleet. Six
+    # boats; reverse by dropping this line and re-running the export.
+    irc_boat_ids -= {b["id"] for b in boats_rows if OD_TYPE_RE.match(b["boat_type"] or "")}
+
+    n_boats_all = len(boats_rows)
+    boats_rows = [b for b in boats_rows if b["id"] in irc_boat_ids]
+    entries_rows = [e for e in entries_rows if e["boat_id"] in irc_boat_ids]
+
+    # Aggregate class-count rows are labelled far more tersely ("1", "2", "0"
+    # are IRC divisions), so only the explicitly one-design fleets are dropped.
+    OD_CLASS_LABELS = {"j/70", "j70", "sb20", "sb 20", "xod", "x one design",
+                       "squib", "sunbeam", "dragon", "etchells", "daring",
+                       "sonar", "mermaid", "redwing", "victory", "flying 15",
+                       "contessa 32", "sonata", "swallow", "rs elite", "j/80"}
+    dropped_cc = {c["event_id"] for c in class_counts
+                  if c["class_label"].strip().lower() in OD_CLASS_LABELS}
+    class_counts = [c for c in class_counts
+                    if c["class_label"].strip().lower() not in OD_CLASS_LABELS]
+    # A "Total" row that counted those one-design boats is now wrong - rebuild
+    # it from the remaining classes for any event we removed a fleet from.
+    for eid in dropped_cc:
+        rest = [c for c in class_counts
+                if c["event_id"] == eid and c["class_label"].lower() != "total"]
+        for c in class_counts:
+            if c["event_id"] == eid and c["class_label"].lower() == "total":
+                c["entry_count"] = sum(x["entry_count"] or 0 for x in rest)
+
+    print(f"IRC filter: kept {len(boats_rows)}/{n_boats_all} boats, "
+          f"{len(entries_rows)} entries; recomputed totals for {len(dropped_cc)} event(s)")
 
     sm_history_rows = cur.execute("""
         SELECT boat_id, sailmaker_id, effective_from, effective_to, source, confidence

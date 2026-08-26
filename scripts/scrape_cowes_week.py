@@ -40,10 +40,23 @@ SCRIPT_DIR = __import__("pathlib").Path(__file__).resolve().parent
 REPO_ROOT = SCRIPT_DIR.parent
 
 
-def fetch(params):
-    r = requests.get(BASE, params=params, timeout=30, headers={"User-Agent": USER_AGENT})
-    r.raise_for_status()
-    return r.text
+def fetch(params, attempts=4):
+    """Retried with backoff. Without this a transient DNS drop mid-run cost 80
+    of 2017's 348 race fetches outright - the scrape reported "Done." and the
+    missing races were only visible by counting rows afterwards."""
+    last = None
+    for n in range(attempts):
+        try:
+            r = requests.get(BASE, params=params, timeout=30, headers={"User-Agent": USER_AGENT})
+            r.raise_for_status()
+            return r.text
+        except Exception as e:
+            last = e
+            if n < attempts - 1:
+                wait = 3 * (2 ** n)
+                print(f"    (retry {n+1}/{attempts-1} in {wait}s: {type(e).__name__})", flush=True)
+                time.sleep(wait)
+    raise last
 
 
 def discover_races(year):
