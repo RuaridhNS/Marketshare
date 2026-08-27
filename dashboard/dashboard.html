@@ -582,9 +582,18 @@ function sparkline(points, {width=560, height=90, color='var(--series-north)'}={
 // where you were instead of jumping to the top every time.
 let lastHash = location.hash || '#/overview';
 const SCROLL_POSITIONS = {};
-function navigate() {
-  SCROLL_POSITIONS[lastHash] = window.scrollY;
+// Record position continuously rather than only on the way out. Reading
+// window.scrollY inside navigate() is too late once the browser has already
+// moved us for a hashchange, and it misses the case where the page is left by
+// the browser Back button.
+addEventListener('scroll', () => {
+  SCROLL_POSITIONS[location.hash || '#/overview'] = window.scrollY;
+}, {passive: true});
 
+// Stop the browser doing its own (wrong, pre-render) scroll restoration on
+// history navigation - we do it ourselves once the new page has laid out.
+if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
+function navigate() {
   const hash = location.hash || '#/overview';
   document.querySelectorAll('.nav-item').forEach(n => {
     n.classList.toggle('active', hash.startsWith(n.dataset.route));
@@ -626,7 +635,12 @@ function navigate() {
   attachSalesHandlers();
   updatePendingBadge();
   lastHash = hash;
-  window.scrollTo(0, SCROLL_POSITIONS[hash] || 0);
+  // Restore AFTER the new content has been laid out. Scrolling in the same
+  // tick clamps to the old document height - usually 0 - which is why this
+  // looked like "always resets to the top". Two frames because the first only
+  // guarantees style/layout is queued, not done.
+  const target = SCROLL_POSITIONS[hash] || 0;
+  requestAnimationFrame(() => requestAnimationFrame(() => window.scrollTo(0, target)));
 }
 window.addEventListener('hashchange', navigate);
 document.addEventListener('click', e => {
@@ -731,9 +745,12 @@ function attachBoatFilterHandlers() {
       }
       tr.style.display = show ? '' : 'none';
     });
-    const shown = document.querySelectorAll('#boats-tbody tr:not([style*="display: none"])').length;
+    const visible = Array.from(document.querySelectorAll('#boats-tbody tr'))
+      .filter(tr => tr.style.display !== 'none');
+    const shown = visible.length;
     const countEl = document.getElementById('boat-count');
     if (countEl) countEl.textContent = shown === DATA.boats.length ? `${shown} boats` : `${shown} of ${DATA.boats.length} boats`;
+    renderFilteredShare(visible, {type: tf, sailmaker: f, activity: af, q});
   };
   search.addEventListener('input', apply);
   filter.addEventListener('change', apply);
@@ -747,6 +764,46 @@ function attachBoatFilterHandlers() {
     apply();
   });
   apply();
+}
+
+// Market share for whatever the Boats page is currently filtered to. Selecting
+// a class (say the 63 J/109s) and seeing who has that fleet is the question
+// this whole tool exists to answer, so it updates live with the filters rather
+// than being a separate report.
+function renderFilteredShare(visibleRows, ctx) {
+  const host = document.getElementById('filtered-share');
+  if (!host) return;
+  if (!visibleRows.length) { host.innerHTML = ''; return; }
+
+  const counts = {};
+  visibleRows.forEach(tr => {
+    const b = boatsById[tr.dataset.boatId];
+    const k = bucketOf(b && b.current_sailmaker);
+    counts[k] = (counts[k] || 0) + 1;
+  });
+  const total = visibleRows.length;
+  const items = BUCKET_ORDER.filter(b => counts[b]).map(b => ({sailmaker: b, entries: counts[b]}));
+  const north = counts['North Sails'] || 0;
+  const known = total - (counts['Unknown'] || 0);
+
+  const bits = [];
+  if (ctx.type) bits.push(`<strong>${esc(ctx.type)}</strong>`);
+  if (ctx.sailmaker && ctx.sailmaker !== 'all') bits.push(`sailmaker ${esc(ctx.sailmaker)}`);
+  if (ctx.activity === 'active') bits.push('active fleet');
+  else if (ctx.activity === 'inactive') bits.push('inactive only');
+  if (ctx.q) bits.push(`matching “${esc(ctx.q)}”`);
+  const scope = bits.length ? bits.join(' · ') : 'all tracked boats';
+
+  host.innerHTML = `
+    <div class="card">
+      <h2>Market share — ${scope}</h2>
+      <p class="muted" style="font-size:12px;margin-top:0;">
+        ${total} boat${total===1?'':'s'} in this selection.
+        North Sails on <strong>${north}</strong>
+        (${total ? Math.round(100*north/total) : 0}% of all,
+         ${known ? Math.round(100*north/known) : 0}% of the ${known} with a known sailmaker).</p>
+      ${svgBarChart(items, {colorFn: it => BUCKET_COLOR[it.sailmaker]})}
+    </div>`;
 }
 
 function renderBoatsList() {
@@ -835,6 +892,7 @@ function renderBoatsList() {
       </div>
       <button class="btn secondary" id="clear-regatta-filter" type="button">Clear regatta filters</button>
     </details>
+    <div id="filtered-share"></div>
     <div class="card" style="padding:0; overflow:auto;">
       <table>
         <thead><tr><th>Boat</th><th>Sail No</th><th>Type</th><th class="num">TCC</th><th>Owner</th><th>Sailmaker</th><th>Status</th><th>Tag</th><th class="num">Entries</th></tr></thead>
@@ -1344,17 +1402,19 @@ function renderCompare(selectedIds) {
     points: x.s.pts.map(p => ({x: p.x, y: p.y, solid: p.real})),
   }));
 
+  // Grouped multi-select. <optgroup> keeps the series structure without the
+  // wall of checkboxes, and the native control gives ctrl/shift multi-pick.
   const bySeries = {};
   candidates.forEach(x => { (bySeries[seriesOf(x.r)] ||= []).push(x); });
-  const picker = Object.keys(bySeries).sort().map(g => `
-    <div class="filter-group">
-      <div class="filter-group-title">${esc(g)}</div>
-      <div class="regatta-checklist">
-        ${bySeries[g].map(x => `<label><input type="checkbox" class="cmp-box" value="${x.r.id}"
-            ${sel.has(x.r.id)?'checked':''}> ${esc(x.r.name)}
-            <span class="muted" style="font-size:11px;">(${x.s.pts.length} seasons)</span></label>`).join('')}
-      </div>
-    </div>`).join('');
+  const picker = `
+    <label class="field-label" for="cmp-select">Regattas (ctrl-click or drag to pick several)</label>
+    <select id="cmp-select" multiple size="14" style="width:100%;max-width:520px;">
+      ${Object.keys(bySeries).sort().map(g => `
+        <optgroup label="${esc(g)}">
+          ${bySeries[g].map(x => `<option value="${x.r.id}" ${sel.has(x.r.id)?'selected':''}>
+            ${esc(x.r.name)} — ${x.s.pts.length} seasons</option>`).join('')}
+        </optgroup>`).join('')}
+    </select>`;
 
   const table = chosen.length ? (() => {
     const years = Array.from(new Set(chosen.flatMap(x => x.s.pts.map(p=>p.x)))).sort((a,b)=>a-b);
@@ -1391,15 +1451,22 @@ function renderCompare(selectedIds) {
 }
 
 function attachCompareHandlers() {
-  const boxes = document.querySelectorAll('.cmp-box');
-  if (!boxes.length) return;
-  const apply = () => {
-    const ids = Array.from(document.querySelectorAll('.cmp-box:checked')).map(b => b.value);
-    location.hash = '#/compare' + (ids.length ? '?r=' + ids.join(',') : '');
-  };
-  boxes.forEach(b => b.addEventListener('change', apply));
+  const sel = document.getElementById('cmp-select');
+  if (!sel) return;
+  sel.addEventListener('change', () => {
+    const ids = Array.from(sel.selectedOptions).map(o => o.value);
+    // replaceState rather than assigning location.hash: picking regattas
+    // shouldn't push a history entry per click, or Back has to walk out
+    // through every selection you tried.
+    const target = '#/compare' + (ids.length ? '?r=' + ids.join(',') : '');
+    history.replaceState(null, '', target);
+    navigate();
+  });
   const clear = document.getElementById('cmp-clear');
-  if (clear) clear.addEventListener('click', () => { location.hash = '#/compare'; });
+  if (clear) clear.addEventListener('click', () => {
+    history.replaceState(null, '', '#/compare');
+    navigate();
+  });
 }
 
 function attachRegattaListHandlers() {
