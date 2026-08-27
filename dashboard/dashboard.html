@@ -204,6 +204,7 @@
     <a class="nav-item" href="#/overview" data-route="#/overview">Overview</a>
     <a class="nav-item" href="#/boats" data-route="#/boats">Boats</a>
     <a class="nav-item" href="#/regattas" data-route="#/regattas">Regattas</a>
+    <a class="nav-item" href="#/compare" data-route="#/compare">Compare</a>
     <a class="nav-item" href="#/market-share" data-route="#/market-share">Market share</a>
     <a class="nav-item" href="#/sales" data-route="#/sales">Sales opportunities</a>
     <a class="nav-item" href="#/duplicates" data-route="#/duplicates">Duplicates<span class="nav-badge" id="duplicates-badge" style="display:none;"></span></a>
@@ -493,6 +494,65 @@ function svgBarChart(items, {width=520, barHeight=22, gap=8, valueKey='entries',
   return `<svg viewBox="0 0 ${width} ${h}" width="100%" height="${h}" role="img">${bars}</svg>`;
 }
 
+// Colours for overlaying several regattas on one axis. Deliberately not the
+// sailmaker palette - these mean "series N", not "North Sails".
+const LINE_COLOURS = ['#2563eb','#ea580c','#16a34a','#7c3aed','#dc2626','#0d9488','#a16207','#db2777'];
+
+// Multi-series line chart on a shared year axis. Each series is
+// {label, points:[{x,y,solid}]}; solid:false draws the marker hollow, which is
+// how an aggregate-only season is distinguished from a counted-boats one.
+function svgLineChart(series, {width=760, height=280, yLabel='Boats'}={}) {
+  const all = series.flatMap(s => s.points);
+  if (!all.length) return '<div class="muted">No data to plot.</div>';
+  const xs = all.map(p=>p.x), ys = all.map(p=>p.y);
+  const minX = Math.min(...xs), maxX = Math.max(...xs);
+  const maxY = Math.max(...ys, 1);
+  const padL = 46, padR = 14, padT = 14, padB = 34;
+  const sx = x => padL + (maxX===minX ? (width-padL-padR)/2 : (x-minX)/(maxX-minX)*(width-padL-padR));
+  const sy = y => (height-padB) - (y/maxY)*(height-padT-padB);
+
+  // y gridlines at 4 steps, rounded to something readable
+  const step = Math.max(1, Math.ceil(maxY/4/10)*10 || Math.ceil(maxY/4));
+  let grid = '';
+  for (let v=0; v<=maxY; v+=step) {
+    grid += `<line x1="${padL}" y1="${sy(v).toFixed(1)}" x2="${width-padR}" y2="${sy(v).toFixed(1)}"
+             stroke="var(--baseline)" stroke-width="1" opacity="0.5"/>
+             <text x="${padL-6}" y="${(sy(v)+4).toFixed(1)}" font-size="11" text-anchor="end"
+             fill="var(--text-muted)">${v}</text>`;
+  }
+  const years = Array.from(new Set(xs)).sort((a,b)=>a-b);
+  const tickEvery = Math.ceil(years.length/10) || 1;
+  let xlab = '';
+  years.forEach((y,i) => { if (i % tickEvery === 0)
+    xlab += `<text x="${sx(y).toFixed(1)}" y="${height-12}" font-size="11" text-anchor="middle" fill="var(--text-muted)">${y}</text>`; });
+
+  let body = '';
+  series.forEach((s, i) => {
+    const c = s.color || LINE_COLOURS[i % LINE_COLOURS.length];
+    const pts = s.points.slice().sort((a,b)=>a.x-b.x);
+    const d = pts.map((p,j) => `${j?'L':'M'}${sx(p.x).toFixed(1)},${sy(p.y).toFixed(1)}`).join(' ');
+    body += `<path d="${d}" fill="none" stroke="${c}" stroke-width="2.2" stroke-linejoin="round"/>`;
+    pts.forEach(p => {
+      body += `<circle cx="${sx(p.x).toFixed(1)}" cy="${sy(p.y).toFixed(1)}" r="4"
+        fill="${p.solid === false ? 'var(--surface)' : c}" stroke="${c}" stroke-width="2">
+        <title>${esc(s.label)} — ${p.x}: ${p.y}${p.solid === false ? ' (aggregate)' : ''}</title></circle>`;
+    });
+  });
+
+  const legend = series.map((s,i) => {
+    const c = s.color || LINE_COLOURS[i % LINE_COLOURS.length];
+    return `<span style="display:inline-flex;align-items:center;gap:6px;margin-right:14px;font-size:12.5px;">
+      <span style="width:14px;height:3px;background:${c};display:inline-block;border-radius:2px;"></span>
+      ${esc(s.label)}</span>`;
+  }).join('');
+
+  return `<svg viewBox="0 0 ${width} ${height}" width="100%" height="${height}" role="img">
+      ${grid}${xlab}${body}
+      <text x="10" y="${padT+2}" font-size="11" fill="var(--text-muted)">${esc(yLabel)}</text>
+    </svg>
+    <div style="margin-top:8px;">${legend}</div>`;
+}
+
 function sparkline(points, {width=560, height=90, color='var(--series-north)'}={}) {
   if (points.length === 0) return '<div class="muted">No data</div>';
   const xs = points.map(p=>p.x), ys = points.map(p=>p.y);
@@ -529,10 +589,13 @@ function navigate() {
   document.querySelectorAll('.nav-item').forEach(n => {
     n.classList.toggle('active', hash.startsWith(n.dataset.route));
   });
-  const [_, route, rawArg] = hash.split('/');
-  // routes may carry a query, e.g. #/regatta/49?year=2025
-  const [arg, queryStr] = (rawArg || '').split('?');
+  // Split the query off the WHOLE hash before splitting the path. Doing it
+  // only on the last segment worked for #/regatta/49?year=2025 but left
+  // #/compare?r=1,2 with route "compare?r=1,2", which matched nothing and
+  // silently fell through to the overview.
+  const [path, queryStr] = hash.split('?');
   const query = new URLSearchParams(queryStr || '');
+  const [_, route, arg] = path.split('/');
   const qYear = query.has('year') ? parseInt(query.get('year'), 10) : null;
   const qCls = query.get('cls') || null;
   const main = document.getElementById('main');
@@ -545,6 +608,7 @@ function navigate() {
     else if (route === 'race') main.innerHTML = renderRacePage(parseInt(arg));
     else if (route === 'market-share') main.innerHTML = renderMarketShare();
     else if (route === 'sales') main.innerHTML = renderSales();
+    else if (route === 'compare') main.innerHTML = renderCompare((query.get('r')||'').split(',').filter(Boolean));
     else if (route === 'duplicates') main.innerHTML = renderDuplicates();
     else if (route === 'changes') main.innerHTML = renderPendingChanges();
     else main.innerHTML = renderOverview();
@@ -558,6 +622,7 @@ function navigate() {
   attachDuplicatesHandlers();
   attachRegattaHandlers();
   attachRegattaListHandlers();
+  attachCompareHandlers();
   attachSalesHandlers();
   updatePendingBadge();
   lastHash = hash;
@@ -631,6 +696,7 @@ function attachBoatFilterHandlers() {
   const search = document.getElementById('boat-search');
   const filter = document.getElementById('boat-filter');
   const activityFilter = document.getElementById('boat-activity-filter');
+  const typeFilter = document.getElementById('boat-type-filter');
   if (!search) return;
   const catBoxes = () => Array.from(document.querySelectorAll('.cat-chip:checked'));
   const regattaBoxes = () => Array.from(document.querySelectorAll('.regatta-box:checked'));
@@ -638,6 +704,7 @@ function attachBoatFilterHandlers() {
     const q = search.value.trim().toLowerCase();
     const f = filter.value;
     const af = activityFilter ? activityFilter.value : 'all';
+    const tf = typeFilter ? typeFilter.value : '';
     const selectedCats = new Set(catBoxes().map(b => b.value));
     const catMode = (document.querySelector('input[name=cat-mode]:checked') || {}).value || 'and';
     const selectedRegattas = new Set(regattaBoxes().map(b => parseInt(b.value)));
@@ -648,7 +715,8 @@ function attachBoatFilterHandlers() {
       const bucket = tr.dataset.bucket;
       const b = boatsById[tr.dataset.boatId];
       let show = (!q || hay.includes(q)) && (f==='all' || bucket===f)
-        && (af==='all' || (af==='active' && tr.dataset.active==='1') || (af==='inactive' && tr.dataset.active==='0'));
+        && (af==='all' || (af==='active' && tr.dataset.active==='1') || (af==='inactive' && tr.dataset.active==='0'))
+        && (!tf || tr.dataset.type === tf);
 
       if (show && selectedCats.size) {
         const cats = b.regattaCategories;
@@ -670,6 +738,7 @@ function attachBoatFilterHandlers() {
   search.addEventListener('input', apply);
   filter.addEventListener('change', apply);
   if (activityFilter) activityFilter.addEventListener('change', apply);
+  if (typeFilter) typeFilter.addEventListener('change', apply);
   document.querySelectorAll('.cat-chip, .regatta-box').forEach(el => el.addEventListener('change', apply));
   document.querySelectorAll('input[name=cat-mode], input[name=reg-mode]').forEach(el => el.addEventListener('change', apply));
   const clearBtn = document.getElementById('clear-regatta-filter');
@@ -688,7 +757,7 @@ function renderBoatsList() {
     const statusPill = b.active
       ? `<span class="pill" style="background:var(--series-north);color:#fff;">Active</span>`
       : `<span class="pill" style="background:var(--surface-2, #eee);color:var(--text-muted);border:1px solid var(--border);">Inactive</span>`;
-    return `<tr class="clickable" data-route="#/boat/${b.id}" data-hay="${esc(hay)}" data-bucket="${bucket}" data-active="${b.active?1:0}" data-boat-id="${b.id}">
+    return `<tr class="clickable" data-route="#/boat/${b.id}" data-hay="${esc(hay)}" data-bucket="${bucket}" data-active="${b.active?1:0}" data-type="${esc(normType(b.boat_type))}" data-boat-id="${b.id}">
       <td><strong>${esc(b.boat_name||'—')}</strong>${edited}</td>
       <td>${esc(b.sail_no||'')}</td>
       <td>${esc(b.boat_type||'')}</td>
@@ -701,6 +770,19 @@ function renderBoatsList() {
     </tr>`;
   }).join('');
   const options = BUCKET_ORDER.map(b => `<option value="${b}">${b}</option>`).join('');
+
+  // Boat-type filter. Types are normalised the same way the duplicate matcher
+  // does it (trailing IRC rating stripped) so "J/109 1.01" and "J/109" are one
+  // entry, and the list is ordered by how many boats carry each type so the
+  // big fleets are reachable without scrolling.
+  const typeCounts = {};
+  DATA.boats.forEach(b => {
+    const t = normType(b.boat_type);
+    if (t) typeCounts[t] = (typeCounts[t] || 0) + 1;
+  });
+  const typeOptions = Object.entries(typeCounts)
+    .sort((a,b) => b[1]-a[1] || a[0].localeCompare(b[0]))
+    .map(([t,n]) => `<option value="${esc(t)}">${esc(t)} (${n})</option>`).join('');
 
   const catsPresent = Array.from(new Set(DATA.regattas.map(r => r.category || 'Other'))).sort();
   const catChips = catsPresent.map(c => `<label class="chip"><input type="checkbox" class="cat-chip" value="${esc(c)}"> ${esc(c)}</label>`).join('');
@@ -726,6 +808,10 @@ function renderBoatsList() {
         <option value="active" selected>Active only (last 5 seasons)</option>
         <option value="inactive">Inactive only</option>
         <option value="all">All boats</option>
+      </select>
+      <select id="boat-type-filter">
+        <option value="">All boat types</option>
+        ${typeOptions}
       </select>
     </div>
     <details class="filter-panel card">
@@ -1243,6 +1329,79 @@ function renderRegattasList() {
   `;
 }
 
+// ---------- page: compare regattas ----------
+function renderCompare(selectedIds) {
+  const sel = new Set((selectedIds || []).map(Number));
+  // only offer regattas that actually have a trend worth plotting
+  const candidates = DATA.regattas
+    .map(r => ({r, s: regattaSummary(r)}))
+    .filter(x => x.s.pts.length > 1)
+    .sort((a,b) => b.s.nRecent - a.s.nRecent || a.r.name.localeCompare(b.r.name));
+
+  const chosen = candidates.filter(x => sel.has(x.r.id));
+  const series = chosen.map(x => ({
+    label: x.r.name,
+    points: x.s.pts.map(p => ({x: p.x, y: p.y, solid: p.real})),
+  }));
+
+  const bySeries = {};
+  candidates.forEach(x => { (bySeries[seriesOf(x.r)] ||= []).push(x); });
+  const picker = Object.keys(bySeries).sort().map(g => `
+    <div class="filter-group">
+      <div class="filter-group-title">${esc(g)}</div>
+      <div class="regatta-checklist">
+        ${bySeries[g].map(x => `<label><input type="checkbox" class="cmp-box" value="${x.r.id}"
+            ${sel.has(x.r.id)?'checked':''}> ${esc(x.r.name)}
+            <span class="muted" style="font-size:11px;">(${x.s.pts.length} seasons)</span></label>`).join('')}
+      </div>
+    </div>`).join('');
+
+  const table = chosen.length ? (() => {
+    const years = Array.from(new Set(chosen.flatMap(x => x.s.pts.map(p=>p.x)))).sort((a,b)=>a-b);
+    const head = years.map(y => `<th class="num">${y}</th>`).join('');
+    const rows = chosen.map(x => {
+      const by = {}; x.s.pts.forEach(p => by[p.x] = p);
+      const first = x.s.pts[0], last = x.s.pts[x.s.pts.length-1];
+      const chg = (first && last && first.y) ? Math.round((last.y-first.y)/first.y*100) : null;
+      return `<tr><td>${esc(x.r.name)}</td>${years.map(y => {
+        const p = by[y];
+        return `<td class="num">${p ? (p.real ? p.y : `<span class="muted">${p.y}</span>`) : '—'}</td>`;
+      }).join('')}<td class="num">${chg==null?'—':(chg>0?'+':'')+chg+'%'}</td></tr>`;
+    }).join('');
+    return `<div class="card" style="padding:0;overflow:auto;">
+      <h2 style="padding:18px 20px 0;">Side by side</h2>
+      <p class="muted" style="font-size:12px;padding:0 20px;margin:4px 0 0;">Greyed figures are aggregate-only seasons.</p>
+      <table><thead><tr><th>Regatta</th>${head}<th class="num">Change</th></tr></thead><tbody>${rows}</tbody></table>
+    </div>`;
+  })() : '';
+
+  return `
+    <h1>Compare regattas</h1>
+    <p class="subtitle">Plot attendance for any regattas together on one axis. ${chosen.length} selected.</p>
+    ${chosen.length ? `<div class="card">
+      ${svgLineChart(series, {height: 320})}
+    </div>` : `<div class="card muted">Pick two or more regattas below to plot them.</div>`}
+    ${table}
+    <details class="filter-panel card" ${chosen.length?'':'open'}>
+      <summary><strong>Choose regattas</strong></summary>
+      ${picker}
+      <button class="btn secondary" id="cmp-clear" type="button">Clear all</button>
+    </details>
+  `;
+}
+
+function attachCompareHandlers() {
+  const boxes = document.querySelectorAll('.cmp-box');
+  if (!boxes.length) return;
+  const apply = () => {
+    const ids = Array.from(document.querySelectorAll('.cmp-box:checked')).map(b => b.value);
+    location.hash = '#/compare' + (ids.length ? '?r=' + ids.join(',') : '');
+  };
+  boxes.forEach(b => b.addEventListener('change', apply));
+  const clear = document.getElementById('cmp-clear');
+  if (clear) clear.addEventListener('click', () => { location.hash = '#/compare'; });
+}
+
 function attachRegattaListHandlers() {
   const search = document.getElementById('regatta-search');
   const filter = document.getElementById('regatta-filter');
@@ -1355,6 +1514,8 @@ function renderRegattaProfile(id, year, cls) {
     </tr>`;
   }).join('');
 
+  const attendancePts = regattaSummary(r).pts.map(p => ({x: p.x, y: p.y, solid: p.real}));
+
   // The selected season's actual entry list. Default to the most recent season
   // that has boat-level results rather than simply the most recent: several
   // regattas (Fastnet, Myth of Malham) have aggregate-only counts for the
@@ -1438,6 +1599,13 @@ function renderRegattaProfile(id, year, cls) {
         <tbody>${seasonRows || '<tr><td colspan="3" class="muted">No seasons on file.</td></tr>'}</tbody>
       </table>
     </div>
+    ${attendancePts.length > 1 ? `<div class="card">
+      <h2>Attendance over time</h2>
+      <p class="muted" style="font-size:12px;margin-top:0;">Distinct boats per season.
+        Hollow markers are seasons where only an aggregate entry count is on file, not boat-level results.
+        <a href="#/compare?r=${id}" data-route="#/compare?r=${id}">Compare with other regattas →</a></p>
+      ${svgLineChart([{label: r.name, points: attendancePts}])}
+    </div>` : ''}
     ${classes.length ? `<div class="card" style="padding:0;overflow:auto;">
       <h2 style="padding:18px 20px 0;">Classes — ${focus}</h2>
       <p class="muted" style="font-size:12px;padding:0 20px;margin:4px 0 0;">
