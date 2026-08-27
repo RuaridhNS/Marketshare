@@ -1307,8 +1307,11 @@ function normClass(raw) {
   if (!s) return 'Unclassified';
   s = s.replace(/\s*\(race\s*\d+\)\s*$/i, '');
   const WORDS = {one:'1', two:'2', three:'3', four:'4', five:'5', six:'6', seven:'7', zero:'0'};
-  let m = s.match(/^IRC\s*(?:class\s*)?([0-9]+|zero|one|two|three|four|five|six|seven)([A-Z])?$/i);
-  if (m) return 'IRC ' + (WORDS[m[1].toLowerCase()] ?? m[1]) + (m[2] || '');
+  // The division marker is not always at the start: Hamble writes "HWS IRC1"
+  // and "Autumn Regatta IRC2", Cowes "LMIS IRC Class 3". Pull the division out
+  // wherever it sits so the same division reads the same across regattas.
+  let m = s.match(/\bIRC\s*(?:class\s*)?([0-9]+|zero|one|two|three|four|five|six|seven)\s*([A-Z])?\b/i);
+  if (m) return 'IRC ' + (WORDS[m[1].toLowerCase()] ?? m[1]) + (m[2] || '').toUpperCase();
   if (/^[0-7]$/.test(s)) return 'IRC ' + s;
   return s.replace(/\s+/g, ' ');
 }

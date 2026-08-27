@@ -108,12 +108,84 @@ def main():
     boats_rows = [b for b in boats_rows if b["id"] in irc_boat_ids]
     entries_rows = [e for e in entries_rows if e["boat_id"] in irc_boat_ids]
 
+    # ---- entry-level: keep only racing that actually happened under IRC ----
+    # Being an IRC boat isn't enough for the ENTRY to count. Cowes Week alone
+    # publishes 85 "classes", of which only IRC Class 0-7 are IRC divisions;
+    # the rest are one-design fleets, cruiser/club-handicap divisions (Club
+    # Cruiser, Performance Cruiser, Sunsail, Sportsboat) that aren't IRC-rated,
+    # and trophies.
+    #
+    # Trophies (Britannia Cup, Queen's Cup, NYYC Challenge Cup, Triple Crown)
+    # are not classes at all - they're prizes contested BY the IRC divisions,
+    # so those entries are real IRC racing wearing the wrong label. Where the
+    # boat also raced a named IRC division at the same regatta that season the
+    # entry is relabelled to it; where it didn't, it's kept as IRC racing under
+    # a single bucket rather than inventing a class per trophy.
+    # "IRC" need not start the label: Hamble writes "HWS IRC1" and "Autumn
+    # Regatta IRC2", Cowes writes "LMIS IRC Class 3". Anchoring this to the
+    # start silently dropped every Hamble entry, so it searches instead.
+    IRC_DIVISION_RE = re.compile(
+        r"\bIRC\s*(?:class\s*)?"
+        r"(?:[0-7][ab]?\b|zero|one\b|two\b|three|four|five|six|seven|"
+        r"overall|super\s*zero|sz\b|canting\s*keel|ck\b|two[- ]handed|2h\b|irm\b)", re.I)
+    TROPHY_RE = re.compile(
+        r"^(britannia cup|queen'?s cup|new york yacht club challenge cup|"
+        r"triple crown.*|double[- ]handed)$", re.I)
+
+    def norm_div(s):
+        return re.sub(r"\s+", " ", (s or "").strip())
+
+    # boat + regatta-season -> the IRC divisions it raced there
+    race_event = {r["id"]: r["event_id"] for r in races}
+    event_key = {e["id"]: (e["regatta_id"], e["season_year"]) for e in events}
+    div_by_boat_event = {}
+    for e in entries_rows:
+        cl = norm_div(e["class"])
+        if cl and IRC_DIVISION_RE.search(cl):
+            ek = event_key.get(race_event.get(e["race_id"]))
+            if ek:
+                div_by_boat_event.setdefault((e["boat_id"], ek), set()).add(cl)
+
+    kept, relabelled, trophy_kept, n_entries_all = [], 0, 0, len(entries_rows)
+    for e in entries_rows:
+        cl = norm_div(e["class"])
+        if not cl:
+            kept.append(e)                      # unlabelled: mostly RORC IRC racing
+            continue
+        if IRC_DIVISION_RE.search(cl):
+            kept.append(e)
+            continue
+        if TROPHY_RE.match(cl):
+            ek = event_key.get(race_event.get(e["race_id"]))
+            divs = div_by_boat_event.get((e["boat_id"], ek))
+            d = dict(e)
+            if divs and len(divs) == 1:
+                d["class"] = next(iter(divs))
+                relabelled += 1
+            else:
+                d["class"] = "IRC (division unrecorded)"
+                trophy_kept += 1
+            kept.append(d)
+            continue
+        # everything else - one-design fleets, cruiser and club-handicap
+        # divisions - is not IRC racing and is dropped.
+    entries_rows = kept
+    n_entries_irc = len(entries_rows)
+
+    # a boat left with no IRC racing at all is no longer in scope
+    still = {e["boat_id"] for e in entries_rows}
+    boats_rows = [b for b in boats_rows if b["id"] in still]
+
     # Aggregate class-count rows are labelled far more tersely ("1", "2", "0"
     # are IRC divisions), so only the explicitly one-design fleets are dropped.
+    # J/111 and J/109 appear both as bare one-design labels and as "(IRC)"
+    # variants - only the plain ones are dropped, since the parenthesised ones
+    # are explicitly the IRC-rated split of that fleet.
     OD_CLASS_LABELS = {"j/70", "j70", "sb20", "sb 20", "xod", "x one design",
                        "squib", "sunbeam", "dragon", "etchells", "daring",
                        "sonar", "mermaid", "redwing", "victory", "flying 15",
-                       "contessa 32", "sonata", "swallow", "rs elite", "j/80"}
+                       "contessa 32", "sonata", "swallow", "rs elite", "j/80",
+                       "j111", "j/111", "j109", "j/109"}
     dropped_cc = {c["event_id"] for c in class_counts
                   if c["class_label"].strip().lower() in OD_CLASS_LABELS}
     class_counts = [c for c in class_counts
@@ -128,7 +200,10 @@ def main():
                 c["entry_count"] = sum(x["entry_count"] or 0 for x in rest)
 
     print(f"IRC filter: kept {len(boats_rows)}/{n_boats_all} boats, "
-          f"{len(entries_rows)} entries; recomputed totals for {len(dropped_cc)} event(s)")
+          f"{n_entries_irc}/{n_entries_all} entries "
+          f"({relabelled} trophy entries relabelled to their IRC division, "
+          f"{trophy_kept} kept as 'division unrecorded'); "
+          f"recomputed totals for {len(dropped_cc)} event(s)")
 
     sm_history_rows = cur.execute("""
         SELECT boat_id, sailmaker_id, effective_from, effective_to, source, confidence
