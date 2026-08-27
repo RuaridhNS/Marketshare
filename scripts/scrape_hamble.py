@@ -241,7 +241,16 @@ def load_into_db(db, csv_path, regatta, year, race_name, class_label, source_url
     return True
 
 
-def regatta_for(class_name, series_name):
+def regatta_for(class_name, series_name, override=None):
+    """`override` lets the same live-HalSail machinery serve other clubs on the
+    platform (Royal Solent's Taittinger regatta, say) without inheriting the
+    Hamble-specific naming below."""
+    if override:
+        return override
+    return _hamble_regatta_for(class_name, series_name)
+
+
+def _hamble_regatta_for(class_name, series_name):
     """Hamble runs the Winter Series and the IRC Autumn Championship on the same
     HalSail club account; keep them as separate regattas."""
     blob = f"{class_name or ''} {series_name or ''}".lower()
@@ -256,6 +265,8 @@ def main():
     p.add_argument("--club", type=int, default=HAMBLE_CLUB_ID)
     p.add_argument("--delay", type=float, default=DELAY)
     p.add_argument("--dry-run", action="store_true")
+    p.add_argument("--regatta", default=None,
+                   help="file every series under this regatta name (for non-Hamble clubs)")
     p.add_argument("--all-classes", action="store_true",
                    help="include one-design classes too (default: IRC only)")
     args = p.parse_args()
@@ -287,7 +298,7 @@ def main():
             continue
 
         class_label = s["class_name"]
-        regatta = regatta_for(s["class_name"], s["series_name"])
+        regatta = regatta_for(s["class_name"], s["series_name"], args.regatta)
         for race in ev["races"]:
             rows = race_to_csv_rows(race)
             if not rows:
