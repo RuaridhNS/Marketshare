@@ -1355,8 +1355,19 @@ function renderRegattaProfile(id, year, cls) {
     </tr>`;
   }).join('');
 
-  // the selected season's actual entry list
-  const focus = year != null ? year : (evs.length ? evs[0].season_year : null);
+  // The selected season's actual entry list. Default to the most recent season
+  // that has boat-level results rather than simply the most recent: several
+  // regattas (Fastnet, Myth of Malham) have aggregate-only counts for the
+  // newest years because the RORC scrape stops at 2022, and landing on one of
+  // those shows an empty entries table for a regatta that plainly has data.
+  let focus = year;
+  if (focus == null) {
+    const withBoats = evs.find(e => DATA.boats.some(b => b.entries.some(x => {
+      const ra = racesById[x.race_id];
+      return ra && ra.event_id === e.id;
+    })));
+    focus = (withBoats || evs[0] || {}).season_year ?? null;
+  }
   const classes = focus != null ? regattaClassesFor(id, focus) : [];
   const classRows = classes.map(g => {
     const sel = (cls === g.cls) ? ' style="background:var(--surface-2,#f3f4f6);font-weight:600;"' : '';

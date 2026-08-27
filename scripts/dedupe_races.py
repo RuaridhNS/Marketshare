@@ -8,14 +8,18 @@ on top of them. (race_entries has UNIQUE(race_id, boat_id), which dedupes
 entries WITHIN a race - but a second race row sidesteps that entirely, which is
 why the duplication went unnoticed.)
 
-Only genuinely duplicated races are merged: those sharing an (event_id,
-race_name) AND whose entries carry exactly the same set of class labels. Groups
-where the class sets differ are left alone - RORC publishes the same race under
-"IRC Overall" and again under each class, and those are legitimately separate
-result sets, not duplicates.
+RORC publishes the same race once per class ("IRC Overall", then IRC Zero, One,
+Two...), so an (event_id, race_name) group legitimately holds several rows.
+The duplicates are WITHIN each of those classes, not across them - the 2019
+Fastnet had 22 race rows covering 8 real classes, each minted 2-3 times over.
 
-Entries move to the earliest race id in each group; where the keeper already has
-that boat, the duplicate entry is dropped (same boat, same race, same class).
+So races are grouped by (event_id, race_name, class-set) and de-duplicated
+inside each sub-group. An earlier version compared class-sets across the whole
+(event, race_name) group and bailed out whenever they differed, which meant it
+skipped every one of the 151 affected groups and merged nothing at all.
+
+Entries move to the earliest race id in each sub-group; where the keeper already
+has that boat, the duplicate entry is dropped (same boat, same race, same class).
 
 Usage:
   python3 dedupe_races.py <db.sqlite> [--dry-run]
@@ -34,24 +38,27 @@ def main():
     conn = sqlite3.connect(args.db)
     cur = conn.cursor()
 
-    groups = defaultdict(list)
+    raw = defaultdict(list)
     for ev, nm, rid in cur.execute(
             "SELECT event_id, COALESCE(race_name,''), id FROM races ORDER BY id"):
-        groups[(ev, nm)].append(rid)
+        raw[(ev, nm)].append(rid)
 
-    merged_races = moved = dropped = skipped_groups = 0
-    for (ev, nm), ids in groups.items():
+    # sub-group each (event, race_name) by the class its entries carry, so a
+    # race split across classes stays split while true repeats collapse
+    groups = defaultdict(list)
+    for (ev, nm), ids in raw.items():
         if len(ids) < 2:
             continue
-        classsets = {}
         for rid in ids:
-            classsets[rid] = frozenset(
+            cs = frozenset(
                 r[0] or "" for r in cur.execute(
                     "SELECT DISTINCT class FROM race_entries WHERE race_id = ?", (rid,)))
-        if len(set(classsets.values())) != 1:
-            skipped_groups += 1          # real class split - leave it be
-            continue
+            groups[(ev, nm, cs)].append(rid)
 
+    merged_races = moved = dropped = skipped_groups = 0
+    for (ev, nm, cs), ids in groups.items():
+        if len(ids) < 2:
+            continue
         keep, rest = ids[0], ids[1:]
         for rid in rest:
             rows = cur.execute(
