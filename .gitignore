@@ -21,3 +21,6 @@ exports/rsyc_*.csv
 exports/warsash_*.csv
 exports/hamble_*.csv
 exports/jog_*.csv
+
+# Scheduled-refresh run logs (rotated, last 30 kept)
+logs/
