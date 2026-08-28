@@ -105,6 +105,14 @@ def main():
     if not ok:
         failures.append("dedupe")
 
+    # Loaders write the owner onto the ENTRY; this promotes it to the boat
+    # record the dashboard actually reads. Skipping it left 2,729 boats looking
+    # ownerless while their own race history named the owner, so it belongs in
+    # every run rather than being remembered occasionally.
+    ok, _ = run("Backfill owners", ["backfill_owners.py"], args.db, args.timeout)
+    if not ok:
+        failures.append("owners")
+
     for step, argv in (("Export JSON", ["export_dashboard_data.py", "dashboard/data.json"]),
                        ("Build dashboard", ["build_dashboard.py"])):
         # build_dashboard takes no db argument
