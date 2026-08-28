@@ -175,10 +175,11 @@ def write_csv(rows, out_path, comment):
         w.writerows(rows)
 
 
-def load_into_db(db, csv_path, regatta, year, race_name, class_label, source_url):
+def load_into_db(db, csv_path, regatta, year, race_name, class_label, source_url, race_date=None):
     cmd = [sys.executable, str(SCRIPT_DIR / "load_rorc_csv.py"), db, str(csv_path),
            "--regatta", regatta, "--year", str(year), "--race-name", race_name,
-           "--source-url", source_url, "--category", "Club",
+           "--source-url", source_url,
+           *(["--race-date", race_date] if race_date else []), "--category", "Club",
            "--source", "scrape:halsail-archive"]
     if class_label:
         cmd += ["--class", class_label]
@@ -264,7 +265,7 @@ def main():
                 print(f"  {race['label']} [{cname}] - {len(rows)} boats -> {out.name}")
                 total += 1
                 if not args.dry_run:
-                    load_into_db(args.db, out, args.regatta, year, race_name, cname, src)
+                    load_into_db(args.db, out, args.regatta, year, race_name, cname, src, race["race_date"])
 
     print(f"Done. {total} race table(s).")
 

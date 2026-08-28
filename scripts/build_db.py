@@ -133,7 +133,8 @@ def get_or_create_event(cur, regatta_id, season_year, notes=None, source_url=Non
     return cur.lastrowid
 
 
-def create_race(cur, event_id, race_name, race_number=None, status=None, class_label=None):
+def create_race(cur, event_id, race_name, race_number=None, status=None, class_label=None,
+                race_date=None):
     """Get-or-create, keyed on (event, race name, class).
 
     This used to insert unconditionally, so every re-run of a scraper minted a
@@ -156,10 +157,15 @@ def create_race(cur, event_id, race_name, race_number=None, status=None, class_l
         existing = {r[0] for r in cur.execute(
             "SELECT DISTINCT class FROM race_entries WHERE race_id = ?", (rid,))}
         if not existing or existing == {class_label}:
+            # fill the date in on a re-run if we didn't have it first time
+            if race_date:
+                cur.execute("UPDATE races SET race_date = COALESCE(race_date, ?) WHERE id = ?",
+                            (race_date, rid))
             return rid
     cur.execute(
-        "INSERT INTO races (event_id, race_name, race_number, status) VALUES (?, ?, ?, ?)",
-        (event_id, race_name, race_number, status),
+        "INSERT INTO races (event_id, race_name, race_number, status, race_date)"
+        " VALUES (?, ?, ?, ?, ?)",
+        (event_id, race_name, race_number, status, race_date),
     )
     return cur.lastrowid
 

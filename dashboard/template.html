@@ -205,6 +205,7 @@
     <a class="nav-item" href="#/boats" data-route="#/boats">Boats</a>
     <a class="nav-item" href="#/regattas" data-route="#/regattas">Regattas</a>
     <a class="nav-item" href="#/compare" data-route="#/compare">Compare</a>
+    <a class="nav-item" href="#/coverage" data-route="#/coverage">Coverage</a>
     <a class="nav-item" href="#/market-share" data-route="#/market-share">Market share</a>
     <a class="nav-item" href="#/sales" data-route="#/sales">Sales opportunities</a>
     <a class="nav-item" href="#/duplicates" data-route="#/duplicates">Duplicates<span class="nav-badge" id="duplicates-badge" style="display:none;"></span></a>
@@ -617,6 +618,7 @@ function navigate() {
     else if (route === 'race') main.innerHTML = renderRacePage(parseInt(arg));
     else if (route === 'market-share') main.innerHTML = renderMarketShare();
     else if (route === 'sales') main.innerHTML = renderSales();
+    else if (route === 'coverage') main.innerHTML = renderCoverage();
     else if (route === 'compare') main.innerHTML = renderCompare((query.get('r')||'').split(',').filter(Boolean));
     else if (route === 'duplicates') main.innerHTML = renderDuplicates();
     else if (route === 'changes') main.innerHTML = renderPendingChanges();
@@ -1383,6 +1385,111 @@ function renderRegattasList() {
         <option value="all">All regattas</option>
       </select>
     </div>
+    ${cards}
+  `;
+}
+
+// ---------- page: coverage ----------
+// Why a source is incomplete, so the gap list says what to DO rather than just
+// that something is missing. Keyed by a test on the regatta name.
+const COVERAGE_NOTES = [
+  [/^Rolex Fastnet|^RORC |^IRC |^NSR |Easter Challenge|Inshore Series|Two-Handed|Myth of Malham|Cervantes|North Sea|Roschier|Caribbean|Transatlantic/i,
+   'blocked', 'RORC results moved to sailracehq.com, which disallows our crawler. Legacy archive covers 2007–2022 only. Needs RORC permission or an export.'],
+  [/^JOG/i, 'blocked',
+   'myjog.jog.org.uk disallows our crawler (Cloudflare managed AI list). Needs JOG to allow it, or a member-side export.'],
+  [/^ORC /i, 'manual',
+   'ORC championships, aggregate counts only from the IRC Solent Report. Boat-level would need the event sites season by season.'],
+  [/^Round the Island/i, 'todo',
+   'Aggregate counts only. Results are published — no scraper written yet. Biggest unmined fleet in the Solent.'],
+  [/^Cowes Week/i, 'auto', 'Scraped weekly. 2017 lost ~80 of 348 fetches to a DNS drop and is worth a re-run.'],
+  [/^Royal Southern|^Taittinger|^Hamble|^Warsash/i, 'auto', 'Scraped weekly.'],
+];
+// A source being blocked only matters if it is actually missing recent
+// seasons. Most of the RORC records are per-class historical result sets that
+// stopped years ago and are complete as they stand - calling those "blocked"
+// buried the handful of regattas that genuinely need action.
+function coverageNote(name, boatYears, aggYears) {
+  const latest = Math.max(0, ...boatYears, ...aggYears);
+  const newestBoat = Math.max(0, ...boatYears);
+  const stale = latest && newestBoat < latest;          // aggregate newer than boats
+  const ranRecently = latest >= ACTIVE_CUTOFF_YEAR;
+
+  // Age decides first: a regatta that last ran years ago cannot be "blocked",
+  // whatever its source, because there is nothing newer to go and fetch.
+  if (!ranRecently) {
+    return {status: 'historical',
+            note: `Complete as held. Last ran ${latest || '—'}; no newer results exist to fetch.`};
+  }
+  for (const [re, status, note] of COVERAGE_NOTES) {
+    if (!re.test(name)) continue;
+    if (status === 'blocked' && !stale) {
+      return {status: 'auto', note: 'Up to date with what the source publishes.'};
+    }
+    return {status, note};
+  }
+  return ranRecently
+    ? {status: 'todo', note: 'No automated source configured yet.'}
+    : {status: 'historical', note: `Complete as held. Last ran ${latest || '—'}.`};
+}
+const COVERAGE_BADGE = {
+  auto:    ['Automated',   'var(--series-north)', '#fff'],
+  todo:    ['Needs work',  'var(--series-doyle)', '#292524'],
+  manual:  ['Manual only', 'var(--series-other)', '#fff'],
+  blocked: ['Blocked',     'var(--series-one)',   '#fff'],
+  historical: ['Historical', 'var(--series-unknown)', 'var(--series-unknown-text)'],
+};
+
+function renderCoverage() {
+  const rows = DATA.regattas.map(r => {
+    const s = regattaSummary(r);
+    const boatYears = s.pts.filter(p => p.real).map(p => p.x);
+    const aggYears  = s.pts.filter(p => !p.real).map(p => p.x);
+    return {r, s, boatYears, aggYears, ...coverageNote(r.name, boatYears, aggYears)};
+  }).filter(x => x.s.pts.length);
+
+  const span = ys => ys.length
+    ? (ys.length === 1 ? String(ys[0]) : `${Math.min(...ys)}–${Math.max(...ys)} (${ys.length})`)
+    : '—';
+
+  // headline counts
+  const tally = {};
+  rows.forEach(x => { tally[x.status] = (tally[x.status]||0)+1; });
+  const chips = ['blocked','todo','manual','auto','historical'].filter(k=>tally[k]).map(k => {
+    const [lbl, bg, fg] = COVERAGE_BADGE[k];
+    return `<span class="pill" style="background:${bg};color:${fg};margin-right:6px;">${lbl}: ${tally[k]}</span>`;
+  }).join('');
+
+  const bySeries = {};
+  rows.forEach(x => { (bySeries[seriesOf(x.r)] ||= []).push(x); });
+
+  const cards = Object.keys(bySeries).sort().map(g => {
+    const body = bySeries[g]
+      .sort((a,b) => b.boatYears.length - a.boatYears.length || a.r.name.localeCompare(b.r.name))
+      .map(x => {
+        const [lbl, bg, fg] = COVERAGE_BADGE[x.status];
+        return `<tr class="clickable" data-route="#/regatta/${x.r.id}">
+          <td>${esc(x.r.name)}</td>
+          <td>${span(x.boatYears)}</td>
+          <td class="muted">${span(x.aggYears)}</td>
+          <td><span class="pill" style="background:${bg};color:${fg};">${lbl}</span></td>
+          <td style="font-size:12px;" class="muted">${esc(x.note)}</td>
+        </tr>`;
+      }).join('');
+    return `<div class="card" style="padding:0;overflow:auto;">
+      <h2 style="padding:18px 20px 0;">${esc(g)}</h2>
+      <table>
+        <thead><tr><th>Regatta</th><th>Boat-level seasons</th><th>Aggregate only</th><th>Status</th><th>What's needed</th></tr></thead>
+        <tbody>${body}</tbody>
+      </table>
+    </div>`;
+  }).join('');
+
+  return `
+    <h1>Coverage</h1>
+    <p class="subtitle">What results we hold per regatta, and what it would take to get the rest.
+      "Boat-level" means actual boats and results; "aggregate only" means an entry count from the
+      IRC Solent Report with no boats behind it.</p>
+    <p style="margin-top:-6px;">${chips}</p>
     ${cards}
   `;
 }

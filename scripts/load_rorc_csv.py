@@ -34,6 +34,10 @@ def parse_args():
     p.add_argument("--regatta", required=True)
     p.add_argument("--year", required=True, type=int)
     p.add_argument("--race-name", required=True)
+    # ISO yyyy-mm-dd. Scrapers already parse the date off each result
+    # page but had nowhere to put it, so races.race_date was empty on
+    # all 3,920 rows and no calendar view was possible.
+    p.add_argument("--race-date", default=None)
     p.add_argument("--class", dest="class_label", default=None)
     p.add_argument("--source-url", default=None)
     # Provenance tag written onto every race_entries row. Defaults to the
@@ -71,7 +75,7 @@ def main():
     regatta_id = get_or_create_regatta(cur, args.regatta, args.category)
     event_id = get_or_create_event(cur, regatta_id, args.year, source_url=args.source_url)
     race_id = create_race(cur, event_id, args.race_name, status="confirmed",
-                          class_label=args.class_label)
+                          class_label=args.class_label, race_date=args.race_date)
 
     n = 0
     for row in reader:
