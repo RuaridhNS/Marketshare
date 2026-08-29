@@ -19,7 +19,7 @@ def main():
     sailmakers = [dict(r) for r in cur.execute("SELECT id, name, is_us FROM sailmakers")]
     sm_by_id = {s["id"]: s for s in sailmakers}
 
-    owners = [dict(r) for r in cur.execute("SELECT id, name FROM owners")]
+    owners = [dict(r) for r in cur.execute("SELECT id, name, is_charter_operator FROM owners")]
     owner_by_id = {o["id"]: o for o in owners}
 
     regattas = [dict(r) for r in cur.execute("SELECT id, name, category, region FROM regattas ORDER BY name")]
@@ -241,6 +241,8 @@ def main():
     for r in owner_history_rows:
         d = dict(r)
         d["owner_name"] = owner_by_id.get(d["owner_id"], {}).get("name") if d["owner_id"] else None
+        # a charter operator entering the boat is not a change of ownership
+        d["is_charter"] = bool(owner_by_id.get(d["owner_id"], {}).get("is_charter_operator")) or None
         ownerhist_by_boat.setdefault(d["boat_id"], []).append(d)
 
     boats = []

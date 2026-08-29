@@ -98,6 +98,14 @@ def main():
 
         cur.execute("DELETE FROM boat_owner_history WHERE boat_id = ? AND source = ?", (boat_id, SOURCE))
 
+        # A charter operator entering the boat for a season does not become its
+        # owner. Bordier chartered Galahad of Cowes for 2023 and entered under
+        # their own name, which read as a change of ownership and back again.
+        # Charter segments are still recorded - they are real racing history -
+        # but they never become the boat's current owner.
+        charter_ids = {r[0] for r in cur.execute(
+            "SELECT id FROM owners WHERE is_charter_operator = 1")}
+
         last_owner_id = None
         for seg in segments:
             oid = owner_id_for(seg["owner"])
@@ -106,7 +114,8 @@ def main():
                 "INSERT INTO boat_owner_history (boat_id, owner_id, effective_from, effective_to, source, confidence) "
                 "VALUES (?, ?, ?, ?, ?, 'inferred')",
                 (boat_id, oid, str(seg["from"]), effective_to, SOURCE))
-            last_owner_id = oid
+            if oid not in charter_ids:
+                last_owner_id = oid       # charterers never become the owner
             segments_written += 1
 
         # only set current_owner_id if nothing more authoritative (a manual

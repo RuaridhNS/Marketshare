@@ -943,17 +943,23 @@ function renderBoatProfile(id) {
       String(c.effective_from || '').localeCompare(String(a.effective_from || '')));
     if (!hs.length) return '<p class="muted" style="margin:0;">No owner history recorded.</p>';
     return `<ol style="list-style:none;padding:0;margin:0;border-left:2px solid var(--border);">` +
-      hs.map((h, i) => {
-        const current = !h.effective_to;
-        const dot = current ? 'var(--series-north)' : 'var(--text-muted)';
+      hs.map(h => {
+        // A charter operator entering the boat for a season is not a change of
+        // ownership - shown on the timeline, but as a charter, and it never
+        // counts as "current".
+        const charter = !!h.is_charter;
+        const current = !h.effective_to && !charter;
+        const dot = charter ? 'var(--series-doyle)'
+                  : current ? 'var(--series-north)' : 'var(--text-muted)';
         return `<li style="position:relative;padding:0 0 14px 18px;">
           <span style="position:absolute;left:-7px;top:4px;width:12px;height:12px;border-radius:50%;
                 background:${current ? dot : 'var(--surface)'};border:2px solid ${dot};"></span>
           <div><strong>${esc(h.owner_name || '—')}</strong>
-            ${current ? '<span class="pill" style="background:var(--series-north);color:#fff;margin-left:6px;">current</span>' : ''}</div>
+            ${charter ? '<span class="pill" style="background:var(--series-doyle);color:#292524;margin-left:6px;">chartered</span>' : ''}
+            ${current ? '<span class="pill" style="background:var(--series-north);color:#fff;margin-left:6px;">current owner</span>' : ''}</div>
           <div class="muted" style="font-size:12px;">
             ${esc(h.effective_from || '?')} → ${esc(h.effective_to || 'present')}
-            ${h.source ? ' · ' + esc(h.source) : ''}
+            ${charter ? ' · entered under a charter/corporate name, not an ownership change' : ''}
             ${h.confidence ? ' · ' + esc(h.confidence) : ''}</div>
         </li>`;
       }).join('') + '</ol>';
@@ -1604,6 +1610,23 @@ function renderQuality() {
 
   const dupCount = findDuplicateGroups().length;
 
+  // Names on several boats that are NOT already marked as charter operators.
+  const byOwner = {};
+  DATA.boats.forEach(b => (b.owner_history || []).forEach(h => {
+    if (!h.owner_name || h.is_charter) return;
+    (byOwner[h.owner_name] ||= new Set()).add(b);
+  }));
+  const charterRows = Object.entries(byOwner)
+    .filter(([, set]) => set.size > 1)
+    .sort((a, b) => b[1].size - a[1].size)
+    .slice(0, 25)
+    .map(([name, set]) => {
+      const boats = Array.from(set).slice(0, 4)
+        .map(b => `<a href="#/boat/${b.id}" data-route="#/boat/${b.id}">${esc(b.boat_name || b.sail_no)}</a>`).join(', ');
+      return `<tr><td>${esc(name)}</td><td class="num">${set.size}</td>
+        <td style="font-size:12px;">${boats}${set.size > 4 ? ' …' : ''}</td></tr>`;
+    }).join('');
+
   return `
     <h1>Data quality</h1>
     <p class="subtitle">Everything waiting on a human decision, computed live from the current data.</p>
@@ -1649,6 +1672,19 @@ function renderQuality() {
       <table>
         <thead><tr><th>Boat</th><th>Sail No</th><th>Sailmaker</th><th>Confidence</th><th>Source</th></tr></thead>
         <tbody>${flagRows}</tbody>
+      </table>
+    </div>` : ''}
+
+    ${charterRows ? `<div class="card" style="padding:0;overflow:auto;">
+      <h2 style="padding:18px 20px 0;">Charter or owner?</h2>
+      <p class="muted" style="font-size:12px;padding:0 20px;margin:4px 0 0;">
+        These names appear on several boats, which usually means a charter company, club or school entering
+        rather than owning — but not always: Peter Morton and Niklas Zennström genuinely own several. Ones
+        already marked as charter are excluded. Tell me which of these are charterers and I'll flag them, so
+        they stop reading as changes of ownership.</p>
+      <table>
+        <thead><tr><th>Name</th><th class="num">Boats</th><th>Boats it appears on</th></tr></thead>
+        <tbody>${charterRows}</tbody>
       </table>
     </div>` : ''}
 
