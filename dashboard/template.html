@@ -209,6 +209,7 @@
     <a class="nav-item" href="#/market-share" data-route="#/market-share">Market share</a>
     <a class="nav-item" href="#/sales" data-route="#/sales">Sales opportunities</a>
     <a class="nav-item" href="#/duplicates" data-route="#/duplicates">Duplicates<span class="nav-badge" id="duplicates-badge" style="display:none;"></span></a>
+    <a class="nav-item" href="#/quality" data-route="#/quality">Data quality</a>
     <a class="nav-item" href="#/changes" data-route="#/changes">Pending changes<span class="nav-badge" id="pending-badge" style="display:none;"></span></a>
   </nav>
   <main class="main" id="main"><div class="card muted">Loading…</div></main>
@@ -637,6 +638,7 @@ function navigate() {
     else if (route === 'market-share') main.innerHTML = renderMarketShare();
     else if (route === 'sales') main.innerHTML = renderSales();
     else if (route === 'coverage') main.innerHTML = renderCoverage();
+    else if (route === 'quality') main.innerHTML = renderQuality();
     else if (route === 'compare') main.innerHTML = renderCompare((query.get('r')||'').split(',').filter(Boolean));
     else if (route === 'duplicates') main.innerHTML = renderDuplicates();
     else if (route === 'changes') main.innerHTML = renderPendingChanges();
@@ -1512,6 +1514,126 @@ function renderCoverage() {
       IRC Solent Report with no boats behind it.</p>
     <p style="margin-top:-6px;">${chips}</p>
     ${cards}
+  `;
+}
+
+// ---------- page: data quality ----------
+// Everything that needs a human verdict, in one place and computed live rather
+// than exported as a snapshot - a CSV of this goes stale the moment a scrape
+// runs.
+const VARIANT_SUFFIX_RE = /\b(ood|od|sport|mod|mk\s*[ivx0-9]+|b&c|r[12]|s|e|c|distinction|yawl|custom|fc|sq)\b/ig;
+
+function typeFamilies() {
+  const counts = {};
+  DATA.boats.forEach(b => {
+    const t = (b.boat_type || '').trim();
+    if (t) counts[t] = (counts[t] || 0) + 1;
+  });
+  const fam = {};
+  Object.entries(counts).forEach(([name, n]) => {
+    const base = name.replace(VARIANT_SUFFIX_RE, '').replace(/\s+/g, ' ').trim().replace(/[-/]$/, '');
+    (fam[base] ||= []).push({name, n});
+  });
+  return Object.entries(fam)
+    .filter(([, v]) => v.length > 1)
+    .map(([base, v]) => ({base, variants: v.sort((a, b) => b.n - a.n),
+                          total: v.reduce((s, x) => s + x.n, 0)}))
+    .sort((a, b) => b.total - a.total);
+}
+
+function renderQuality() {
+  const active = DATA.boats.filter(b => b.active);
+  const missing = (f) => active.filter(b => !b[f])
+    .sort((a, b) => b.entries.length - a.entries.length);
+  const noSm = missing('current_sailmaker'), noOwner = missing('owner_name'),
+        noType = missing('boat_type'), noTcc = missing('tcc');
+
+  // research findings that were flagged rather than asserted
+  const flagged = [];
+  DATA.boats.forEach(b => (b.sailmaker_history || []).forEach(h => {
+    if (h.confidence === 'low' || (h.confidence === 'medium' && /^research:/.test(h.source || '')))
+      flagged.push({b, h});
+  }));
+  flagged.sort((a, b) => (a.h.confidence === 'low' ? -1 : 1) - (b.h.confidence === 'low' ? -1 : 1));
+
+  const fams = typeFamilies();
+  const famRows = fams.slice(0, 40).map(f => `<tr>
+      <td><strong>${esc(f.base)}</strong></td>
+      <td>${f.variants.map(v => `${esc(v.name)} <span class="muted">(${v.n})</span>`).join(' · ')}</td>
+      <td class="num">${f.total}</td>
+    </tr>`).join('');
+
+  const missRow = (label, list, note) => `<tr>
+      <td>${label}</td><td class="num">${list.length}</td>
+      <td>${list.slice(0, 5).map(b => `<a href="#/boat/${b.id}" data-route="#/boat/${b.id}">${esc(b.boat_name || b.sail_no)}</a>`).join(', ')}${list.length > 5 ? ' …' : ''}</td>
+      <td class="muted" style="font-size:12px;">${note}</td>
+    </tr>`;
+
+  const flagRows = flagged.slice(0, 30).map(({b, h}) => `<tr>
+      <td><a href="#/boat/${b.id}" data-route="#/boat/${b.id}">${esc(b.boat_name || '')}</a></td>
+      <td>${esc(b.sail_no || '')}</td>
+      <td>${esc(h.sailmaker_name || '')}</td>
+      <td><span class="pill" style="${h.confidence === 'low'
+            ? 'background:var(--series-doyle);color:#292524;'
+            : 'background:var(--surface-2,#eee);color:var(--text-muted);border:1px solid var(--border);'}">${esc(h.confidence || '')}</span></td>
+      <td style="font-size:12px;word-break:break-all;">${esc((h.source || '').replace(/^research:/, ''))}</td>
+    </tr>`).join('');
+
+  const dupCount = findDuplicateGroups().length;
+
+  return `
+    <h1>Data quality</h1>
+    <p class="subtitle">Everything waiting on a human decision, computed live from the current data.</p>
+
+    <div class="stat-row">
+      <div class="stat-tile"><div class="v">${fams.length}</div><div class="l">Naming families to confirm</div></div>
+      <div class="stat-tile"><div class="v">${dupCount}</div><div class="l">Duplicate candidates</div></div>
+      <div class="stat-tile"><div class="v">${flagged.length}</div><div class="l">Flagged sailmaker findings</div></div>
+      <div class="stat-tile"><div class="v">${noSm.length}</div><div class="l">Active boats, no sailmaker</div></div>
+    </div>
+
+    <div class="card" style="padding:0;overflow:auto;">
+      <h2 style="padding:18px 20px 0;">Missing data — active fleet (${active.length} boats)</h2>
+      <p class="muted" style="font-size:12px;padding:0 20px;margin:4px 0 0;">Most-raced boats shown first, since those matter commercially.</p>
+      <table>
+        <thead><tr><th>Field</th><th class="num">Missing</th><th>Busiest boats missing it</th><th>Why it matters</th></tr></thead>
+        <tbody>
+          ${missRow('Sailmaker', noSm, 'The core gap. Race results almost never publish sails.')}
+          ${missRow('Owner', noOwner, 'Beware: results often record the boat captain here.')}
+          ${missRow('Boat type', noType, 'Needed for duplicate detection and class analysis.')}
+          ${missRow('IRC TCC', noTcc, 'Also the IRC-eligibility signal for the fleet filter.')}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="card" style="padding:0;overflow:auto;">
+      <h2 style="padding:18px 20px 0;">Naming — is each row the same boat as its siblings?</h2>
+      <p class="muted" style="font-size:12px;padding:0 20px;margin:4px 0 0;">
+        These differ only by a variant suffix. A suffix often means a genuinely different boat — deeper keel,
+        different designer, different generation — so none of them have been merged.
+        ${fams.length > 40 ? `Showing the 40 largest of ${fams.length}.` : ''}</p>
+      <table>
+        <thead><tr><th>Family</th><th>Variants on file</th><th class="num">Boats</th></tr></thead>
+        <tbody>${famRows || '<tr><td colspan="3" class="muted">Nothing ambiguous.</td></tr>'}</tbody>
+      </table>
+    </div>
+
+    ${flagged.length ? `<div class="card" style="padding:0;overflow:auto;">
+      <h2 style="padding:18px 20px 0;">Sailmaker findings worth checking</h2>
+      <p class="muted" style="font-size:12px;padding:0 20px;margin:4px 0 0;">
+        Researched from published sources, not asserted. <strong>low</strong> means the match itself is
+        doubtful; <strong>medium</strong> usually means the evidence is sound but dated.</p>
+      <table>
+        <thead><tr><th>Boat</th><th>Sail No</th><th>Sailmaker</th><th>Confidence</th><th>Source</th></tr></thead>
+        <tbody>${flagRows}</tbody>
+      </table>
+    </div>` : ''}
+
+    <div class="card">
+      <h2>Duplicates</h2>
+      <p style="margin:0;">${dupCount} candidate group(s) waiting.
+        <a href="#/duplicates" data-route="#/duplicates">Work through them →</a></p>
+    </div>
   `;
 }
 
