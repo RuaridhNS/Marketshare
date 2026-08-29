@@ -829,7 +829,14 @@ function renderFilteredShare(visibleRows, ctx) {
 }
 
 function renderBoatsList() {
-  const rows = DATA.boats.map(b => {
+  // Alphabetical by boat name, case- and accent-insensitive. The SQL ORDER BY
+  // uses SQLite's default binary collation, which sorts by byte value - so
+  // lower-case names fall after every upper-case one and accented names sort
+  // last of all. localeCompare puts them where a reader expects.
+  const rows = DATA.boats.slice()
+    .sort((a, b) => (a.boat_name || '￿').localeCompare(b.boat_name || '￿',
+                     'en', {sensitivity: 'base', numeric: true}))
+    .map(b => {
     const bucket = bucketOf(b.current_sailmaker);
     const hayRaw = [b.boat_name,b.sail_no,b.owner_name,b.boat_type,b.current_sailmaker,b.tag].join(' ');
     const hayKeep = searchKeep(hayRaw), hayTight = searchTight(hayRaw);
@@ -1711,19 +1718,30 @@ function renderCompare(selectedIds) {
     points: x.s.pts.map(p => ({x: p.x, y: p.y, solid: p.real})),
   }));
 
-  // Grouped multi-select. <optgroup> keeps the series structure without the
-  // wall of checkboxes, and the native control gives ctrl/shift multi-pick.
-  const bySeries = {};
-  candidates.forEach(x => { (bySeries[seriesOf(x.r)] ||= []).push(x); });
+  // Add-one-at-a-time dropdown plus removable chips. A <select multiple>
+  // needs ctrl-click to pick a second item - clicking normally REPLACES the
+  // first - so the tool looked broken to anyone using it the obvious way.
+  // Alphabetical, because you come here knowing which regatta you want.
+  const unpicked = candidates.filter(x => !sel.has(x.r.id))
+    .sort((a, b) => a.r.name.localeCompare(b.r.name));
+  const chips = chosen.map((x, i) => `
+    <span class="cmp-chip" style="display:inline-flex;align-items:center;gap:8px;margin:0 8px 8px 0;
+          padding:6px 10px;border-radius:999px;background:var(--surface-2,#f3f4f6);border:1px solid var(--border);">
+      <span style="width:10px;height:10px;border-radius:50%;background:${LINE_COLOURS[i % LINE_COLOURS.length]};"></span>
+      ${esc(x.r.name)}
+      <button type="button" class="cmp-remove" data-id="${x.r.id}" aria-label="Remove ${esc(x.r.name)}"
+              style="border:0;background:none;cursor:pointer;font-size:16px;line-height:1;color:var(--text-muted);padding:0;">×</button>
+    </span>`).join('');
+
   const picker = `
-    <label class="field-label" for="cmp-select">Regattas (ctrl-click or drag to pick several)</label>
-    <select id="cmp-select" multiple size="14" style="width:100%;max-width:520px;">
-      ${Object.keys(bySeries).sort().map(g => `
-        <optgroup label="${esc(g)}">
-          ${bySeries[g].map(x => `<option value="${x.r.id}" ${sel.has(x.r.id)?'selected':''}>
-            ${esc(x.r.name)} — ${x.s.pts.length} seasons</option>`).join('')}
-        </optgroup>`).join('')}
-    </select>`;
+    <div style="display:flex;flex-wrap:wrap;align-items:center;gap:10px;">
+      <select id="cmp-add" style="min-width:280px;">
+        <option value="">+ Add a regatta…</option>
+        ${unpicked.map(x => `<option value="${x.r.id}">${esc(x.r.name)} (${x.s.pts.length} seasons)</option>`).join('')}
+      </select>
+      ${chosen.length ? `<button class="btn secondary" id="cmp-clear" type="button">Clear all</button>` : ''}
+    </div>
+    ${chips ? `<div style="margin-top:12px;">${chips}</div>` : ''}`;
 
   const table = chosen.length ? (() => {
     const years = Array.from(new Set(chosen.flatMap(x => x.s.pts.map(p=>p.x)))).sort((a,b)=>a-b);
@@ -1746,36 +1764,38 @@ function renderCompare(selectedIds) {
 
   return `
     <h1>Compare regattas</h1>
-    <p class="subtitle">Plot attendance for any regattas together on one axis. ${chosen.length} selected.</p>
-    ${chosen.length ? `<div class="card">
-      ${svgLineChart(series, {height: 320})}
-    </div>` : `<div class="card muted">Pick two or more regattas below to plot them.</div>`}
+    <p class="subtitle">Attendance over time, plotted together. Add as many as you like.</p>
+    <div class="card">${picker}</div>
+    ${chosen.length ? `<div class="card">${svgLineChart(series, {height: 320})}</div>`
+      : `<div class="card muted">Add a regatta above to start.</div>`}
     ${table}
-    <details class="filter-panel card" ${chosen.length?'':'open'}>
-      <summary><strong>Choose regattas</strong></summary>
-      ${picker}
-      <button class="btn secondary" id="cmp-clear" type="button">Clear all</button>
-    </details>
   `;
 }
 
 function attachCompareHandlers() {
-  const sel = document.getElementById('cmp-select');
-  if (!sel) return;
-  sel.addEventListener('change', () => {
-    const ids = Array.from(sel.selectedOptions).map(o => o.value);
-    // replaceState rather than assigning location.hash: picking regattas
-    // shouldn't push a history entry per click, or Back has to walk out
-    // through every selection you tried.
-    const target = '#/compare' + (ids.length ? '?r=' + ids.join(',') : '');
-    history.replaceState(null, '', target);
+  const add = document.getElementById('cmp-add');
+  if (!add) return;
+  // replaceState rather than assigning location.hash: picking regattas
+  // shouldn't push a history entry per click, or Back has to walk out
+  // through every selection you tried.
+  const go = (ids) => {
+    history.replaceState(null, '', '#/compare' + (ids.length ? '?r=' + ids.join(',') : ''));
     navigate();
+  };
+  const current = () => {
+    const q = (location.hash.split('?')[1] || '');
+    return new URLSearchParams(q).get('r')?.split(',').filter(Boolean) || [];
+  };
+  add.addEventListener('change', () => {
+    if (!add.value) return;
+    const ids = current();
+    if (!ids.includes(add.value)) ids.push(add.value);
+    go(ids);
   });
+  document.querySelectorAll('.cmp-remove').forEach(b =>
+    b.addEventListener('click', () => go(current().filter(id => id !== b.dataset.id))));
   const clear = document.getElementById('cmp-clear');
-  if (clear) clear.addEventListener('click', () => {
-    history.replaceState(null, '', '#/compare');
-    navigate();
-  });
+  if (clear) clear.addEventListener('click', () => go([]));
 }
 
 function attachRegattaListHandlers() {
@@ -2130,6 +2150,10 @@ function renderMarketShare() {
 }
 
 // ---------- page: sales opportunities ----------
+// How many editable rows the Sales page renders. Kept small because each row
+// carries four form controls; "show all" is available but is genuinely heavy.
+let salesLimit = 50;
+
 function renderSales() {
   const allTargets = DATA.boats.filter(b => bucketOf(b.current_sailmaker) !== 'North Sails');
   const targets = allTargets.filter(b => b.active);
@@ -2140,7 +2164,13 @@ function renderSales() {
   const selectOptions = (options, current) => `<option value="">— no change —</option>` +
     options.map(name => `<option value="${esc(name)}" ${current===name?'selected':''}>${esc(name)}</option>`).join('');
 
-  const rows = targets.map(b => {
+  // Only the visible slice gets form controls. Rendering four dropdowns for
+  // every target built 3,324 controls and 40k words into one page, which is
+  // what made this screen feel unusable. The rest are one row of plain text
+  // until you search or ask for more.
+  const shown = targets.slice(0, salesLimit);
+
+  const rows = shown.map(b => {
     const p = PENDING[b.id] || {};
     const edited = PENDING[b.id] ? '<span class="edited-flag">Edited</span>' : '';
     return `
@@ -2156,7 +2186,7 @@ function renderSales() {
   }).join('');
   return `
     <h1>Sales opportunities</h1>
-    <p class="subtitle">Boats not currently on North Sails (competitor-flagged, partial, or unknown), sorted by how active they are — most races entered first. ${targets.length} active boats
+    <p class="subtitle">Boats not on North Sails, most active first. Showing <strong>${shown.length}</strong> of ${targets.length} active boats
       (raced in ${ACTIVE_CUTOFF_YEAR}–${MAX_SEASON_YEAR}).${inactiveCount ? ` ${inactiveCount} more are inactive (no entry in the last 5 seasons) and hidden here — see <a href="#/boats" data-route="#/boats">Boats</a> and filter to Inactive to find them.` : ''}</p>
     <div class="card" style="padding:0;overflow:auto;">
       <table>
@@ -2164,11 +2194,20 @@ function renderSales() {
         <tbody>${rows}</tbody>
       </table>
     </div>
+    ${shown.length < targets.length ? `<div class="card" style="text-align:center;">
+      <button class="btn secondary" id="sales-more" type="button">Show 50 more</button>
+      <button class="btn secondary" id="sales-all" type="button">Show all ${targets.length}</button>
+      <p class="muted" style="font-size:12px;margin:8px 0 0;">Each row carries four editable fields, so showing everything at once is slow.</p>
+    </div>` : ''}
     <footer class="note">Owner, sailmaker, lead rep and contacted-by are editable here — edits are saved locally (see <a href="#/changes" data-route="#/changes">Pending changes</a> to export and apply them). In CS is read-only, exactly as imported from your fleet register.</footer>
   `;
 }
 
 function attachSalesHandlers() {
+  const more=document.getElementById('sales-more');
+  if (more) more.addEventListener('click', () => { salesLimit += 50; navigate(); });
+  const all=document.getElementById('sales-all');
+  if (all) all.addEventListener('click', () => { salesLimit = Infinity; navigate(); });
   document.querySelectorAll('.sales-edit-owner').forEach(el => el.addEventListener('change', () => {
     setPendingEdit(el.dataset.boatId, { owner: el.value.trim() }); navigate();
   }));
