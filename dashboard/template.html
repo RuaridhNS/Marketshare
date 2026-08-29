@@ -277,6 +277,24 @@ function pillStyle(name) {
   const border = b === 'Unknown' ? `border:1px solid var(--border);` : '';
   return `background:${BUCKET_COLOR[b]};color:${BUCKET_TEXT[b]};${border}`;
 }
+// Search normalisation. Sources spell the same boat type every possible way -
+// "J/111", "J111", "J 111", "J-111" all occur - so a literal substring match
+// makes the answer depend on which spelling the user happens to guess, and
+// "J 111" matched nothing at all. Two passes: one keeping word boundaries (so
+// "mike moxley" still works) and one collapsing everything to alphanumerics
+// (so "j 111", "j/111" and "j111" are the same query).
+function searchKeep(s) {
+  return (s || '').toLowerCase().replace(/[^a-z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim();
+}
+function searchTight(s) {
+  return (s || '').toLowerCase().replace(/[^a-z0-9]+/g, '');
+}
+function matchesSearch(hayKeep, hayTight, q) {
+  if (!q) return true;
+  const k = searchKeep(q), t = searchTight(q);
+  return (k && hayKeep.includes(k)) || (t && hayTight.includes(t));
+}
+
 function esc(s) { return (s===null||s===undefined) ? '' : String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 function fmtDate(iso) { return iso ? iso.slice(0,10) : ''; }
 
@@ -727,10 +745,10 @@ function attachBoatFilterHandlers() {
     const regMode = (document.querySelector('input[name=reg-mode]:checked') || {}).value || 'any';
 
     document.querySelectorAll('#boats-tbody tr').forEach(tr => {
-      const hay = tr.dataset.hay;
+      const hayKeep = tr.dataset.hay, hayTight = tr.dataset.haytight;
       const bucket = tr.dataset.bucket;
       const b = boatsById[tr.dataset.boatId];
-      let show = (!q || hay.includes(q)) && (f==='all' || bucket===f)
+      let show = matchesSearch(hayKeep, hayTight, q) && (f==='all' || bucket===f)
         && (af==='all' || (af==='active' && tr.dataset.active==='1') || (af==='inactive' && tr.dataset.active==='0'))
         && (!tf || tr.dataset.type === tf);
 
@@ -811,12 +829,13 @@ function renderFilteredShare(visibleRows, ctx) {
 function renderBoatsList() {
   const rows = DATA.boats.map(b => {
     const bucket = bucketOf(b.current_sailmaker);
-    const hay = [b.boat_name,b.sail_no,b.owner_name,b.boat_type,b.current_sailmaker,b.tag].join(' ').toLowerCase();
+    const hayRaw = [b.boat_name,b.sail_no,b.owner_name,b.boat_type,b.current_sailmaker,b.tag].join(' ');
+    const hayKeep = searchKeep(hayRaw), hayTight = searchTight(hayRaw);
     const edited = PENDING[b.id] ? '<span class="edited-flag">Edited</span>' : '';
     const statusPill = b.active
       ? `<span class="pill" style="background:var(--series-north);color:#fff;">Active</span>`
       : `<span class="pill" style="background:var(--surface-2, #eee);color:var(--text-muted);border:1px solid var(--border);">Inactive</span>`;
-    return `<tr class="clickable" data-route="#/boat/${b.id}" data-hay="${esc(hay)}" data-bucket="${bucket}" data-active="${b.active?1:0}" data-type="${esc(normType(b.boat_type))}" data-boat-id="${b.id}">
+    return `<tr class="clickable" data-route="#/boat/${b.id}" data-hay="${esc(hayKeep)}" data-haytight="${esc(hayTight)}" data-bucket="${bucket}" data-active="${b.active?1:0}" data-type="${esc(normType(b.boat_type))}" data-boat-id="${b.id}">
       <td><strong>${esc(b.boat_name||'—')}</strong>${edited}</td>
       <td>${esc(b.sail_no||'')}</td>
       <td>${esc(b.boat_type||'')}</td>
