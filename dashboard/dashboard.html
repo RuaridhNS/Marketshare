@@ -1209,24 +1209,45 @@ function attachBoatEditHandlers() {
 }
 
 // ---------- page: pending changes ----------
+// Has this pending edit already made it into the database? The export is a
+// one-way copy - applying the CSV never told the browser - so edits sat in the
+// pending list forever after they were live, and the only button offered was
+// "Discard", which reads as undo rather than done. Comparing each field against
+// the rebuilt data answers it without anyone having to remember.
+function pendingApplied(b, p) {
+  const same = (a, c) => String(a ?? '').trim().toLowerCase() === String(c ?? '').trim().toLowerCase();
+  const checks = [];
+  if (p.sailmaker)   checks.push(same(b.current_sailmaker, p.sailmaker));
+  if (p.owner)       checks.push(same(b.owner_name, p.owner));
+  if (p.tcc)         checks.push(same(b.tcc, p.tcc));
+  if (p.leadRep)     checks.push(same(b.lead_rep, p.leadRep));
+  if (p.contactedBy) checks.push(same(b.contacted_by, p.contactedBy));
+  return checks.length > 0 && checks.every(Boolean);
+}
+
 function renderPendingChanges() {
   const ids = Object.keys(PENDING);
+  const appliedIds = ids.filter(id => boatsById[id] && pendingApplied(boatsById[id], PENDING[id]));
   const rows = ids.map(boatId => {
     const b = boatsById[boatId];
     if (!b) return '';
     const p = PENDING[boatId];
+    const done = pendingApplied(b, p);
     const changes = [];
     if (p.sailmaker) changes.push(`Sailmaker: <strong>${esc(b.current_sailmaker||'—')}</strong> → <strong>${esc(p.sailmaker)}</strong>`);
     if (p.owner) changes.push(`Owner: <strong>${esc(b.owner_name||'—')}</strong> → <strong>${esc(p.owner)}</strong>`);
     if (p.tcc) changes.push(`TCC: <strong>${esc(b.tcc||'—')}</strong> → <strong>${esc(p.tcc)}</strong>`);
     if (p.leadRep) changes.push(`Lead rep: <strong>${esc(b.lead_rep||'—')}</strong> → <strong>${esc(p.leadRep)}</strong>`);
     if (p.contactedBy) changes.push(`Contacted by: <strong>${esc(b.contacted_by||'—')}</strong> → <strong>${esc(p.contactedBy)}</strong>`);
-    return `<tr>
+    return `<tr${done ? ' style="opacity:.62;"' : ''}>
       <td><a href="#/boat/${b.id}" data-route="#/boat/${b.id}">${esc(b.boat_name||b.sail_no)}</a></td>
       <td>${esc(b.sail_no||'')}</td>
       <td style="font-size:13px;">${changes.join('<br>') || '<span class="muted">—</span>'}</td>
+      <td>${done
+        ? '<span class="pill" style="background:var(--series-quantum);color:#fff;">applied</span>'
+        : '<span class="pill" style="background:var(--series-doyle);color:#292524;">not yet applied</span>'}</td>
       <td>${esc(p.notes||'')}</td>
-      <td><button class="btn secondary" type="button" data-discard-edit="${b.id}">Discard</button></td>
+      <td><button class="btn secondary" type="button" data-discard-edit="${b.id}">${done ? 'Clear' : 'Discard'}</button></td>
     </tr>`;
   }).join('');
 
@@ -1246,7 +1267,13 @@ function renderPendingChanges() {
 
   return `
     <h1>Pending changes</h1>
-    <p class="subtitle">${ids.length} boat(s) with unsaved edits, ${PENDING_MERGES.length} pending merge(s), held only in this browser — nothing is written to the database yet.</p>
+    <p class="subtitle">${ids.length - appliedIds.length} edit(s) still to apply${appliedIds.length ? `, ${appliedIds.length} already in the database` : ''},
+      ${PENDING_MERGES.length} pending merge(s). Edits are held in this browser until applied.</p>
+    ${appliedIds.length ? `<div class="card" style="border-left:3px solid var(--series-quantum);">
+      <p style="margin:0 0 8px;"><strong>${appliedIds.length} of these ${ids.length} edit(s) are already in the database.</strong>
+        They were exported and applied, but the export cannot tell this browser that, so they stayed on the list.</p>
+      <button class="btn" id="clear-applied" type="button">Clear the ${appliedIds.length} applied edit(s)</button>
+    </div>` : ''}
     <div class="card" style="border-left: 3px solid var(--series-north);">
       <h2 style="margin-bottom:8px;">What happens next</h2>
       <p style="margin:0 0 8px;">Edits made in the dashboard (sailmaker, owner, TCC, merges, ...) only live in <em>this browser's</em> local storage until they're applied to the real database. Nothing here is final yet — that's why nothing seems to "happen" after you save one.</p>
@@ -1256,8 +1283,8 @@ function renderPendingChanges() {
     <div class="card" style="padding:0;overflow:auto;">
       <h2 style="padding:18px 20px 0;">Field edits</h2>
       <table>
-        <thead><tr><th>Boat</th><th>Sail No</th><th>Changes</th><th>Notes</th><th></th></tr></thead>
-        <tbody>${rows || '<tr><td colspan="5" class="muted">No pending edits. Edit a sailmaker, owner, TCC, lead rep or contacted-by from a boat profile or the Sales opportunities page to see it here.</td></tr>'}</tbody>
+        <thead><tr><th>Boat</th><th>Sail No</th><th>Changes</th><th>Status</th><th>Notes</th><th></th></tr></thead>
+        <tbody>${rows || '<tr><td colspan="6" class="muted">No pending edits. Edit a sailmaker, owner, TCC, lead rep or contacted-by from a boat profile or the Sales opportunities page to see it here.</td></tr>'}</tbody>
       </table>
     </div>
     ${ids.length ? `
@@ -1293,6 +1320,14 @@ function renderPendingChanges() {
 }
 
 function attachPendingChangesHandlers() {
+  const clearApplied = document.getElementById('clear-applied');
+  if (clearApplied) clearApplied.addEventListener('click', () => {
+    Object.keys(PENDING).forEach(id => {
+      const b = boatsById[id];
+      if (b && pendingApplied(b, PENDING[id])) delete PENDING[id];
+    });
+    savePendingEdits(); updatePendingBadge(); navigate();
+  });
   document.querySelectorAll('[data-discard-edit]').forEach(btn => {
     btn.addEventListener('click', () => { clearPendingEdit(btn.dataset.discardEdit); navigate(); });
   });
