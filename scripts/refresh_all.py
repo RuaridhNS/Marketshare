@@ -113,6 +113,13 @@ def main():
     if not ok:
         failures.append("owners")
 
+    # Scrapers write whatever spelling their source uses, so every run
+    # re-fragments the type list (J/109, J 109, J109 as three fleets). This has
+    # to run after the scrape or the canonical names last exactly one week.
+    ok, _ = run("Canonicalise boat types", ["normalise_boat_types.py"], args.db, args.timeout)
+    if not ok:
+        failures.append("boat types")
+
     for step, argv in (("Export JSON", ["export_dashboard_data.py", "dashboard/data.json"]),
                        ("Build dashboard", ["build_dashboard.py"])):
         # build_dashboard takes no db argument

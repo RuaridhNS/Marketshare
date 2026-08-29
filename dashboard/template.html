@@ -206,6 +206,7 @@
     <a class="nav-item" href="#/regattas" data-route="#/regattas">Regattas</a>
     <a class="nav-item" href="#/compare" data-route="#/compare">Compare</a>
     <a class="nav-item" href="#/coverage" data-route="#/coverage">Coverage</a>
+    <a class="nav-item" href="#/market-analysis" data-route="#/market-analysis">Market analysis</a>
     <a class="nav-item" href="#/market-share" data-route="#/market-share">Market share</a>
     <a class="nav-item" href="#/sales" data-route="#/sales">Sales opportunities</a>
     <a class="nav-item" href="#/duplicates" data-route="#/duplicates">Duplicates<span class="nav-badge" id="duplicates-badge" style="display:none;"></span></a>
@@ -269,7 +270,7 @@ function teamOptions() {
 // the active fleet (last 5 seasons) - pass DATA.boats explicitly for all-time.
 function boatBucketCounts(boats) {
   const counts = {};
-  (boats || DATA.boats.filter(b => b.active)).forEach(b => { const bucket = bucketOf(b.current_sailmaker); counts[bucket] = (counts[bucket]||0) + 1; });
+  (boats || DATA.boats.filter(b => b.active)).forEach(b => { const bucket = bucketOf(liveSailmaker(b)); counts[bucket] = (counts[bucket]||0) + 1; });
   return counts;
 }
 // inline style string for a sailmaker pill, incl. a border on the (near-white) Unknown pill so it stays visible
@@ -294,6 +295,17 @@ function matchesSearch(hayKeep, hayTight, q) {
   if (!q) return true;
   const k = searchKeep(q), t = searchTight(q);
   return (k && hayKeep.includes(k)) || (t && hayTight.includes(t));
+}
+
+// A boat's sailmaker as it stands RIGHT NOW, including edits made in this
+// browser that have not yet been exported and applied to the database. Without
+// this, changing a sailmaker on a boat left every share figure showing the old
+// value until the CSV round-trip had been run, which made the analysis look
+// stale and wrong at exactly the moment someone had just corrected it.
+function liveSailmaker(b) {
+  if (!b) return null;
+  const p = PENDING[b.id];
+  return (p && p.sailmaker) || b.current_sailmaker || null;
 }
 
 function esc(s) { return (s===null||s===undefined) ? '' : String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
@@ -635,6 +647,7 @@ function navigate() {
     else if (route === 'regattas') main.innerHTML = renderRegattasList();
     else if (route === 'regatta') main.innerHTML = renderRegattaProfile(parseInt(arg), qYear, qCls);
     else if (route === 'race') main.innerHTML = renderRacePage(parseInt(arg));
+    else if (route === 'market-analysis') main.innerHTML = renderMarketAnalysis();
     else if (route === 'market-share') main.innerHTML = renderMarketShare();
     else if (route === 'sales') main.innerHTML = renderSales();
     else if (route === 'coverage') main.innerHTML = renderCoverage();
@@ -699,10 +712,22 @@ function renderOverview() {
   // know is skewed towards boats North Sails itself publicises. The overview
   // shows both and says so, rather than picking the flattering one.
   const northN = byBucket['North Sails'] || 0;
-  const smKnown = activeBoats.filter(b => b.current_sailmaker).length;
+  // 29 boats carry the literal value "Unknown" - a recorded finding meaning
+  // "we looked and could not establish it", not a known sailmaker. Counting
+  // those as known made the overview claim 144 where Market analysis said
+  // 115, and two pages disagreeing is worse than either number.
+  const smKnown = activeBoats.filter(b => liveSailmaker(b)
+                                     && bucketOf(liveSailmaker(b)) !== 'Unknown').length;
   const smKnownPct = activeBoats.length ? Math.round(100 * smKnown / activeBoats.length) : 0;
   const northOfKnown = smKnown ? Math.round(100 * northN / smKnown) : 0;
   const northPct = activeBoats.length ? Math.round(100 * northN / activeBoats.length) : 0;
+  // Known-market breakdown excludes Unknown: this chart answers "of the boats
+  // we can actually see, who has them", which is a different question from the
+  // whole-fleet chart further down and must not be confused with it.
+  const knownItems = BUCKET_ORDER.filter(b => b !== 'Unknown' && byBucket[b])
+    .map(b => ({sailmaker: b, entries: byBucket[b]}));
+  const contactableCount = activeBoats.filter(b =>
+    (!liveSailmaker(b) || bucketOf(liveSailmaker(b)) === 'Unknown') && b.owner_name).length;
 
   return `
     <h1>Overview</h1>
@@ -717,19 +742,29 @@ function renderOverview() {
       <div class="stat-tile"><div class="v">${smKnownPct}%</div><div class="l">Sailmaker known</div></div>
     </div>
 
-    <div class="card" style="border-left:4px solid var(--series-north);">
-      <h2 style="margin-top:0;">Where North Sails stands</h2>
-      <p style="margin:0 0 10px;font-size:15px;">
-        <strong>${northN}</strong> of the <strong>${smKnown}</strong> active boats whose sailmaker we know are on North Sails —
-        <strong>${northOfKnown}%</strong> of the measured fleet.</p>
-      <p class="muted" style="font-size:13px;margin:0;">
-        That is <em>not</em> ${northOfKnown}% of the Solent. We know the sailmaker for only
-        <strong>${smKnown} of ${activeBoats.length}</strong> active boats (${smKnownPct}%), because race results
-        almost never record whose sails a boat carries — just ${s.n_entries_with_sailmaker ?? 0} of
-        ${s.n_entries} entries do. Measured across the whole active fleet instead, North Sails is ${northPct}%.
-        The real number lies between ${northPct}% and ${northOfKnown}%; what we know is also skewed towards boats
-        North Sails publicises, so treat ${northOfKnown}% as the optimistic end. Loading our own customer list
-        would settle it outright.</p>
+    <div class="card-row">
+      <div class="card" style="border-left:4px solid var(--series-north);">
+        <h2 style="margin-top:0;">The known market ${confidenceBadge(smKnown, activeBoats.length, {label: 'active boats measured'})}</h2>
+        <p style="margin:0 0 10px;font-size:15px;">Of the <strong>${smKnown}</strong> active boats whose sailmaker
+          we know, <strong>${northN}</strong> are on North Sails — <strong>${northOfKnown}%</strong>.</p>
+        ${svgBarChart(knownItems, {colorFn: it => BUCKET_COLOR[it.sailmaker], width: 460})}
+        <p class="muted" style="font-size:12px;margin-top:10px;">
+          The badge is our confidence: ${smKnownPct}% of the active fleet is measured. What we know also leans
+          towards boats North Sails publicises, since competitors publish far less, so read ${northOfKnown}% as the
+          optimistic end. <a href="#/market-analysis" data-route="#/market-analysis">Full analysis →</a></p>
+      </div>
+      <div class="card" style="border-left:4px solid var(--series-other);">
+        <h2 style="margin-top:0;">The real market size</h2>
+        <p style="margin:0 0 10px;font-size:15px;"><strong>${activeBoats.length - smKnown}</strong> active IRC boats
+          have no sailmaker on file — the addressable fleet we cannot yet see into.</p>
+        <p class="muted" style="font-size:13px;margin:0 0 10px;">
+          Race results almost never record whose sails a boat carries: only
+          <strong>${s.n_entries_with_sailmaker ?? 0}</strong> of ${s.n_entries} entries do. These are not lost
+          business, they are <em>unmeasured</em> business — <strong>${contactableCount}</strong> of them already
+          have an owner on file and could be approached tomorrow.</p>
+        <p class="muted" style="font-size:12px;margin:0;">
+          <a href="#/market-analysis" data-route="#/market-analysis">Targets →</a></p>
+      </div>
     </div>
     <div class="card-row">
       <div class="card">
@@ -824,7 +859,7 @@ function renderFilteredShare(visibleRows, ctx) {
   const counts = {};
   visibleRows.forEach(tr => {
     const b = boatsById[tr.dataset.boatId];
-    const k = bucketOf(b && b.current_sailmaker);
+    const k = bucketOf(liveSailmaker(b));
     counts[k] = (counts[k] || 0) + 1;
   });
   const total = visibleRows.length;
@@ -861,7 +896,7 @@ function renderBoatsList() {
     .sort((a, b) => (a.boat_name || '￿').localeCompare(b.boat_name || '￿',
                      'en', {sensitivity: 'base', numeric: true}))
     .map(b => {
-    const bucket = bucketOf(b.current_sailmaker);
+    const bucket = bucketOf(liveSailmaker(b));
     const hayRaw = [b.boat_name,b.sail_no,b.owner_name,b.boat_type,b.current_sailmaker,b.tag].join(' ');
     const hayKeep = searchKeep(hayRaw), hayTight = searchTight(hayRaw);
     const edited = PENDING[b.id] ? '<span class="edited-flag">Edited</span>' : '';
@@ -874,7 +909,7 @@ function renderBoatsList() {
       <td>${esc(b.boat_type||'')}</td>
       <td class="num">${b.tcc||''}</td>
       <td>${esc(b.owner_name||'')}</td>
-      <td><span class="pill" style="${pillStyle(b.current_sailmaker)}">${esc(b.current_sailmaker||'Unknown')}</span></td>
+      <td><span class="pill" style="${pillStyle(liveSailmaker(b))}">${esc(liveSailmaker(b)||'Unknown')}</span></td>
       <td>${statusPill}${b.lastActiveYear ? ` <span class="muted" style="font-size:11px;">(${b.lastActiveYear})</span>` : ''}</td>
       <td>${esc(b.tag||'')}</td>
       <td class="num">${b.entries.length}</td>
@@ -1605,7 +1640,7 @@ function renderQuality() {
   const active = DATA.boats.filter(b => b.active);
   const missing = (f) => active.filter(b => !b[f])
     .sort((a, b) => b.entries.length - a.entries.length);
-  const noSm = missing('current_sailmaker'), noOwner = missing('owner_name'),
+  const noSm = active.filter(b => !liveSailmaker(b)).sort((a,b)=>b.entries.length-a.entries.length), _noSmUnused = missing('current_sailmaker'), noOwner = missing('owner_name'),
         noType = missing('boat_type'), noTcc = missing('tcc');
 
   // research findings that were flagged rather than asserted
@@ -2135,6 +2170,141 @@ function renderRacePage(raceId) {
 }
 
 // ---------- page: market share ----------
+// ---------- confidence ----------
+// Every derived figure carries the share of its population we actually
+// measured. A market-share number over 5 known boats is not the same claim as
+// one over 500, and the dashboard should never let those look alike.
+function confidenceBadge(known, total, {label = 'measured'} = {}) {
+  if (!total) return '';
+  const pct = Math.round(100 * known / total);
+  const band = pct >= 60 ? 'high' : pct >= 25 ? 'medium' : 'low';
+  const bg = band === 'high' ? 'var(--series-quantum)'
+           : band === 'medium' ? 'var(--series-doyle)' : 'var(--series-one)';
+  const fg = band === 'medium' ? '#292524' : '#fff';
+  return `<span class="pill" title="${known} of ${total} ${label} — ${band} confidence"
+    style="background:${bg};color:${fg};font-variant-numeric:tabular-nums;">${pct}%</span>`;
+}
+
+// ---------- page: market analysis ----------
+function boatIsNorth(b) { return bucketOf(liveSailmaker(b)) === 'North Sails'; }
+
+function typeMarketRows(active) {
+  const byType = {};
+  active.forEach(b => {
+    const t = (b.boat_type || '').trim() || '(type unrecorded)';
+    const g = (byType[t] ||= {type: t, boats: 0, known: 0, north: 0, comp: 0, list: []});
+    g.boats++;
+    g.list.push(b);
+    if (liveSailmaker(b)) {
+      const bk = bucketOf(liveSailmaker(b));
+      if (bk !== 'Unknown') {
+        g.known++;
+        if (bk === 'North Sails') g.north++;
+        else if (bk !== 'Partial') g.comp++;
+      }
+    }
+  });
+  return Object.values(byType)
+    .filter(g => g.boats >= 3)
+    .map(g => ({...g, share: g.known ? Math.round(100 * g.north / g.known) : null}))
+    .sort((a, b) => b.boats - a.boats);
+}
+
+function renderMarketAnalysis() {
+  const active = DATA.boats.filter(b => b.active);
+  const known = active.filter(b => liveSailmaker(b) && bucketOf(liveSailmaker(b)) !== 'Unknown');
+  const north = known.filter(boatIsNorth);
+  const rows = typeMarketRows(active);
+
+  // Strength / weakness only where enough of the fleet is measured to mean
+  // anything. Below a third measured the share is noise, and is shown as such.
+  const solid = rows.filter(r => r.known >= 4 && r.known / r.boats >= 0.33);
+  const strengths = solid.filter(r => r.share >= 50).slice(0, 8);
+  const weaknesses = solid.filter(r => r.share < 50).sort((a, b) => a.share - b.share).slice(0, 8);
+
+  const typeRows = rows.map(r => `<tr class="clickable" data-route="#/boats?type=${encodeURIComponent(r.type)}">
+      <td><strong>${esc(r.type)}</strong></td>
+      <td class="num">${r.boats}</td>
+      <td class="num">${r.north}</td>
+      <td class="num">${r.comp}</td>
+      <td class="num">${r.boats - r.known}</td>
+      <td class="num">${r.known < 3 ? '<span class="muted" title="too few measured boats to state a share">—</span>'
+                          : r.share + '%'}</td>
+      <td>${confidenceBadge(r.known, r.boats, {label: 'boats with a known sailmaker'})}</td>
+    </tr>`).join('');
+
+  // Contactable = active, not ours, and we know who to talk to.
+  const targets = active.filter(b => !boatIsNorth(b))
+    .sort((a, b) => b.entries.length - a.entries.length);
+  const contactable = targets.filter(b => b.owner_name);
+  const topTargets = contactable.slice(0, 25).map(b => `
+    <tr class="clickable" data-route="#/boat/${b.id}">
+      <td><strong>${esc(b.boat_name || '—')}</strong></td>
+      <td>${esc(b.sail_no || '')}</td>
+      <td>${esc(b.boat_type || '')}</td>
+      <td>${esc(b.owner_name || '')}</td>
+      <td><span class="pill" style="${pillStyle(liveSailmaker(b))}">${esc(liveSailmaker(b) || 'Unknown')}</span></td>
+      <td class="num">${b.entries.length}</td>
+    </tr>`).join('');
+
+  const list = (arr, empty) => arr.length ? `<ul style="margin:8px 0 0;padding-left:18px;">
+      ${arr.map(r => `<li style="margin-bottom:4px;">
+        <strong>${esc(r.type)}</strong> — ${r.share}% of ${r.known} known
+        <span class="muted">(${r.boats} boats)</span> ${confidenceBadge(r.known, r.boats)}</li>`).join('')}
+    </ul>` : `<p class="muted" style="margin:8px 0 0;">${empty}</p>`;
+
+  return `
+    <h1>Market analysis</h1>
+    <p class="subtitle">Where we are strong, where we are not, and who is worth calling.
+      Every share figure carries the share of that fleet we have actually measured — a percentage
+      over 4 known boats is not the same claim as one over 40.</p>
+
+    <div class="stat-row">
+      <div class="stat-tile"><div class="v">${active.length}</div><div class="l">Active IRC boats</div></div>
+      <div class="stat-tile"><div class="v">${known.length}</div><div class="l">Sailmaker known</div></div>
+      <div class="stat-tile"><div class="v">${north.length}</div><div class="l">On North Sails</div></div>
+      <div class="stat-tile"><div class="v">${contactable.length}</div><div class="l">Contactable targets</div></div>
+    </div>
+
+    <div class="card-row">
+      <div class="card" style="border-left:4px solid var(--series-quantum);">
+        <h2 style="margin-top:0;">Strengths</h2>
+        <p class="muted" style="font-size:12px;margin:0;">Types where we hold at least half the measured fleet.</p>
+        ${list(strengths, 'No type yet has enough measured boats to call a strength.')}
+      </div>
+      <div class="card" style="border-left:4px solid var(--series-one);">
+        <h2 style="margin-top:0;">Weaknesses</h2>
+        <p class="muted" style="font-size:12px;margin:0;">Measured fleets where we hold under half — the winnable ground.</p>
+        ${list(weaknesses, 'Nothing qualifies yet. A weakness needs at least 4 boats of that type measured, and outside the J/109 and Sun Fast fleets we are not there — a 33% share over 3 boats is one boat, not a trend.')}
+      </div>
+    </div>
+
+    <div class="card" style="padding:0;overflow:auto;">
+      <h2 style="padding:18px 20px 0;">Fleet by boat type</h2>
+      <p class="muted" style="font-size:12px;padding:0 20px;margin:4px 0 0;">
+        Types with 3+ active boats. Click a row to see those boats. "Measured" is the confidence
+        column: it is the proportion of that fleet whose sailmaker we actually know.</p>
+      <table>
+        <thead><tr><th>Boat type</th><th class="num">Active</th><th class="num">North</th>
+          <th class="num">Competitor</th><th class="num">Unknown</th><th class="num">Our share</th><th>Measured</th></tr></thead>
+        <tbody>${typeRows}</tbody>
+      </table>
+    </div>
+
+    <div class="card" style="padding:0;overflow:auto;">
+      <h2 style="padding:18px 20px 0;">Top targets</h2>
+      <p class="muted" style="font-size:12px;padding:0 20px;margin:4px 0 0;">
+        Active, not on North Sails, and we know the owner — so they can actually be approached.
+        Busiest first. ${contactable.length} in total; ${targets.length - contactable.length} more
+        are active but have no owner on file.</p>
+      <table>
+        <thead><tr><th>Boat</th><th>Sail No</th><th>Type</th><th>Owner</th><th>Sailmaker</th><th class="num">Races</th></tr></thead>
+        <tbody>${topTargets}</tbody>
+      </table>
+    </div>
+  `;
+}
+
 function renderMarketShare() {
   // "By race entry" is recomputed from raw entries (rather than the
   // server-precomputed all-time DATA.market_share_entries) so it can be
@@ -2179,7 +2349,7 @@ function renderMarketShare() {
 let salesLimit = 50;
 
 function renderSales() {
-  const allTargets = DATA.boats.filter(b => bucketOf(b.current_sailmaker) !== 'North Sails');
+  const allTargets = DATA.boats.filter(b => bucketOf(liveSailmaker(b)) !== 'North Sails');
   const targets = allTargets.filter(b => b.active);
   const inactiveCount = allTargets.length - targets.length;
   targets.sort((a,b) => (b.entries.length - a.entries.length));
