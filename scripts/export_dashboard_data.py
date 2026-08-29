@@ -211,6 +211,11 @@ def main():
         FROM boat_sailmaker_history ORDER BY boat_id, id
     """).fetchall()
 
+    name_history_rows = cur.execute("""
+        SELECT boat_id, name, first_season, last_season, variants, confidence
+        FROM boat_name_history ORDER BY boat_id, first_season
+    """).fetchall()
+
     owner_history_rows = cur.execute("""
         SELECT boat_id, owner_id, effective_from, effective_to, source, confidence
         FROM boat_owner_history ORDER BY boat_id, id
@@ -237,6 +242,10 @@ def main():
         d["sailmaker_name"] = sm_by_id.get(d["sailmaker_id"], {}).get("name") if d["sailmaker_id"] else None
         smhist_by_boat.setdefault(d["boat_id"], []).append(d)
 
+    namehist_by_boat = {}
+    for r in name_history_rows:
+        namehist_by_boat.setdefault(r["boat_id"], []).append(dict(r))
+
     ownerhist_by_boat = {}
     for r in owner_history_rows:
         d = dict(r)
@@ -252,6 +261,7 @@ def main():
                                key=lambda e: (entry_season_year(e) or 0), reverse=True)
         d["sailmaker_history"] = smhist_by_boat.get(d["id"], [])
         d["owner_history"] = ownerhist_by_boat.get(d["id"], [])
+        d["name_history"] = namehist_by_boat.get(d["id"], [])
         # "current" sailmaker = most recent history row, else most recent entry's sailmaker
         current_sm = None
         if d["sailmaker_history"]:
@@ -338,6 +348,7 @@ def main():
         b["entries"] = [strip_nulls(e) for e in b["entries"]]
         b["sailmaker_history"] = [strip_nulls(h) for h in b["sailmaker_history"]]
         b["owner_history"] = [strip_nulls(h) for h in b["owner_history"]]
+        b["name_history"] = [strip_nulls(h) for h in b.get("name_history", [])]
 
     with open(out_path, "w") as f:
         json.dump(data, f, default=str)

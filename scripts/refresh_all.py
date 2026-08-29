@@ -120,6 +120,12 @@ def main():
     if not ok:
         failures.append("boat types")
 
+    # Naming history is derived from the names boats raced under, so it has to
+    # be rebuilt after each scrape like the owner history is.
+    ok, _ = run("Derive naming history", ["backfill_boat_names.py"], args.db, args.timeout)
+    if not ok:
+        failures.append("boat names")
+
     for step, argv in (("Export JSON", ["export_dashboard_data.py", "dashboard/data.json"]),
                        ("Build dashboard", ["build_dashboard.py"])):
         # build_dashboard takes no db argument
