@@ -306,6 +306,9 @@ def main():
         "n_events": len(events),
         "n_races": len(races),
         "n_class_count_rows": len(class_counts),
+        # how many entries carry any sailmaker at all - the honest
+        # denominator behind every market-share figure in the dashboard
+        "n_entries_with_sailmaker": sum(1 for e in entries_rows if e["sailmaker_id"]),
     }
 
     data = {

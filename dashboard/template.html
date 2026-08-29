@@ -693,7 +693,16 @@ function renderOverview() {
   }));
   const distinctPts = Object.keys(yearBoats).map(Number).sort((a,b)=>a-b).map(y => ({x:y, y:yearBoats[y].size}));
 
-  const northPct = byBucket['North Sails'] ? Math.round(100*byBucket['North Sails']/activeBoats.length) : 0;
+  // Two different North Sails figures, both true, and misleading on their own.
+  // Share of the WHOLE active fleet understates us because most of the fleet is
+  // simply unmeasured; share of the KNOWN fleet overstates us because what we
+  // know is skewed towards boats North Sails itself publicises. The overview
+  // shows both and says so, rather than picking the flattering one.
+  const northN = byBucket['North Sails'] || 0;
+  const smKnown = activeBoats.filter(b => b.current_sailmaker).length;
+  const smKnownPct = activeBoats.length ? Math.round(100 * smKnown / activeBoats.length) : 0;
+  const northOfKnown = smKnown ? Math.round(100 * northN / smKnown) : 0;
+  const northPct = activeBoats.length ? Math.round(100 * northN / activeBoats.length) : 0;
 
   return `
     <h1>Overview</h1>
@@ -705,7 +714,22 @@ function renderOverview() {
       <div class="stat-tile"><div class="v">${s.n_entries}</div><div class="l">Boat-level race entries (all-time)</div></div>
       <div class="stat-tile"><div class="v">${s.n_regattas}</div><div class="l">Regattas / races</div></div>
       <div class="stat-tile"><div class="v">${s.n_class_count_rows}</div><div class="l">Historical class-count records</div></div>
-      <div class="stat-tile"><div class="v">${northPct}%</div><div class="l">Active boats on North Sails</div></div>
+      <div class="stat-tile"><div class="v">${smKnownPct}%</div><div class="l">Sailmaker known</div></div>
+    </div>
+
+    <div class="card" style="border-left:4px solid var(--series-north);">
+      <h2 style="margin-top:0;">Where North Sails stands</h2>
+      <p style="margin:0 0 10px;font-size:15px;">
+        <strong>${northN}</strong> of the <strong>${smKnown}</strong> active boats whose sailmaker we know are on North Sails —
+        <strong>${northOfKnown}%</strong> of the measured fleet.</p>
+      <p class="muted" style="font-size:13px;margin:0;">
+        That is <em>not</em> ${northOfKnown}% of the Solent. We know the sailmaker for only
+        <strong>${smKnown} of ${activeBoats.length}</strong> active boats (${smKnownPct}%), because race results
+        almost never record whose sails a boat carries — just ${s.n_entries_with_sailmaker ?? 0} of
+        ${s.n_entries} entries do. Measured across the whole active fleet instead, North Sails is ${northPct}%.
+        The real number lies between ${northPct}% and ${northOfKnown}%; what we know is also skewed towards boats
+        North Sails publicises, so treat ${northOfKnown}% as the optimistic end. Loading our own customer list
+        would settle it outright.</p>
     </div>
     <div class="card-row">
       <div class="card">

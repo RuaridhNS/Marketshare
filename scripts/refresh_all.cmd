@@ -26,6 +26,32 @@ echo ===== refresh started %DATE% %TIME% ===== > "%LOG%"
 set RC=%ERRORLEVEL%
 echo ===== finished rc=%RC% %DATE% %TIME% ===== >> "%LOG%"
 
+REM ---------------------------------------------------------------------------
+REM Off-machine backup of the database.
+REM
+REM db\*.db is gitignored (30MB, and regenerable in principle), so the database
+REM has never been on GitHub. But "regenerable" is not true of what actually
+REM matters in it: ~130 boat merges and their aliases, the researched sailmaker
+REM findings, the JOG data supplied by hand that no scraper can reach, the
+REM charter flags, and RORC 2007-2022 whose source has since moved behind a
+REM crawler block. The .bak files sit on the same disk, so they protect against
+REM a bad script, not a dead drive.
+REM
+REM Copied to OneDrive, which syncs off the machine. Keeps the last 8 weekly
+REM copies.
+REM ---------------------------------------------------------------------------
+set BACKUPDIR=C:\Users\ruari\OneDrive - North Technology Group\Marketshare backups
+if not exist "%BACKUPDIR%" mkdir "%BACKUPDIR%"
+copy /Y "%REPO%\db\marketshare.db" "%BACKUPDIR%\marketshare_%STAMP%.db" >> "%LOG%" 2>&1
+if errorlevel 1 (
+  echo !! DATABASE BACKUP FAILED >> "%LOG%"
+) else (
+  echo database backed up to "%BACKUPDIR%\marketshare_%STAMP%.db" >> "%LOG%"
+)
+
+powershell -NoProfile -Command ^
+  "Get-ChildItem '%BACKUPDIR%\marketshare_*.db' | Sort-Object LastWriteTime -Descending | Select-Object -Skip 8 | Remove-Item -Force -ErrorAction SilentlyContinue"
+
 REM keep the 30 most recent logs
 powershell -NoProfile -Command ^
   "Get-ChildItem '%LOGDIR%\refresh_*.log' | Sort-Object LastWriteTime -Descending | Select-Object -Skip 30 | Remove-Item -Force -ErrorAction SilentlyContinue"
