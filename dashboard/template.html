@@ -934,9 +934,30 @@ function renderBoatProfile(id) {
     <tr><td>${esc(h.sailmaker_name||'—')}</td><td>${esc(h.source||'')}</td><td>${esc(h.confidence||'')}</td></tr>
   `).join('') || `<tr><td colspan="3" class="muted">No sailmaker history recorded.</td></tr>`;
 
-  const ownerHistoryRows = b.owner_history.map(h => `
-    <tr><td>${esc(h.owner_name||'—')}</td><td>${esc(h.effective_from||'—')}</td><td>${esc(h.effective_to||'current')}</td><td>${esc(h.source||'')}</td></tr>
-  `).join('') || `<tr><td colspan="4" class="muted">No owner history recorded.</td></tr>`;
+  // Ownership timeline, newest first. Segments come from walking the boat's
+  // race history, so a merged-in duplicate contributes its previous owner here
+  // rather than that record's owner being lost - which is usually the whole
+  // point of the pair: the same hull under two owners.
+  const ownerTimeline = (() => {
+    const hs = (b.owner_history || []).slice().sort((a, c) =>
+      String(c.effective_from || '').localeCompare(String(a.effective_from || '')));
+    if (!hs.length) return '<p class="muted" style="margin:0;">No owner history recorded.</p>';
+    return `<ol style="list-style:none;padding:0;margin:0;border-left:2px solid var(--border);">` +
+      hs.map((h, i) => {
+        const current = !h.effective_to;
+        const dot = current ? 'var(--series-north)' : 'var(--text-muted)';
+        return `<li style="position:relative;padding:0 0 14px 18px;">
+          <span style="position:absolute;left:-7px;top:4px;width:12px;height:12px;border-radius:50%;
+                background:${current ? dot : 'var(--surface)'};border:2px solid ${dot};"></span>
+          <div><strong>${esc(h.owner_name || '—')}</strong>
+            ${current ? '<span class="pill" style="background:var(--series-north);color:#fff;margin-left:6px;">current</span>' : ''}</div>
+          <div class="muted" style="font-size:12px;">
+            ${esc(h.effective_from || '?')} → ${esc(h.effective_to || 'present')}
+            ${h.source ? ' · ' + esc(h.source) : ''}
+            ${h.confidence ? ' · ' + esc(h.confidence) : ''}</div>
+        </li>`;
+      }).join('') + '</ol>';
+  })();
 
   // A boat's history reads as the regattas it has entered, not the hundreds of
   // individual races inside them (a single Cowes Week is ~15 rows on its own).
@@ -1064,8 +1085,10 @@ function renderBoatProfile(id) {
       <table><thead><tr><th>Sailmaker</th><th>Source</th><th>Confidence</th></tr></thead><tbody>${smHistoryRows}</tbody></table>
     </div>
     <div class="card">
-      <h2>Owner history</h2>
-      <table><thead><tr><th>Owner</th><th>From</th><th>To</th><th>Source</th></tr></thead><tbody>${ownerHistoryRows}</tbody></table>
+      <h2>Ownership timeline</h2>
+      <p class="muted" style="font-size:12px;margin-top:0;">Derived from who this boat was entered under, season by season —
+        including any records merged into it, so a previous owner survives the merge.</p>
+      ${ownerTimeline}
     </div>
     <div class="card" style="padding:0;overflow:auto;">
       <h2 style="padding:18px 20px 0;">Regatta entries (${regattaEntries.length})</h2>

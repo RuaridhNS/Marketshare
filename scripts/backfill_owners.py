@@ -25,7 +25,7 @@ Usage:
 import sys
 import argparse
 import sqlite3
-from collections import defaultdict
+from collections import defaultdict, Counter
 
 sys.path.insert(0, str(__import__("pathlib").Path(__file__).resolve().parent))
 from build_db import norm_upper
@@ -75,6 +75,18 @@ def main():
 
     for boat_id, entries in by_boat.items():
         entries.sort(key=lambda x: x[0])
+
+        # One owner per SEASON first. A boat is entered several times a year and
+        # different sources name the entrant differently (the charter company in
+        # one, the individual in another), so iterating raw entries produced
+        # timelines that flip-flopped inside a single season - Galahad read
+        # Sailing Logic -> Banim -> Sailing Logic -> Banim across 2016 alone.
+        # The most frequently recorded name for that season wins; ties go to the
+        # one seen last, which is the later entry.
+        per_year = defaultdict(Counter)
+        for year, owner_name in entries:
+            per_year[year][owner_name] += 1
+        entries = [(y, per_year[y].most_common(1)[0][0]) for y in sorted(per_year)]
 
         # collapse consecutive same-owner years into segments
         segments = []

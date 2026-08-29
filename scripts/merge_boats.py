@@ -65,6 +65,11 @@ def merge_one(cur, keep_id, merge_id):
             cur.execute("UPDATE race_entries SET boat_id = ? WHERE id = ?", (keep_id, entry_id))
 
     cur.execute("UPDATE boat_sailmaker_history SET boat_id = ? WHERE boat_id = ?", (keep_id, merge_id))
+    # Ownership timeline must survive the merge too. Without this the
+    # merged-away boat's owner history died with it (ON DELETE CASCADE), losing
+    # exactly the previous-owner record a duplicate pair usually exists to
+    # document - the two records often ARE the same hull under two owners.
+    cur.execute("UPDATE boat_owner_history SET boat_id = ? WHERE boat_id = ?", (keep_id, merge_id))
 
     # backfill scalar fields onto the keeper where missing
     cur.execute("SELECT boat_name, boat_type, tcc, current_owner_id FROM boats WHERE id = ?", (keep_id,))
@@ -77,21 +82,25 @@ def merge_one(cur, keep_id, merge_id):
         (k_type or m_type, k_tcc if k_tcc is not None else m_tcc, k_owner or m_owner, keep_id))
 
     # boat_crm: backfill any field the keeper is missing
-    cur.execute("SELECT lead_rep, contacted_by, in_cs, tag, notes FROM boat_crm WHERE boat_id = ?", (keep_id,))
+    cur.execute("SELECT lead_rep, contacted_by, in_cs, tag, notes, boat_captain, programme_manager FROM boat_crm WHERE boat_id = ?", (keep_id,))
     keep_crm = cur.fetchone()
-    cur.execute("SELECT lead_rep, contacted_by, in_cs, tag, notes FROM boat_crm WHERE boat_id = ?", (merge_id,))
+    cur.execute("SELECT lead_rep, contacted_by, in_cs, tag, notes, boat_captain, programme_manager FROM boat_crm WHERE boat_id = ?", (merge_id,))
     merge_crm = cur.fetchone()
     if merge_crm:
         if keep_crm:
-            fields = ["lead_rep", "contacted_by", "in_cs", "tag", "notes"]
-            merged = [keep_crm[i] if keep_crm[i] not in (None, "") else merge_crm[i] for i in range(5)]
+            # 7 CRM fields now (boat_captain and programme_manager added);
+            # keep whatever the keeper already has, fall back to the other record
+            merged = [keep_crm[i] if keep_crm[i] not in (None, "") else merge_crm[i]
+                      for i in range(7)]
             cur.execute(
-                "UPDATE boat_crm SET lead_rep=?, contacted_by=?, in_cs=?, tag=?, notes=? WHERE boat_id=?",
+                "UPDATE boat_crm SET lead_rep=?, contacted_by=?, in_cs=?, tag=?, notes=?, "
+                "boat_captain=?, programme_manager=? WHERE boat_id=?",
                 (*merged, keep_id))
         else:
             cur.execute(
-                "INSERT INTO boat_crm (boat_id, lead_rep, contacted_by, in_cs, tag, notes) "
-                "VALUES (?, ?, ?, ?, ?, ?)", (keep_id, *merge_crm))
+                "INSERT INTO boat_crm (boat_id, lead_rep, contacted_by, in_cs, tag, notes, "
+                "boat_captain, programme_manager) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?)", (keep_id, *merge_crm))
 
     cur.execute("DELETE FROM boats WHERE id = ?", (merge_id,))
 
