@@ -78,6 +78,19 @@ def get_or_create_boat(cur, sail_no, boat_name, boat_type=None, tcc=None):
         row = cur.fetchone()
         if row:
             boat_id = row[0]
+        else:
+            # A sail number that was merged away must not come back as a new
+            # boat the next time a scrape meets it. Without this, every re-run
+            # silently undid the manual merge work - 20 merged boats had been
+            # re-created before the alias table existed.
+            cur.execute("""CREATE TABLE IF NOT EXISTS boat_sail_aliases (
+                             alias_sail_no TEXT PRIMARY KEY,
+                             boat_id       INTEGER NOT NULL REFERENCES boats(id) ON DELETE CASCADE,
+                             created_at    TEXT NOT NULL DEFAULT (datetime('now')))""")
+            cur.execute("SELECT boat_id FROM boat_sail_aliases WHERE alias_sail_no = ?", (sail_no,))
+            row = cur.fetchone()
+            if row:
+                boat_id = row[0]
     if boat_id is None and sail_no is None and boat_name:
         # fallback match by name only (rare boats without a clean sail no)
         cur.execute("SELECT id FROM boats WHERE boat_name = ? AND sail_no IS NULL", (boat_name,))

@@ -954,6 +954,8 @@ function renderBoatProfile(id) {
     <dl class="kv">
       <dt>Lead rep</dt><dd>${esc(b.lead_rep||'—')}</dd>
       <dt>Contacted by</dt><dd>${esc(b.contacted_by||'—')}</dd>
+      <dt>Boat captain</dt><dd>${esc(b.boat_captain||'—')}</dd>
+      <dt>Programme manager</dt><dd>${esc(b.programme_manager||'—')}</dd>
       <dt>In customer system</dt><dd>${b.in_cs===1?'Yes':(b.in_cs===0?'No':'—')}</dd>
       <dt>Tag</dt><dd>${esc(b.tag||'—')}</dd>
       <dt>Notes</dt><dd>${esc(b.crm_notes||'—')}</dd>

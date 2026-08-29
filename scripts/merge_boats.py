@@ -37,6 +37,22 @@ def parse_args():
 
 
 def merge_one(cur, keep_id, merge_id):
+    # Record the merged-away sail number as an alias of the keeper FIRST, so a
+    # later scrape that meets that number again resolves to the keeper instead
+    # of re-creating the boat. Without this every merge was undone by the next
+    # scrape - 20 of them had silently come back.
+    cur.execute("""CREATE TABLE IF NOT EXISTS boat_sail_aliases (
+                     alias_sail_no TEXT PRIMARY KEY,
+                     boat_id       INTEGER NOT NULL REFERENCES boats(id) ON DELETE CASCADE,
+                     created_at    TEXT NOT NULL DEFAULT (datetime('now')))""")
+    cur.execute("SELECT sail_no FROM boats WHERE id = ?", (merge_id,))
+    row = cur.fetchone()
+    if row and row[0]:
+        cur.execute("INSERT OR REPLACE INTO boat_sail_aliases (alias_sail_no, boat_id) VALUES (?, ?)",
+                    (row[0], keep_id))
+    # any aliases already pointing at the merged-away boat must follow it
+    cur.execute("UPDATE boat_sail_aliases SET boat_id = ? WHERE boat_id = ?", (keep_id, merge_id))
+
     # race_entries: reassign, but drop the merged-away row if the keeper
     # already has an entry for that race (true duplicate row).
     cur.execute("SELECT race_id FROM race_entries WHERE boat_id = ?", (keep_id,))

@@ -5,7 +5,8 @@ made in the dashboard back into the database. The dashboard can't write to
 the DB itself (it's a static file) - instead it lets you make edits in the
 browser, then export them as a CSV in this shape:
 
-    SailNo,BoatName,NewSailmaker,NewOwner,NewTCC,NewLeadRep,NewContactedBy,Notes
+    SailNo,BoatName,NewSailmaker,NewOwner,NewTCC,NewLeadRep,NewContactedBy,
+    NewBoatCaptain,NewProgrammeManager,Notes
 
 Any of the New* columns may be blank (= no change to that field). One row
 per boat. Matched by SailNo.
@@ -84,6 +85,18 @@ def main():
                 n_tcc += 1
             except ValueError:
                 print(f"  Skipping bad TCC value for {sail_no}: {new_tcc!r}")
+
+        # crew roles: a boat captain or programme manager is often the name a
+        # results system records as "owner", so capturing them separately keeps
+        # the owner field meaning the actual owner
+        for col, field in (("NewBoatCaptain", "boat_captain"),
+                           ("NewProgrammeManager", "programme_manager")):
+            val = norm(row.get(col))
+            if val:
+                cur.execute(f"INSERT INTO boat_crm (boat_id, {field}) VALUES (?,?) "
+                            f"ON CONFLICT(boat_id) DO UPDATE SET {field}=excluded.{field}, "
+                            f"last_updated=?", (boat_id, val, datetime.datetime.now().isoformat()))
+                n_crm += 1
 
         new_lead_rep = norm(row.get("NewLeadRep"))
         new_contacted_by = norm(row.get("NewContactedBy"))

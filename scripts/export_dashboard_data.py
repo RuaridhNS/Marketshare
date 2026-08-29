@@ -36,7 +36,8 @@ def main():
     boats_rows = cur.execute("""
         SELECT b.id, b.sail_no, b.boat_name, b.boat_type, b.tcc,
                o.name AS owner_name,
-               bc.lead_rep, bc.contacted_by, bc.in_cs, bc.tag, bc.notes AS crm_notes
+               bc.lead_rep, bc.contacted_by, bc.boat_captain, bc.programme_manager,
+               bc.in_cs, bc.tag, bc.notes AS crm_notes
         FROM boats b
         LEFT JOIN owners o ON o.id = b.current_owner_id
         LEFT JOIN boat_crm bc ON bc.boat_id = b.id
