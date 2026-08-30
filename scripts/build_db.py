@@ -424,17 +424,20 @@ def import_class_block(cur, ws, fallback_name, category, class_col=1, max_row=20
 def import_irc_solent_report(cur, path):
     wb = openpyxl.load_workbook(path, data_only=True)
 
-    # RORC Inshore: block 1's title ("Easter challenge", a copy/paste artifact)
-    # sits in column B instead of A on this sheet; blocks 2-4 have no title at
-    # all, so they're named from their first class label instead.
-    import_class_block(cur, wb["RORC Inshore"], "RORC Inshore Series", "RORC",
+    # The sheet is TABBED "RORC Inshore" but holds four separately titled
+    # blocks, each a different regatta, with the titles in column B.
+    #
+    # An earlier version read block 1's title, "Easter challenge", as a
+    # copy/paste artifact and overrode it to "RORC Inshore Series". That was
+    # wrong: the title was correct and there is no RORC Inshore Series. The
+    # override invented a regatta and filed nine years of Easter Challenge
+    # entry counts under it. Do not reintroduce it - the tab name is not the
+    # regatta name here.
+    import_class_block(cur, wb["RORC Inshore"], "RORC Easter Challenge", "RORC",
                         title_col=2,
-                        title_overrides={"easter challenge": "RORC Inshore Series"},
+                        title_overrides={"easter challenge": "RORC Easter Challenge"},
                         hint_overrides={
-                            "0 (cape 31)": "RORC Inshore Series",
-                            "2h": "RORC Inshore Series",
-                            "fast 40/ gp0 (irc)": "RORC Inshore Non-IRC Classes",
-                            "0": "RORC Inshore Series (extended classes, 0-4 banding)",
+                            "fast 40/ gp0 (irc)": "Vice admirals cup/ RTYC",
                         })
 
     # RSYC: 4 stacked blocks (May/June/July/September Regatta) -> 4 distinct regattas
