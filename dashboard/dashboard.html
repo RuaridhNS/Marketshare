@@ -396,7 +396,16 @@ function setPendingEdit(boatId, patch) {
 function clearPendingEdit(boatId) { delete PENDING[boatId]; savePendingEdits(); updatePendingBadge(); }
 function clearAllPendingEdits() { PENDING = {}; savePendingEdits(); updatePendingBadge(); }
 function updatePendingBadge() {
-  const n = Object.keys(PENDING).length + PENDING_MERGES.length;
+  // Count only work still OUTSTANDING. An edit that has already been applied to
+  // the database is done, and leaving it in the badge meant the number never
+  // cleared - it just counted everything ever edited in this browser.
+  const outstandingEdits = Object.keys(PENDING).filter(id => {
+    const b = boatsById[id];
+    return !b || !pendingApplied(b, PENDING[id]);
+  }).length;
+  // a merge is done once the merged-away boat is gone from the data
+  const outstandingMerges = PENDING_MERGES.filter(m => boatsById[m.mergeId]).length;
+  const n = outstandingEdits + outstandingMerges;
   const badge = document.getElementById('pending-badge');
   if (badge) { badge.style.display = n ? '' : 'none'; badge.textContent = n; }
   const dupBadge = document.getElementById('duplicates-badge');
