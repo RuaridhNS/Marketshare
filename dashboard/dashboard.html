@@ -661,6 +661,7 @@ function navigate() {
     console.error(err);
   }
   attachBoatFilterHandlers();
+  attachInlineSailmakerHandlers();
   attachBoatEditHandlers();
   attachPendingChangesHandlers();
   attachDuplicatesHandlers();
@@ -888,6 +889,48 @@ function renderFilteredShare(visibleRows, ctx) {
     </div>`;
 }
 
+// Sailmaker choices, shared by every editor so the three places you can change
+// one all offer the same list.
+function sailmakerChoices() {
+  return DATA.sailmakers.map(s => s.name).concat(BUCKET_ORDER)
+    .filter((v, i, a) => a.indexOf(v) === i).sort();
+}
+
+// Click-to-edit sailmaker in the Boats table. Deliberately NOT a <select> on
+// every row: that is what made the Sales page unusable at 3,324 controls. The
+// cell stays a plain pill until you click it, so 3,000 rows cost nothing.
+function attachInlineSailmakerHandlers() {
+  document.querySelectorAll('.sm-cell').forEach(td => {
+    td.addEventListener('click', (ev) => {
+      if (td.querySelector('select')) return;      // already editing
+      ev.stopPropagation();                        // don't open the boat page
+      const b = boatsById[td.dataset.boatId];
+      if (!b) return;
+      const current = liveSailmaker(b) || '';
+      const sel = document.createElement('select');
+      sel.innerHTML = '<option value="">— unknown —</option>' +
+        sailmakerChoices().map(n =>
+          `<option value="${esc(n)}" ${n === current ? 'selected' : ''}>${esc(n)}</option>`).join('');
+      sel.style.maxWidth = '150px';
+      td.innerHTML = '';
+      td.appendChild(sel);
+      sel.focus();
+      const close = (commit) => {
+        if (commit && sel.value !== current) {
+          setPendingEdit(b.id, { sailmaker: sel.value });
+          navigate();                              // figures update immediately
+        } else {
+          td.innerHTML = `<span class="pill" style="${pillStyle(current)};cursor:pointer;">` +
+                         `${esc(current || 'Unknown')}</span>`;
+        }
+      };
+      sel.addEventListener('change', () => close(true));
+      sel.addEventListener('blur', () => close(false));
+      sel.addEventListener('keydown', e => { if (e.key === 'Escape') close(false); });
+    });
+  });
+}
+
 function renderBoatsList() {
   // Alphabetical by boat name, case- and accent-insensitive. The SQL ORDER BY
   // uses SQLite's default binary collation, which sorts by byte value - so
@@ -910,7 +953,8 @@ function renderBoatsList() {
       <td>${esc(b.boat_type||'')}</td>
       <td class="num">${b.tcc||''}</td>
       <td>${esc(b.owner_name||'')}</td>
-      <td><span class="pill" style="${pillStyle(liveSailmaker(b))}">${esc(liveSailmaker(b)||'Unknown')}</span></td>
+      <td class="sm-cell" data-boat-id="${b.id}" title="Click to change the sailmaker">
+        <span class="pill" style="${pillStyle(liveSailmaker(b))};cursor:pointer;">${esc(liveSailmaker(b)||'Unknown')}</span></td>
       <td>${statusPill}${b.lastActiveYear ? ` <span class="muted" style="font-size:11px;">(${b.lastActiveYear})</span>` : ''}</td>
       <td>${esc(b.tag||'')}</td>
       <td class="num">${b.entries.length}</td>
