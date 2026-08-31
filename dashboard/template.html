@@ -195,6 +195,44 @@
   }
   dialog#chart-modal .modal-head { display:flex; align-items:center; justify-content:space-between; gap: 16px; margin-bottom: 16px; }
   dialog#chart-modal .modal-head h2 { margin: 0; }
+
+/* ---- regatta tree: Series > Regatta > Class ---- */
+.regatta-series{padding:0;}
+.regatta-series>summary.tree-series{
+  display:flex;align-items:baseline;gap:12px;cursor:pointer;list-style:none;
+  padding:16px 20px;font-size:19px;font-weight:600;
+}
+.regatta-series>summary.tree-series::-webkit-details-marker{display:none;}
+.regatta-series>summary.tree-series::before{
+  content:"B8";font-size:12px;color:var(--text-muted);transition:transform .15s;
+}
+.regatta-series[open]>summary.tree-series::before{transform:rotate(90deg);}
+.tree-body{padding:0 8px 10px;}
+.tree-node{border-top:1px solid var(--border);}
+.tree-node>summary{
+  display:flex;align-items:center;gap:12px;flex-wrap:wrap;cursor:pointer;
+  list-style:none;padding:11px 12px;
+}
+.tree-node>summary::-webkit-details-marker{display:none;}
+.tree-node>summary::before{
+  content:"B8";font-size:11px;color:var(--text-muted);flex:none;transition:transform .15s;
+}
+.tree-node[open]>summary::before{transform:rotate(90deg);}
+.tree-node>summary:hover{background:var(--surface-2,#f5f7f8);}
+.tree-name{font-weight:600;flex:1 1 240px;}
+.tree-meta{display:flex;gap:14px;flex-wrap:wrap;align-items:center;
+  font-size:12px;color:var(--text-muted);}
+.tree-open{font-size:12px;font-weight:600;text-decoration:none;color:var(--series-north,#1b4f6e);
+  white-space:nowrap;}
+.tree-kids{display:flex;flex-direction:column;padding:2px 12px 12px 30px;gap:2px;}
+.tree-leaf{
+  display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;text-decoration:none;
+  color:inherit;padding:6px 10px;border-radius:5px;border-left:2px solid var(--border);
+}
+.tree-leaf:hover{background:var(--surface-2,#f5f7f8);border-left-color:var(--series-north,#1b4f6e);}
+.tree-leaf-name{font-weight:500;flex:1 1 200px;}
+.tree-leaf-meta{font-size:12px;color:var(--text-muted);font-variant-numeric:tabular-nums;}
+.tree-empty{padding:8px 10px;font-size:12.5px;color:var(--text-muted);margin:0;}
 </style>
 </head>
 <body>
@@ -1584,41 +1622,68 @@ function renderRegattasList() {
   const bySeries = {};
   DATA.regattas.forEach(r => { (bySeries[seriesOf(r)] ||= []).push(r); });
 
+  // Class membership per regatta, built once. The class layer used to be baked
+  // into the regatta NAME ("Vice Admiral's Cup - J/109"), which made one event
+  // look like eleven. It now lives on the entries, so it can be shown as the
+  // third level of the tree instead of fragmenting the second.
+  const clsByRegatta = {};
+  DATA.boats.forEach(b => b.entries.forEach(e => {
+    const ra = racesById[e.race_id]; if (!ra) return;
+    const ev = eventsById[ra.event_id]; if (!ev) return;
+    const m = (clsByRegatta[ev.regatta_id] ||= {});
+    const c = normClass(e.class) || 'Class unrecorded';
+    const g = (m[c] ||= { boats: new Set(), races: new Set(), years: new Set() });
+    g.boats.add(b.id); g.races.add(e.race_id); g.years.add(ev.season_year);
+  }));
+
   const cards = Object.keys(bySeries).sort().map(series => {
-    const rows = bySeries[series].map(r => {
+    const nodes = bySeries[series].map(r => {
       const s = regattaSummary(r);
-      const spark = s.pts.length > 1
-        ? `<span class="muted" style="font-size:11px;">${s.pts.slice(-6).map(p=>p.y).join(' · ')}</span>` : '';
-      return { r, s, html: `<tr class="clickable regatta-row"
-          data-route="#/regatta/${r.id}"
+      const cm = clsByRegatta[r.id] || {};
+      const classes = Object.keys(cm).sort((a,b) => cm[b].boats.size - cm[a].boats.size);
+      const kids = classes.length ? classes.map(c => {
+        const g = cm[c];
+        const yrs = Array.from(g.years).sort();
+        const latest = yrs[yrs.length - 1];
+        return `<a class="tree-leaf" href="#/regatta/${r.id}?year=${latest}&cls=${encodeURIComponent(c)}">
+          <span class="tree-leaf-name">${esc(c)}</span>
+          <span class="tree-leaf-meta">${g.boats.size} boat${g.boats.size===1?'':'s'} &middot; ${g.races.size} race${g.races.size===1?'':'s'} &middot; ${yrs.length} season${yrs.length===1?'':'s'}</span>
+        </a>`;
+      }).join('') : `<p class="tree-empty">No boat-level results yet &mdash; this regatta has aggregate entry counts only.</p>`;
+
+      return { s, r, html: `<details class="tree-node regatta-row"
           data-name="${esc((r.name+' '+series).toLowerCase())}"
           data-recent="${s.nRecent}" data-boatlevel="${s.hasBoatLevel?1:0}">
-        <td>${esc(r.name)}</td>
-        <td class="num">${s.nSeasons}</td>
-        <td class="num">${s.nRecent}</td>
-        <td class="num">${s.latest ? s.latest.y + ' <span class="muted" style="font-size:11px;">(' + s.latest.x + ')</span>' : '—'}</td>
-        <td>${spark}</td>
-        <td>${s.hasBoatLevel
+        <summary>
+          <span class="tree-name">${esc(r.name)}</span>
+          <span class="tree-meta">
+            <span>${s.nSeasons} season${s.nSeasons===1?'':'s'}</span>
+            <span>${classes.length} class${classes.length===1?'':'es'}</span>
+            <span>${s.latest ? s.latest.y + ' boats (' + s.latest.x + ')' : '&mdash;'}</span>
+            ${s.hasBoatLevel
               ? '<span class="pill" style="background:var(--series-north);color:#fff;">boat-level</span>'
-              : '<span class="pill" style="background:var(--surface-2,#eee);color:var(--text-muted);border:1px solid var(--border);">aggregate</span>'}</td>
-      </tr>` };
+              : '<span class="pill" style="background:var(--surface-2,#eee);color:var(--text-muted);border:1px solid var(--border);">aggregate</span>'}
+          </span>
+          <a class="tree-open" href="#/regatta/${r.id}" title="Open this regatta">open &rsaquo;</a>
+        </summary>
+        <div class="tree-kids">${kids}</div>
+      </details>` };
     }).sort((a,b) => b.s.nRecent - a.s.nRecent || a.r.name.localeCompare(b.r.name));
 
-    return `<div class="card regatta-series" style="padding:0;overflow:auto;" data-series="${esc(series.toLowerCase())}">
-      <h2 style="padding:18px 20px 0;">${esc(series)} <span class="muted" style="font-weight:400;font-size:13px;">· ${rows.length} regatta${rows.length===1?'':'s'}</span></h2>
-      <table>
-        <thead><tr><th>Regatta</th><th class="num">Seasons</th><th class="num">Last 5yr</th><th class="num">Latest boats</th><th>Recent trend</th><th>Data</th></tr></thead>
-        <tbody>${rows.map(x=>x.html).join('')}</tbody>
-      </table>
-    </div>`;
+    return `<details class="card regatta-series" open data-series="${esc(series.toLowerCase())}">
+      <summary class="tree-series"><span>${esc(series)}</span>
+        <span class="muted" style="font-weight:400;font-size:13px;">${nodes.length} regatta${nodes.length===1?'':'s'}</span>
+      </summary>
+      <div class="tree-body">${nodes.map(x=>x.html).join('')}</div>
+    </details>`;
   }).join('');
 
   return `
     <h1>Regattas</h1>
     <p class="subtitle"><span id="regatta-count">${DATA.regattas.length}</span> regattas across ${Object.keys(bySeries).length} series,
-      spanning ${DATA.stats.n_events} regatta-seasons. Click a regatta for its seasons, classes and races.</p>
+      spanning ${DATA.stats.n_events} regatta-seasons. Open a series, then a regatta, to see its classes.</p>
     <div class="search-row">
-      <input type="text" id="regatta-search" placeholder="Search regatta or series…">
+      <input type="text" id="regatta-search" placeholder="Search regatta or series&hellip;">
       <select id="regatta-filter">
         <option value="recent">Active in last 5 seasons</option>
         <option value="boatlevel">Has boat-level results</option>
