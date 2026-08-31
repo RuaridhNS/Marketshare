@@ -41,6 +41,53 @@ from build_db import (get_or_create_sailmaker, get_or_create_owner, get_or_creat
 
 REQUIRED = ["Regatta", "SeasonYear", "RaceName", "ClassLabel", "SailNo"]
 
+CREW_SCHEMA = """
+CREATE TABLE IF NOT EXISTS people (
+    id   INTEGER PRIMARY KEY,
+    name TEXT NOT NULL UNIQUE
+);
+CREATE TABLE IF NOT EXISTS race_crew (
+    id        INTEGER PRIMARY KEY,
+    race_id   INTEGER NOT NULL REFERENCES races(id) ON DELETE CASCADE,
+    boat_id   INTEGER NOT NULL REFERENCES boats(id) ON DELETE CASCADE,
+    person_id INTEGER NOT NULL REFERENCES people(id),
+    role      TEXT,
+    UNIQUE(race_id, boat_id, person_id)
+);
+CREATE INDEX IF NOT EXISTS idx_race_crew_person ON race_crew(person_id);
+"""
+
+# Results pages list joint skippers in one cell - "NICK MARTIN, RUARIDH WRIGHT",
+# "TIM GOODHEW / KELVIN MATTHEWS", "DEB FISH & ROB CRAIGIE". Kept as one string
+# the second name is invisible, and on a double-handed boat that is half the
+# crew. Split so each person is findable in their own right.
+CREW_SPLIT = re.compile(r"\s*(?:,|&|/|\+|and)\s*", re.I)
+
+
+def split_crew(raw):
+    """Return the individual people named in a Skipper/s cell.
+
+    Deliberately conservative: a fragment must contain a letter and be long
+    enough to be a name, so "N/A" or a stray separator does not invent a person.
+    """
+    raw = norm(raw) or ""
+    if not raw:
+        return []
+    parts = [p.strip(" .") for p in CREW_SPLIT.split(raw)]
+    return [p for p in parts if len(p) >= 3 and re.search(r"[A-Za-z]{2}", p)]
+
+
+def get_or_create_person(cur, name):
+    n = norm_upper(name)
+    if not n:
+        return None
+    cur.execute("SELECT id FROM people WHERE name = ?", (n,))
+    r = cur.fetchone()
+    if r:
+        return r[0]
+    cur.execute("INSERT INTO people (name) VALUES (?)", (n,))
+    return cur.lastrowid
+
 # This tool is IRC-only by decision: one-design fleets are excluded even when
 # they sail the same regatta. Anything without IRC in the class label has to
 # earn its place some other way, so it is reported and skipped by default.
@@ -100,8 +147,9 @@ def main():
 
     conn = sqlite3.connect(args.db)
     cur = conn.cursor()
+    cur.executescript(CREW_SCHEMA)
 
-    n_entries = skipped_od = skipped_blank = 0
+    n_entries = skipped_od = skipped_blank = n_crew = 0
     races = {}
     per_race = defaultdict(int)
     warnings = []
@@ -165,10 +213,24 @@ def main():
              num(row.get("Position"), int), num(row.get("Points")),
              "partial inventory" if partial else norm(row.get("Comments")),
              tag, "paste:claude-in-chrome"))
+        # Record every named person, not just the first. A single name is the
+        # skipper; where the page names two or more they are listed jointly, so
+        # none of them is demoted to a passenger.
+        crew = split_crew(row.get("SailedBy"))
+        role = "skipper" if len(crew) == 1 else "co-skipper"
+        for person in crew:
+            pid = get_or_create_person(cur, person)
+            if pid:
+                cur.execute(
+                    "INSERT OR IGNORE INTO race_crew (race_id, boat_id, person_id, role) "
+                    "VALUES (?,?,?,?)", (race_id, boat_id, pid, role))
+                n_crew += 1
+
         n_entries += 1
         per_race[key] += 1
 
-    print(f"{n_entries} entr(ies) across {len(races)} race/class combination(s):")
+    print(f"{n_entries} entr(ies) across {len(races)} race/class combination(s); "
+          f"{n_crew} crew placement(s):")
     for (regatta, year, race_name, cls), cnt in sorted(per_race.items()):
         print(f"  {year}  {regatta[:34]:<34} {race_name[:26]:<26} {cls[:14]:<14} {cnt:>3}")
     if skipped_od:
