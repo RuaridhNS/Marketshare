@@ -286,6 +286,39 @@ tr.sales-saved > td:first-child { box-shadow: inset 3px 0 0 var(--series-quantum
   border-left:3px solid var(--series-doyle); border-radius:0 8px 8px 0;
   padding:12px 16px; margin-bottom:14px; font-size:13px; color:var(--text-secondary); }
 .callout-warn strong { color:var(--text-primary); }
+
+/* boat page: a regatta opens to that boat's own races */
+.boat-regatta { border-top: 1px solid var(--border); }
+.boat-regatta > summary {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  cursor: pointer; list-style: none; padding: 10px 8px;
+}
+.boat-regatta > summary::-webkit-details-marker { display: none; }
+.boat-regatta > summary::before {
+  content: ""; flex: none; width: 0; height: 0;
+  border-left: 5px solid currentColor;
+  border-top: 4px solid transparent; border-bottom: 4px solid transparent;
+  opacity: .45; transition: transform .15s ease; transform-origin: 35% 50%;
+}
+.boat-regatta[open] > summary::before { transform: rotate(90deg); }
+.boat-regatta > summary:hover { background: var(--surface-2); }
+.br-name { font-weight: 600; flex: 1 1 200px; }
+.br-year { font-family: "IBM Plex Mono", monospace; font-variant-numeric: tabular-nums;
+  font-size: 12.5px; color: var(--text-muted); }
+.br-meta { font-size: 12px; color: var(--text-muted); }
+.br-open { font-size: 12px; font-weight: 600; text-decoration: none;
+  color: var(--series-north); white-space: nowrap; margin-left: auto; }
+.boat-races { display: flex; flex-direction: column; gap: 2px; padding: 2px 8px 10px 26px; }
+.boat-race {
+  display: grid; grid-template-columns: minmax(120px,1.5fr) minmax(80px,1fr) 70px 1fr 1fr;
+  gap: 10px; align-items: baseline; text-decoration: none; color: inherit;
+  padding: 5px 10px; border-radius: 5px; border-left: 2px solid var(--border);
+}
+.boat-race:hover { background: var(--surface-2); border-left-color: var(--series-north); }
+.boat-race-name { font-weight: 500; }
+.boat-race-meta { font-size: 12px; color: var(--text-muted);
+  font-variant-numeric: tabular-nums; }
+@media (max-width: 640px) { .boat-race { grid-template-columns: 1fr; gap: 2px; } }
 </style>
 </head>
 <body>
@@ -431,10 +464,12 @@ function boatRegattaEntries(boat) {
     if (!g) {
       g = { regattaId: ev.regatta_id, year: ev.season_year,
             regattaName: (regattasById[ev.regatta_id] || {}).name || '—',
-            classes: new Set(), races: 0, best: null, sailmaker: null };
+            classes: new Set(), races: 0, best: null, sailmaker: null,
+            entries: [] };   // the individual races, so a boat page can reach them
       byKey.set(key, g);
     }
     g.races++;
+    g.entries.push(e);
     if (e.class) g.classes.add(e.class);
     // finishing positions only - DNF/DNC/RET and the like aren't placings
     const pos = parseInt(e.position, 10);
@@ -1238,15 +1273,42 @@ function renderBoatProfile(id) {
   // individual races inside them (a single Cowes Week is ~15 rows on its own).
   // Races are still there, one level down, on the regatta page.
   const regattaEntries = boatRegattaEntries(b);
-  const entryRows = regattaEntries.map(g => `
-    <tr class="clickable" data-route="#/regatta/${g.regattaId}?year=${g.year}">
-      <td>${esc(g.regattaName)}</td>
-      <td class="num">${g.year||''}</td>
-      <td>${esc(Array.from(g.classes).join(', '))}</td>
-      <td class="num">${g.races}</td>
-      <td>${g.best!=null ? (g.best===1?'1st':g.best===2?'2nd':g.best===3?'3rd':g.best+'th') : '—'}</td>
-      <td>${g.sailmaker ? `<span class="pill" style="${pillStyle(g.sailmaker)}">${esc(g.sailmaker)}</span>` : ''}</td>
-    </tr>`).join('') || `<tr><td colspan="6" class="muted">No regatta entries on file.</td></tr>`;
+  const ordinal = n => n === 1 ? '1st' : n === 2 ? '2nd' : n === 3 ? '3rd' : n + 'th';
+  // Each regatta opens to the boat's OWN races in it. These used to be one
+  // level down on the regatta page, which meant hunting for this boat among
+  // everyone else's results to answer "how did we actually do?".
+  const entryRows = regattaEntries.map(g => {
+    const races = g.entries.slice().sort((x, y) => {
+      const rx = racesById[x.race_id] || {}, ry = racesById[y.race_id] || {};
+      return (rx.race_number || 0) - (ry.race_number || 0)
+          || String(rx.race_name || '').localeCompare(String(ry.race_name || ''));
+    });
+    const raceRows = races.map(e => {
+      const ra = racesById[e.race_id] || {};
+      const pos = parseInt(e.position, 10);
+      const status = (e.status && e.status !== 'finished') ? e.status : '';
+      return `<a class="boat-race" href="#/race/${e.race_id}">
+        <span class="boat-race-name">${esc(ra.race_name || 'Race')}</span>
+        <span class="boat-race-meta">${esc(e.class || '')}</span>
+        <span class="boat-race-meta">${!isNaN(pos) && pos > 0 ? ordinal(pos)
+            : (status ? esc(status) : '—')}</span>
+        <span class="boat-race-meta">${e.elapsed_time ? 'elapsed ' + esc(e.elapsed_time) : ''}</span>
+        <span class="boat-race-meta">${e.corrected_time ? 'corrected ' + esc(e.corrected_time) : ''}</span>
+      </a>`;
+    }).join('');
+    return `<details class="boat-regatta">
+      <summary>
+        <span class="br-name">${esc(g.regattaName)}</span>
+        <span class="br-year">${g.year || ''}</span>
+        <span class="br-meta">${esc(Array.from(g.classes).join(', '))}</span>
+        <span class="br-meta">${g.races} race${g.races === 1 ? '' : 's'}</span>
+        <span class="br-meta">${g.best != null ? 'best ' + ordinal(g.best) : '—'}</span>
+        ${g.sailmaker ? `<span class="pill" style="${pillStyle(g.sailmaker)}">${esc(g.sailmaker)}</span>` : ''}
+        <a class="br-open" href="#/regatta/${g.regattaId}?year=${g.year}">whole regatta &rsaquo;</a>
+      </summary>
+      <div class="boat-races">${raceRows || '<p class="muted" style="padding:6px 10px;margin:0;">No individual races on file — this season is aggregate counts only.</p>'}</div>
+    </details>`;
+  }).join('') || `<p class="muted" style="padding:0 20px 16px;">No regatta entries on file.</p>`;
 
   const crm = `
     <dl class="kv">
@@ -1383,13 +1445,10 @@ function renderBoatProfile(id) {
     </div>
     <div class="card" style="padding:0;overflow:auto;">
       <h2 style="padding:18px 20px 0;">Regatta entries (${regattaEntries.length})</h2>
-      <p class="muted" style="font-size:12px;padding:0 20px;margin:4px 0 0;">
-        One row per regatta entered, newest first — ${b.entries.length} individual race results sit behind these.
-        Click through to a regatta to see its races.</p>
-      <table>
-        <thead><tr><th>Regatta</th><th class="num">Year</th><th>Class(es)</th><th class="num">Races</th><th>Best</th><th>Sailmaker</th></tr></thead>
-        <tbody>${entryRows}</tbody>
-      </table>
+      <p class="muted" style="font-size:12px;padding:0 20px;margin:4px 0 12px;">
+        One row per regatta entered, newest first. Open one to see this boat's ${b.entries.length}
+        individual race results — position, elapsed and corrected time — or go to the whole regatta.</p>
+      <div style="padding:0 12px 12px;">${entryRows}</div>
     </div>
   `;
 }
