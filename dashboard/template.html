@@ -1009,35 +1009,48 @@ function sailmakerChoices() {
 // every row: that is what made the Sales page unusable at 3,324 controls. The
 // cell stays a plain pill until you click it, so 3,000 rows cost nothing.
 function attachInlineSailmakerHandlers() {
-  document.querySelectorAll('.sm-cell').forEach(td => {
-    td.addEventListener('click', (ev) => {
-      if (td.querySelector('select')) return;      // already editing
-      ev.stopPropagation();                        // don't open the boat page
-      const b = boatsById[td.dataset.boatId];
-      if (!b) return;
-      const current = liveSailmaker(b) || '';
-      const sel = document.createElement('select');
-      sel.innerHTML = '<option value="">— unknown —</option>' +
-        sailmakerChoices().map(n =>
-          `<option value="${esc(n)}" ${n === current ? 'selected' : ''}>${esc(n)}</option>`).join('');
-      sel.style.maxWidth = '150px';
-      td.innerHTML = '';
-      td.appendChild(sel);
-      sel.focus();
-      const close = (commit) => {
-        if (commit && sel.value !== current) {
-          setPendingEdit(b.id, { sailmaker: sel.value });
-          navigate();                              // figures update immediately
-        } else {
-          td.innerHTML = `<span class="pill" style="${pillStyle(current)};cursor:pointer;">` +
-                         `${esc(current || 'Unknown')}</span>`;
-        }
-      };
-      sel.addEventListener('change', () => close(true));
-      sel.addEventListener('blur', () => close(false));
-      sel.addEventListener('keydown', e => { if (e.key === 'Escape') close(false); });
+  // One handler for both columns. The main inventory and the partial one are
+  // edited the same way; only the field written and the empty label differ.
+  const wire = (selector, field, emptyLabel, readCurrent) => {
+    document.querySelectorAll(selector).forEach(td => {
+      td.addEventListener('click', (ev) => {
+        if (td.querySelector('select')) return;    // already editing
+        ev.stopPropagation();                      // don't open the boat page
+        const b = boatsById[td.dataset.boatId];
+        if (!b) return;
+        const current = readCurrent(b) || '';
+        const sel = document.createElement('select');
+        sel.innerHTML = `<option value="">${emptyLabel}</option>` +
+          sailmakerChoices()
+            .filter(n => field === 'sailmaker' || !['Partial', 'Unknown', 'Other'].includes(n))
+            .map(n => `<option value="${esc(n)}" ${n === current ? 'selected' : ''}>${esc(n)}</option>`).join('');
+        sel.style.maxWidth = '150px';
+        td.innerHTML = '';
+        td.appendChild(sel);
+        sel.focus();
+        const paint = () => {
+          td.innerHTML = current
+            ? `<span class="pill" style="${pillStyle(current)};cursor:pointer;">${esc(current)}</span>`
+            : (field === 'sailmaker'
+                ? `<span class="pill" style="${pillStyle('')};cursor:pointer;">Unknown</span>`
+                : `<span class="muted" style="cursor:pointer;">—</span>`);
+        };
+        const close = (commit) => {
+          if (commit && sel.value !== current) {
+            // an emptied partial is a deliberate clear, not "no change"
+            const v = (field === 'partialSailmaker' && sel.value === '') ? '__none__' : sel.value;
+            setPendingEdit(b.id, { [field]: v });
+            navigate();                            // figures update immediately
+          } else { paint(); }
+        };
+        sel.addEventListener('change', () => close(true));
+        sel.addEventListener('blur', () => close(false));
+        sel.addEventListener('keydown', e => { if (e.key === 'Escape') close(false); });
+      });
     });
-  });
+  };
+  wire('.sm-cell', 'sailmaker', '— unknown —', b => liveSailmaker(b));
+  wire('.sm-partial-cell', 'partialSailmaker', '— none —', b => livePartial(b));
 }
 
 function renderBoatsList() {
@@ -1062,8 +1075,12 @@ function renderBoatsList() {
       <td>${esc(b.boat_type||'')}</td>
       <td class="num">${b.tcc||''}</td>
       <td>${esc(b.owner_name||'')}</td>
-      <td class="sm-cell" data-boat-id="${b.id}" title="Click to change the sailmaker">
+      <td class="sm-cell" data-boat-id="${b.id}" title="Click to change the main inventory">
         <span class="pill" style="${pillStyle(liveSailmaker(b))};cursor:pointer;">${esc(liveSailmaker(b)||'Unknown')}</span></td>
+      <td class="sm-partial-cell" data-boat-id="${b.id}" title="Click to record a second, partial inventory">
+        ${livePartial(b)
+          ? `<span class="pill" style="${pillStyle(livePartial(b))};cursor:pointer;">${esc(livePartial(b))}</span>`
+          : '<span class="muted" style="cursor:pointer;">—</span>'}</td>
       <td>${statusPill}${b.lastActiveYear ? ` <span class="muted" style="font-size:11px;">(${b.lastActiveYear})</span>` : ''}</td>
       <td>${esc(b.tag||'')}</td>
       <td class="num">${b.entries.length}</td>
@@ -1138,7 +1155,7 @@ function renderBoatsList() {
     <div id="filtered-share"></div>
     <div class="card" style="padding:0; overflow:auto;">
       <table>
-        <thead><tr><th>Boat</th><th>Sail No</th><th>Type</th><th class="num">TCC</th><th>Owner</th><th>Sailmaker</th><th>Status</th><th>Tag</th><th class="num">Entries</th></tr></thead>
+        <thead><tr><th>Boat</th><th>Sail No</th><th>Type</th><th class="num">TCC</th><th>Owner</th><th>Sailmaker</th><th>Partial</th><th>Status</th><th>Tag</th><th class="num">Entries</th></tr></thead>
         <tbody id="boats-tbody">${rows}</tbody>
       </table>
     </div>
@@ -3106,6 +3123,9 @@ function renderSales() {
       <td><a href="#/boat/${b.id}" data-route="#/boat/${b.id}">${esc(b.boat_name)}</a>${edited}</td>
       <td><input type="text" class="sales-edit-owner" data-boat-id="${b.id}" value="${esc(p.owner!=null?p.owner:(b.owner_name||''))}"></td>
       <td><select class="sales-edit-sailmaker" data-boat-id="${b.id}">${selectOptions(sailmakerNames, p.sailmaker||b.current_sailmaker)}</select></td>
+      <td><select class="sales-edit-partial" data-boat-id="${b.id}">${selectOptions(
+            sailmakerNames.filter(n => !['Partial','Unknown','Other'].includes(n)),
+            p.partialSailmaker || partialSailmakerOf(b))}</select></td>
       <td><select class="sales-edit-leadrep" data-boat-id="${b.id}">${selectOptions(team, p.leadRep||b.lead_rep)}</select></td>
       <td><select class="sales-edit-contactedby" data-boat-id="${b.id}">${selectOptions(team, p.contactedBy||b.contacted_by)}</select></td>
       <td class="${b.in_cs ? '' : 'tag-flag'}">${b.in_cs===1?'Yes':(b.in_cs===0?'No':'—')}</td>
@@ -3119,7 +3139,7 @@ function renderSales() {
       (raced in ${ACTIVE_CUTOFF_YEAR}–${MAX_SEASON_YEAR}).${inactiveCount ? ` ${inactiveCount} more are inactive (no entry in the last 5 seasons) and hidden here — see <a href="#/boats" data-route="#/boats">Boats</a> and filter to Inactive to find them.` : ''}</p>
     <div class="card" style="padding:0;overflow:auto;">
       <table>
-        <thead><tr><th>Boat</th><th>Owner</th><th>Current sailmaker</th><th>Lead rep</th><th>Contacted by</th><th>In CS</th><th class="num">Entries</th><th></th></tr></thead>
+        <thead><tr><th>Boat</th><th>Owner</th><th>Current sailmaker</th><th>Partial</th><th>Lead rep</th><th>Contacted by</th><th>In CS</th><th class="num">Entries</th><th></th></tr></thead>
         <tbody>${rows}</tbody>
       </table>
     </div>
@@ -3150,6 +3170,8 @@ function attachSalesHandlers() {
     el.addEventListener('input', () => stage(el, 'owner', el.value.trim())));
   document.querySelectorAll('.sales-edit-sailmaker').forEach(el =>
     el.addEventListener('change', () => stage(el, 'sailmaker', el.value)));
+  document.querySelectorAll('.sales-edit-partial').forEach(el =>
+    el.addEventListener('change', () => stage(el, 'partialSailmaker', el.value)));
   document.querySelectorAll('.sales-edit-leadrep').forEach(el =>
     el.addEventListener('change', () => stage(el, 'leadRep', el.value)));
   document.querySelectorAll('.sales-edit-contactedby').forEach(el =>
