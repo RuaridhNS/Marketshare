@@ -27,6 +27,14 @@ SAILMAKER_ALIASES = {
     "doyle": "Doyle", "ullman": "Ullman", "quantum": "Quantum",
     "sanders": "Sanders", "partial": "Partial", "unknown": "Unknown",
     "other": "Other", "gp": "GP", "uk": "UK",
+    # The NS market-share sheet writes these long-hand. Without the mapping
+    # each one created a SECOND sailmaker record for a maker already in the
+    # table, splitting that maker's share across two names.
+    "one": "One", "one sails": "One", "onesails": "One", "one sail": "One",
+    "uk sails": "UK", "uk sailmakers": "UK", "uk halsey": "UK",
+    "elvstrom": "Elvstrom", "elvstroem": "Elvstrom", "elvstrøm": "Elvstrom",
+    "relling": "Relling", "ullman sails": "Ullman", "doyle sails": "Doyle",
+    "quantum sails": "Quantum", "sanders sails": "Sanders",
 }
 
 
