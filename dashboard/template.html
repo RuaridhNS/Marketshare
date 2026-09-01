@@ -233,6 +233,23 @@
 .tree-leaf-name{font-weight:500;flex:1 1 200px;}
 .tree-leaf-meta{font-size:12px;color:var(--text-muted);font-variant-numeric:tabular-nums;}
 .tree-empty{padding:8px 10px;font-size:12.5px;color:var(--text-muted);margin:0;}
+
+/* ---- contrast fix (reported: "this is white on white") ----
+   --series-doyle (#eab308) is a CHART FILL, meant to sit behind dark text.
+   Used as a foreground colour it gave yellow on a near-white card at 1.87:1,
+   which reads as invisible; used as a badge background with white text it
+   fails the same way from the other side. Both now use a contrast-safe pair:
+   a dark amber for text on light, the yellow kept only as a fill under dark
+   text. The dashboard themes on prefers-color-scheme, and the artifact viewer
+   also stamps data-theme, so both are covered. */
+:root { --flag-text: #8A5A00; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) { --flag-text: #F0C33A; }
+}
+:root[data-theme="dark"] { --flag-text: #F0C33A; }
+:root[data-theme="light"] { --flag-text: #8A5A00; }
+.tag-flag { color: var(--flag-text); }
+.nav-badge { color: #292524; }
 </style>
 </head>
 <body>
@@ -281,8 +298,10 @@ const BUCKET_COLOR = {
   'Sanders':'var(--series-sanders)', 'Quantum':'var(--series-quantum)', 'Elvstrom':'var(--series-elvstrom)',
   'Other':'var(--series-other)', 'Partial':'var(--series-partial)', 'Unknown':'var(--series-unknown)'
 };
+// Text colour per bucket. Yellow and green are light fills: white on them
+// measures 1.9:1 and 2.4:1, which is unreadable, so both take dark text.
 const BUCKET_TEXT = {
-  'North Sails':'#fff', 'Doyle':'#292524', 'One':'#fff', 'Sanders':'#fff', 'Quantum':'#fff',
+  'North Sails':'#fff', 'Doyle':'#292524', 'One':'#fff', 'Sanders':'#fff', 'Quantum':'#292524',
   'Elvstrom':'#fff', 'Other':'#fff', 'Partial':'#fff', 'Unknown':'var(--series-unknown-text)'
 };
 function bucketOf(name) {
@@ -2383,7 +2402,9 @@ function confidenceBadge(known, total, {label = 'measured'} = {}) {
   const band = pct >= 60 ? 'high' : pct >= 25 ? 'medium' : 'low';
   const bg = band === 'high' ? 'var(--series-quantum)'
            : band === 'medium' ? 'var(--series-doyle)' : 'var(--series-one)';
-  const fg = band === 'medium' ? '#292524' : '#fff';
+  // high uses the green fill and medium the yellow - white on either is
+  // ~2.4:1 and ~1.9:1, so only the red 'low' band can carry white text.
+  const fg = band === 'low' ? '#fff' : '#292524';
   return `<span class="pill" title="${known} of ${total} ${label} — ${band} confidence"
     style="background:${bg};color:${fg};font-variant-numeric:tabular-nums;">${pct}%</span>`;
 }
