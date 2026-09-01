@@ -1617,16 +1617,21 @@ function attachDuplicatesHandlers() {
 // from the regatta name rather than stored, so it needs no migration and no
 // second place to keep in sync.
 function seriesOf(r) {
+  // Top level of the tree is the CLUB, so these name the organiser rather
+  // than the event it runs. Cowes Week and the IRC/ORC Championships are
+  // deliberately left as-is: the first is an event brand run by Cowes
+  // Combined Clubs, the others are championship series with no single
+  // host club.
   const n = r.name || '';
   // One club, one branch. Splitting the four Summer Series regattas away
   // from the club's other sixteen events put the same organiser in two
   // places, and left a bucket literally called "other".
-  if (/^Royal Southern/i.test(n)) return 'Royal Southern';
-  if (/royal solent|taittinger/i.test(n)) return 'Royal Solent';
-  if (/^Warsash/i.test(n)) return 'Warsash Spring';
-  if (/^Hamble/i.test(n)) return 'Hamble';
+  if (/^Royal Southern/i.test(n)) return 'Royal Southern Yacht Club';
+  if (/royal solent|taittinger/i.test(n)) return 'Royal Solent Yacht Club';
+  if (/^Warsash/i.test(n)) return 'Warsash Sailing Club';
+  if (/^Hamble/i.test(n)) return 'Hamble River Sailing Club';
   if (/^Cowes Week$/i.test(n)) return 'Cowes Week';
-  if (/^Round the Island/i.test(n)) return 'Round the Island';
+  if (/^Round the Island/i.test(n)) return 'Island Sailing Club';
   if (/^IRC (National|Nationals|Two-Handed)/i.test(n)) return 'IRC Championships';
   if (/^ORC /i.test(n)) return 'ORC Championships';
   // RORC and "RORC Offshore" were two buckets for a single organiser, which
