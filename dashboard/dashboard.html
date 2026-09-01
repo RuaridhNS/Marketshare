@@ -258,6 +258,17 @@
 tr.sales-dirty > td { background: var(--surface-2); }
 tr.sales-dirty > td:first-child { box-shadow: inset 3px 0 0 var(--series-doyle); }
 tr.sales-saved > td:first-child { box-shadow: inset 3px 0 0 var(--series-quantum); }
+
+/* deeper tree: Club > Year > Event > Class > boat */
+.tree-year > summary .tree-name { font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-variant-numeric: tabular-nums; letter-spacing: .02em; }
+.tree-year > .tree-kids { padding-left: 18px; }
+.tree-class > summary .tree-name { font-weight: 500; }
+.tree-class > .tree-kids { padding-left: 18px; }
+.tree-boats { max-height: 420px; overflow-y: auto; }
+.tree-boats .tree-leaf { display: grid; grid-template-columns: minmax(120px,1.4fr) minmax(100px,1.2fr) minmax(90px,1fr) auto;
+  gap: 10px; align-items: baseline; }
+@media (max-width: 640px) { .tree-boats .tree-leaf { grid-template-columns: 1fr; gap: 2px; } }
 </style>
 </head>
 <body>
@@ -1608,8 +1619,9 @@ function seriesOf(r) {
   if (/vice admiral|RTYC/i.test(n)) return "Vice Admiral's Cup";
   if (/^IRC (National|Nationals|Two-Handed)/i.test(n)) return 'IRC Championships';
   if (/^ORC /i.test(n)) return 'ORC Championships';
-  if (/fastnet|myth of malham|cervantes|north sea race|roschier|caribbean|transatlantic/i.test(n)) return 'RORC Offshore';
-  if (/^RORC|^NSR|easter challenge|inshore series/i.test(n)) return 'RORC';
+  // RORC and "RORC Offshore" were two buckets for a single organiser, which
+  // split the same club's events across two places in the tree.
+  if (/fastnet|myth of malham|cervantes|north sea race|roschier|caribbean|transatlantic|^RORC|^NSR|easter challenge|inshore series/i.test(n)) return 'RORC';
   if (/^JOG/i.test(n)) return 'JOG';
   return r.category || 'Other';
 }
@@ -1646,79 +1658,146 @@ function regattaSummary(r) {
 }
 
 function renderRegattasList() {
-  const bySeries = {};
-  DATA.regattas.forEach(r => { (bySeries[seriesOf(r)] ||= []).push(r); });
-
-  // Class membership per regatta, built once. The class layer used to be baked
-  // into the regatta NAME ("Vice Admiral's Cup - J/109"), which made one event
-  // look like eleven. It now lives on the entries, so it can be shown as the
-  // third level of the tree instead of fragmenting the second.
-  const clsByRegatta = {};
+  // Club > Year > Event > Class > boat. The class layer lives on the entries -
+  // it used to be baked into regatta NAMES, which made one event look like
+  // eighteen - so the tree is built straight from the entry list.
+  const idx = {};           // club -> year -> regattaId -> class -> [entry refs]
+  const meta = {};          // regattaId -> regatta
   DATA.boats.forEach(b => b.entries.forEach(e => {
     const ra = racesById[e.race_id]; if (!ra) return;
     const ev = eventsById[ra.event_id]; if (!ev) return;
-    const m = (clsByRegatta[ev.regatta_id] ||= {});
-    const c = normClass(e.class) || 'Class unrecorded';
-    const g = (m[c] ||= { boats: new Set(), races: new Set(), years: new Set() });
-    g.boats.add(b.id); g.races.add(e.race_id); g.years.add(ev.season_year);
+    const rg = regattasById[ev.regatta_id]; if (!rg) return;
+    meta[rg.id] = rg;
+    const club = seriesOf(rg), yr = ev.season_year || 0;
+    const cls = normClass(e.class) || 'Class unrecorded';
+    const byYear = (idx[club] = idx[club] || {});
+    const byReg = (byYear[yr] = byYear[yr] || {});
+    const byCls = (byReg[rg.id] = byReg[rg.id] || {});
+    (byCls[cls] = byCls[cls] || []).push({ b: b.id, p: e.position });
   }));
 
-  const cards = Object.keys(bySeries).sort().map(series => {
-    const nodes = bySeries[series].map(r => {
-      const s = regattaSummary(r);
-      const cm = clsByRegatta[r.id] || {};
-      const classes = Object.keys(cm).sort((a,b) => cm[b].boats.size - cm[a].boats.size);
-      const kids = classes.length ? classes.map(c => {
-        const g = cm[c];
-        const yrs = Array.from(g.years).sort();
-        const latest = yrs[yrs.length - 1];
-        return `<a class="tree-leaf" href="#/regatta/${r.id}?year=${latest}&cls=${encodeURIComponent(c)}">
-          <span class="tree-leaf-name">${esc(c)}</span>
-          <span class="tree-leaf-meta">${g.boats.size} boat${g.boats.size===1?'':'s'} &middot; ${g.races.size} race${g.races.size===1?'':'s'} &middot; ${yrs.length} season${yrs.length===1?'':'s'}</span>
-        </a>`;
-      }).join('') : `<p class="tree-empty">No boat-level results yet &mdash; this regatta has aggregate entry counts only.</p>`;
+  // Events with no boat-level results still need a place, or the tree silently
+  // loses every aggregate-only season.
+  DATA.regattas.forEach(rg => {
+    const club = seriesOf(rg);
+    DATA.events.filter(e => e.regatta_id === rg.id).forEach(ev => {
+      const yr = ev.season_year || 0;
+      const byYear = (idx[club] = idx[club] || {});
+      const byReg = (byYear[yr] = byYear[yr] || {});
+      if (!byReg[rg.id]) { byReg[rg.id] = {}; meta[rg.id] = rg; }
+    });
+  });
 
-      return { s, r, html: `<details class="tree-node regatta-row"
-          data-name="${esc((r.name+' '+series).toLowerCase())}"
-          data-recent="${s.nRecent}" data-boatlevel="${s.hasBoatLevel?1:0}">
-        <summary>
-          <span class="tree-name">${esc(r.name)}</span>
-          <span class="tree-meta">
-            <span>${s.nSeasons} season${s.nSeasons===1?'':'s'}</span>
-            <span>${classes.length} class${classes.length===1?'':'es'}</span>
-            <span>${s.latest ? s.latest.y + ' boats (' + s.latest.x + ')' : '&mdash;'}</span>
-            ${s.hasBoatLevel
-              ? '<span class="pill" style="background:var(--series-north);color:#fff;">boat-level</span>'
-              : '<span class="pill" style="background:var(--surface-2,#eee);color:var(--text-muted);border:1px solid var(--border);">aggregate</span>'}
-          </span>
-          <a class="tree-open" href="#/regatta/${r.id}" title="Open this regatta">open &rsaquo;</a>
-        </summary>
-        <div class="tree-kids">${kids}</div>
-      </details>` };
-    }).sort((a,b) => b.s.nRecent - a.s.nRecent || a.r.name.localeCompare(b.r.name));
+  // Boat rows are built on demand. Rendering every entry up front is ~54,000
+  // rows of HTML, which is what made the old Sales page unusable.
+  window.__treeData = {};
+  let leafSeq = 0;
 
-    return `<details class="card regatta-series" open data-series="${esc(series.toLowerCase())}">
-      <summary class="tree-series"><span>${esc(series)}</span>
-        <span class="muted" style="font-weight:400;font-size:13px;">${nodes.length} regatta${nodes.length===1?'':'s'}</span>
-      </summary>
-      <div class="tree-body">${nodes.map(x=>x.html).join('')}</div>
-    </details>`;
+  const clubs = Object.keys(idx).sort();
+  const cards = clubs.map(club => {
+    const years = Object.keys(idx[club]).map(Number).sort((a, b) => b - a);
+    const clubBoats = new Set();
+    let clubEvents = 0;
+
+    const yearNodes = years.map(yr => {
+      const regs = idx[club][yr];
+      const regIds = Object.keys(regs).sort((a, b) =>
+        (meta[a].name || '').localeCompare(meta[b].name || ''));
+      const yearBoats = new Set();
+
+      const evNodes = regIds.map(rid => {
+        const rg = meta[rid];
+        const classes = Object.keys(regs[rid])
+          .map(c => [c, regs[rid][c]])
+          .sort((a, b) => b[1].length - a[1].length);
+        const evBoats = new Set();
+        const clsNodes = classes.map(pair => {
+          const cls = pair[0], rows = pair[1];
+          const byBoat = {};
+          rows.forEach(r => {
+            const g = (byBoat[r.b] = byBoat[r.b] || { races: 0, best: null });
+            g.races++;
+            if (r.p != null && (g.best == null || r.p < g.best)) g.best = r.p;
+            evBoats.add(r.b); yearBoats.add(r.b); clubBoats.add(r.b);
+          });
+          const key = 'leaf' + (leafSeq++);
+          window.__treeData[key] = byBoat;
+          const n = Object.keys(byBoat).length;
+          return '<details class="tree-node tree-class" data-leaf="' + key + '">' +
+            '<summary><span class="tree-name">' + esc(cls) + '</span>' +
+            '<span class="tree-meta"><span>' + n + ' boat' + (n === 1 ? '' : 's') + '</span>' +
+            '<span>' + rows.length + ' entr' + (rows.length === 1 ? 'y' : 'ies') + '</span></span></summary>' +
+            '<div class="tree-kids tree-boats"><p class="tree-empty">Opening&hellip;</p></div></details>';
+        }).join('');
+        clubEvents++;
+        const sm = regattaSummary(rg);
+        return '<details class="tree-node regatta-row" data-name="' +
+          esc((rg.name + ' ' + club).toLowerCase()) + '" data-recent="' + sm.nRecent +
+          '" data-boatlevel="' + (sm.hasBoatLevel ? 1 : 0) + '">' +
+          '<summary><span class="tree-name">' + esc(rg.name) + '</span>' +
+          '<span class="tree-meta"><span>' + evBoats.size + ' boat' + (evBoats.size === 1 ? '' : 's') + '</span>' +
+          '<span>' + classes.length + ' class' + (classes.length === 1 ? '' : 'es') + '</span></span>' +
+          '<a class="tree-open" href="#/regatta/' + rg.id + '?year=' + yr + '">open &rsaquo;</a></summary>' +
+          '<div class="tree-kids">' + (clsNodes ||
+            '<p class="tree-empty">Aggregate entry counts only &mdash; no boat-level results for this season.</p>') +
+          '</div></details>';
+      }).join('');
+
+      return '<details class="tree-node tree-year"><summary>' +
+        '<span class="tree-name">' + (yr || 'Season unrecorded') + '</span>' +
+        '<span class="tree-meta"><span>' + regIds.length + ' event' + (regIds.length === 1 ? '' : 's') + '</span>' +
+        '<span>' + yearBoats.size + ' boat' + (yearBoats.size === 1 ? '' : 's') + '</span></span></summary>' +
+        '<div class="tree-kids">' + evNodes + '</div></details>';
+    }).join('');
+
+    return '<details class="card regatta-series" data-series="' + esc(club.toLowerCase()) + '">' +
+      '<summary class="tree-series"><span>' + esc(club) + '</span>' +
+      '<span class="muted" style="font-weight:400;font-size:13px;">' + years.length +
+      ' season' + (years.length === 1 ? '' : 's') + ' &middot; ' + clubEvents +
+      ' event' + (clubEvents === 1 ? '' : 's') + ' &middot; ' + clubBoats.size + ' boats</span></summary>' +
+      '<div class="tree-body">' + yearNodes + '</div></details>';
   }).join('');
 
   return `
     <h1>Regattas</h1>
-    <p class="subtitle"><span id="regatta-count">${DATA.regattas.length}</span> regattas across ${Object.keys(bySeries).length} series,
-      spanning ${DATA.stats.n_events} regatta-seasons. Open a series, then a regatta, to see its classes.</p>
+    <p class="subtitle"><span id="regatta-count">${DATA.regattas.length}</span> events across ${clubs.length} clubs and series,
+      spanning ${DATA.stats.n_events} event-seasons. Open a club, then a season, an event and a class to reach the boats.</p>
     <div class="search-row">
-      <input type="text" id="regatta-search" placeholder="Search regatta or series&hellip;">
+      <input type="text" id="regatta-search" placeholder="Search event or club&hellip;">
       <select id="regatta-filter">
         <option value="recent">Active in last 5 seasons</option>
         <option value="boatlevel">Has boat-level results</option>
-        <option value="all">All regattas</option>
+        <option value="all">All events</option>
       </select>
     </div>
     ${cards}
   `;
+}
+
+// A class node fills its boat list the first time it is opened.
+function fillTreeLeaf(det) {
+  const key = det.dataset.leaf;
+  const box = det.querySelector('.tree-boats');
+  if (!key || !box || box.dataset.filled) return;
+  box.dataset.filled = '1';
+  const byBoat = (window.__treeData || {})[key] || {};
+  const rows = Object.keys(byBoat).map(id => ({ b: boatsById[id], g: byBoat[id] }))
+    .filter(x => x.b)
+    .sort((x, y) => (x.g.best == null) - (y.g.best == null)
+                 || (x.g.best - y.g.best)
+                 || (x.b.boat_name || '').localeCompare(y.b.boat_name || ''));
+  const ord = n => n === 1 ? '1st' : n === 2 ? '2nd' : n === 3 ? '3rd' : n + 'th';
+  box.innerHTML = rows.map(r => {
+    const b = r.b, g = r.g, sm = liveSailmaker(b);
+    return '<a class="tree-leaf" href="#/boat/' + b.id + '">' +
+      '<span class="tree-leaf-name">' + esc(b.boat_name || '\u2014') + '</span>' +
+      '<span class="tree-leaf-meta">' + esc(b.sail_no || '') +
+      (b.boat_type ? ' &middot; ' + esc(b.boat_type) : '') + '</span>' +
+      '<span class="tree-leaf-meta">' +
+      (g.best != null ? ord(g.best) + ' best' : 'no result') +
+      ' &middot; ' + g.races + ' race' + (g.races === 1 ? '' : 's') + '</span>' +
+      '<span class="pill" style="' + pillStyle(sm) + '">' + esc(sm || 'Unknown') + '</span></a>';
+  }).join('') || '<p class="tree-empty">No boats.</p>';
 }
 
 // ---------- page: coverage ----------
@@ -2091,6 +2170,15 @@ function attachRegattaListHandlers() {
   const search = document.getElementById('regatta-search');
   const filter = document.getElementById('regatta-filter');
   if (!search) return;
+  // Class nodes render their boats only when opened - see fillTreeLeaf.
+  const sections = document.getElementById('main');
+  if (sections && !sections.dataset.treeBound) {
+    sections.dataset.treeBound = '1';
+    sections.addEventListener('toggle', (ev) => {
+      const d = ev.target;
+      if (d && d.tagName === 'DETAILS' && d.open && d.dataset.leaf) fillTreeLeaf(d);
+    }, true);   // capture: 'toggle' does not bubble
+  }
   const apply = () => {
     const q = search.value.trim().toLowerCase();
     const f = filter.value;
@@ -2102,10 +2190,17 @@ function attachRegattaListHandlers() {
       tr.style.display = ok ? '' : 'none';
       if (ok) shown++;
     });
-    // hide a series card entirely once nothing in it matches
+    // A season with no surviving event is noise, and so is a club with no
+    // surviving season - hide both, innermost first.
+    document.querySelectorAll('.tree-year').forEach(y => {
+      const any = Array.from(y.querySelectorAll('.regatta-row')).some(tr => tr.style.display !== 'none');
+      y.style.display = any ? '' : 'none';
+      if (any && q) y.open = true;
+    });
     document.querySelectorAll('.regatta-series').forEach(card => {
       const any = Array.from(card.querySelectorAll('.regatta-row')).some(tr => tr.style.display !== 'none');
       card.style.display = any ? '' : 'none';
+      if (any && q) card.open = true;
     });
     const c = document.getElementById('regatta-count');
     if (c) c.textContent = shown;
