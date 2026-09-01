@@ -248,6 +248,16 @@ def main():
         ev = events_by_id.get(race["event_id"]) if race else None
         return ev["season_year"] if ev else None
 
+    # people + race_crew exist only where a source published skipper names
+    # (JOG and the RORC per-race pages so far), so this is deliberately small.
+    try:
+        crew_rows = [dict(r) for r in cur.execute(
+            "SELECT rc.boat_id, rc.race_id, rc.role, p.name AS person "
+            "FROM race_crew rc JOIN people p ON p.id = rc.person_id")]
+    except sqlite3.OperationalError:
+        crew_rows = []          # tables not created yet on an older database
+    crew_rows = [c for c in crew_rows if c["boat_id"] in irc_boat_ids]
+
     entries_by_boat = {}
     for r in entries_rows:
         d = dict(r)
@@ -351,6 +361,10 @@ def main():
         "market_share_boats": market_share_boats,
         "entry_trends": trend_rows,
         "class_counts": class_counts,
+        # Crew, for the Analysis tab. Only the boats that survived the IRC
+        # filter, so the panel cannot show people sailing boats the rest of the
+        # dashboard has excluded.
+        "crew": crew_rows,
     }
 
     # Most entry/history fields are null on any given row (RORC/Cowes/Royal

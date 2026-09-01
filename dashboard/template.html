@@ -277,6 +277,15 @@ tr.sales-saved > td:first-child { box-shadow: inset 3px 0 0 var(--series-quantum
 .tree-boats .tree-leaf { display: grid; grid-template-columns: minmax(120px,1.4fr) minmax(100px,1.2fr) minmax(90px,1fr) auto;
   gap: 10px; align-items: baseline; }
 @media (max-width: 640px) { .tree-boats .tree-leaf { grid-template-columns: 1fr; gap: 2px; } }
+
+.analysis-filters { display:flex; gap:14px; flex-wrap:wrap; align-items:flex-end; }
+.analysis-filters label { display:flex; flex-direction:column; gap:4px; font-size:12px;
+  color:var(--text-muted); font-weight:600; }
+.analysis-filters select { min-width:130px; }
+.callout-warn { background:var(--surface-1); border:1px solid var(--border);
+  border-left:3px solid var(--series-doyle); border-radius:0 8px 8px 0;
+  padding:12px 16px; margin-bottom:14px; font-size:13px; color:var(--text-secondary); }
+.callout-warn strong { color:var(--text-primary); }
 </style>
 </head>
 <body>
@@ -288,6 +297,7 @@ tr.sales-saved > td:first-child { box-shadow: inset 3px 0 0 var(--series-quantum
     <a class="nav-item" href="#/regattas" data-route="#/regattas">Regattas</a>
     <a class="nav-item" href="#/compare" data-route="#/compare">Compare</a>
     <a class="nav-item" href="#/coverage" data-route="#/coverage">Coverage</a>
+    <a class="nav-item" href="#/analysis" data-route="#/analysis">Analysis</a>
     <a class="nav-item" href="#/market-analysis" data-route="#/market-analysis">Market analysis</a>
     <a class="nav-item" href="#/market-share" data-route="#/market-share">Market share</a>
     <a class="nav-item" href="#/sales" data-route="#/sales">Sales opportunities</a>
@@ -656,7 +666,10 @@ function svgLineChart(series, {width=760, height=280, yLabel='Boats'}={}) {
     const c = s.color || LINE_COLOURS[i % LINE_COLOURS.length];
     const pts = s.points.slice().sort((a,b)=>a.x-b.x);
     const d = pts.map((p,j) => `${j?'L':'M'}${sx(p.x).toFixed(1)},${sy(p.y).toFixed(1)}`).join(' ');
-    body += `<path d="${d}" fill="none" stroke="${c}" stroke-width="2.2" stroke-linejoin="round"/>`;
+    // A dashed series is a DIFFERENT measure, not another subject - the
+    // reported entry total beside the boats we actually hold results for.
+    const dash = s.dashed ? ' stroke-dasharray="6 4"' : '';
+    body += `<path d="${d}" fill="none" stroke="${c}" stroke-width="2.2" stroke-linejoin="round"${dash}/>`;
     pts.forEach(p => {
       body += `<circle cx="${sx(p.x).toFixed(1)}" cy="${sy(p.y).toFixed(1)}" r="4"
         fill="${p.solid === false ? 'var(--surface)' : c}" stroke="${c}" stroke-width="2">
@@ -667,7 +680,8 @@ function svgLineChart(series, {width=760, height=280, yLabel='Boats'}={}) {
   const legend = series.map((s,i) => {
     const c = s.color || LINE_COLOURS[i % LINE_COLOURS.length];
     return `<span style="display:inline-flex;align-items:center;gap:6px;margin-right:14px;font-size:12.5px;">
-      <span style="width:14px;height:3px;background:${c};display:inline-block;border-radius:2px;"></span>
+      <span style="width:14px;height:3px;display:inline-block;border-radius:2px;${
+        s.dashed ? `background:repeating-linear-gradient(90deg,${c} 0 5px,transparent 5px 8px);` : `background:${c};`}"></span>
       ${esc(s.label)}</span>`;
   }).join('');
 
@@ -740,6 +754,7 @@ function navigate() {
     else if (route === 'regattas') main.innerHTML = renderRegattasList();
     else if (route === 'regatta') main.innerHTML = renderRegattaProfile(parseInt(arg), qYear, qCls);
     else if (route === 'race') main.innerHTML = renderRacePage(parseInt(arg));
+    else if (route === 'analysis') { main.innerHTML = renderAnalysis(); attachAnalysisHandlers(); }
     else if (route === 'market-analysis') main.innerHTML = renderMarketAnalysis();
     else if (route === 'market-share') main.innerHTML = renderMarketShare();
     else if (route === 'sales') main.innerHTML = renderSales();
@@ -1665,11 +1680,20 @@ function regattaSummary(r) {
     (boatsByYear[y] ||= new Set()).add(b.id);
   }));
   const trends = DATA.entry_trends.filter(t => t.regatta_id === r.id);
-  const pts = years.map(y => ({
-    x: y,
-    y: boatsByYear[y] ? boatsByYear[y].size : ((trends.find(t=>t.season_year===y)||{}).total || 0),
-    real: !!boatsByYear[y],
-  }));
+  // Two DIFFERENT measures, kept apart deliberately. "Boats" is the count of
+  // distinct boats we hold named results for; "reported" is the entry total the
+  // organiser published, carried in the class counts. They disagree in both
+  // directions - our Fastnet 2023 results cover 306 of a reported 358, while in
+  // 2021 we hold 310 against a reported 264 because that year's spreadsheet row
+  // counted a narrower set of classes. Collapsing them into one line, taking
+  // whichever existed, is what made the plotted line contradict the totals
+  // printed further down the same page.
+  const pts = years.map(y => {
+    const rep = (trends.find(t => t.season_year === y) || {}).total || null;
+    const own = boatsByYear[y] ? boatsByYear[y].size : null;
+    return { x: y, y: own != null ? own : (rep || 0), real: own != null,
+             reported: rep, boatLevel: own };
+  });
   const recent = pts.filter(p => p.x >= ACTIVE_CUTOFF_YEAR);
   return {
     years, pts,
@@ -1822,6 +1846,262 @@ function fillTreeLeaf(det) {
       ' &middot; ' + g.races + ' race' + (g.races === 1 ? '' : 's') + '</span>' +
       '<span class="pill" style="' + pillStyle(sm) + '">' + esc(sm || 'Unknown') + '</span></a>';
   }).join('') || '<p class="tree-empty">No boats.</p>';
+}
+
+
+// ---------- page: analysis ----------
+// One filter state, every panel below it. Splitting these into separate views
+// meant answering "how do J/109s attend?" and "who wins in J/109s?" in two
+// places with two filter settings that could silently disagree.
+const ANALYSIS = { sailmaker: '', type: '', club: '', from: 0, to: 0, minRaces: 5 };
+
+function analysisRows() {
+  // one flat row per entry, already joined to season / club / class
+  const out = [];
+  DATA.boats.forEach(b => b.entries.forEach(e => {
+    const ra = racesById[e.race_id]; if (!ra) return;
+    const ev = eventsById[ra.event_id]; if (!ev) return;
+    const rg = regattasById[ev.regatta_id]; if (!rg) return;
+    out.push({ b, e, year: ev.season_year || 0, club: seriesOf(rg), regatta: rg,
+               cls: normClass(e.class) || '', pos: e.position });
+  }));
+  return out;
+}
+
+function analysisFiltered(rows) {
+  const f = ANALYSIS;
+  return rows.filter(r =>
+    (!f.sailmaker || bucketOf(liveSailmaker(r.b)) === f.sailmaker) &&
+    (!f.type || r.b.boat_type === f.type) &&
+    (!f.club || r.club === f.club) &&
+    (!f.from || r.year >= f.from) &&
+    (!f.to || r.year <= f.to));
+}
+
+function panel(title, note, body, extra) {
+  return `<div class="card" style="padding:0;overflow:auto;">
+    <h2 style="padding:16px 20px 0;">${title}</h2>
+    <p class="muted" style="padding:0 20px;font-size:12px;margin:4px 0 0;">${note}</p>
+    ${extra || ''}
+    ${body}
+  </div>`;
+}
+
+function renderAnalysis() {
+  const all = analysisRows();
+  const years = [...new Set(all.map(r => r.year).filter(Boolean))].sort((a, b) => b - a);
+  if (!ANALYSIS.from) { ANALYSIS.from = years[Math.min(4, years.length - 1)] || 0; }
+  if (!ANALYSIS.to) { ANALYSIS.to = years[0] || 0; }
+  const rows = analysisFiltered(all);
+
+  const makers = BUCKET_ORDER.filter(m => m !== 'Unknown');
+  const types = [...new Set(DATA.boats.map(b => b.boat_type).filter(Boolean))].sort();
+  const clubs = [...new Set(all.map(r => r.club))].sort();
+  const opt = (list, cur) => list.map(v =>
+    `<option value="${esc(v)}" ${cur === v ? 'selected' : ''}>${esc(v)}</option>`).join('');
+
+  // ---- per-boat rollup ----
+  const byBoat = {};
+  rows.forEach(r => {
+    const g = (byBoat[r.b.id] ||= { b: r.b, n: 0, byYear: {}, places: [], podium: 0, scored: 0 });
+    g.n++;
+    g.byYear[r.year] = (g.byYear[r.year] || 0) + 1;
+    if (r.pos != null) { g.scored++; g.places.push(r.pos); if (r.pos <= 3) g.podium++; }
+  });
+  const boats = Object.values(byBoat);
+  const nBoats = boats.length;
+
+  // 1. attendance
+  const attend = boats.slice().sort((a, b) => b.n - a.n).slice(0, 15);
+  const maxN = attend.length ? attend[0].n : 1;
+  const attendBody = `<table><thead><tr><th>Boat</th><th>Type</th><th>Sailmaker</th>
+      <th class="num">Races</th><th>Share of the period</th></tr></thead><tbody>` +
+    attend.map(g => `<tr class="clickable" data-route="#/boat/${g.b.id}">
+      <td><strong>${esc(g.b.boat_name || '—')}</strong> <span class="muted">${esc(g.b.sail_no || '')}</span></td>
+      <td>${esc(g.b.boat_type || '')}</td>
+      <td><span class="pill" style="${pillStyle(liveSailmaker(g.b))}">${esc(liveSailmaker(g.b) || 'Unknown')}</span></td>
+      <td class="num">${g.n}</td>
+      <td><span style="display:inline-block;height:8px;border-radius:2px;background:var(--series-north);width:${Math.max(3, g.n / maxN * 100)}%"></span></td>
+    </tr>`).join('') + '</tbody></table>';
+
+  // 2. most successful - podium RATE, not raw wins, or the biggest fleets win
+  //    by arithmetic. A minimum race count stops a single lucky result topping it.
+  const succ = boats.filter(g => g.scored >= ANALYSIS.minRaces)
+    .map(g => ({ ...g, rate: g.podium / g.scored,
+                 avg: g.places.reduce((a, c) => a + c, 0) / g.places.length }))
+    .sort((a, b) => b.rate - a.rate || a.avg - b.avg).slice(0, 15);
+  const succBody = succ.length ? `<table><thead><tr><th>Boat</th><th>Type</th><th>Sailmaker</th>
+      <th class="num">Scored</th><th class="num">Podiums</th><th class="num">Podium rate</th><th class="num">Avg finish</th></tr></thead><tbody>` +
+    succ.map(g => `<tr class="clickable" data-route="#/boat/${g.b.id}">
+      <td><strong>${esc(g.b.boat_name || '—')}</strong> <span class="muted">${esc(g.b.sail_no || '')}</span></td>
+      <td>${esc(g.b.boat_type || '')}</td>
+      <td><span class="pill" style="${pillStyle(liveSailmaker(g.b))}">${esc(liveSailmaker(g.b) || 'Unknown')}</span></td>
+      <td class="num">${g.scored}</td><td class="num">${g.podium}</td>
+      <td class="num">${Math.round(g.rate * 100)}%</td>
+      <td class="num">${g.avg.toFixed(1)}</td></tr>`).join('') + '</tbody></table>'
+    : '<p class="muted" style="padding:0 20px 16px;">No boat has enough scored races in this selection.</p>';
+
+  // 3. movers - first half of the window against the second
+  const mid = Math.floor((ANALYSIS.from + ANALYSIS.to) / 2);
+  const movers = boats.map(g => {
+    let early = 0, late = 0;
+    Object.keys(g.byYear).forEach(y => { (+y <= mid ? (early += g.byYear[y]) : (late += g.byYear[y])); });
+    return { g, early, late, d: late - early };
+  }).filter(m => m.early + m.late >= 4);
+  const up = movers.slice().sort((a, b) => b.d - a.d).slice(0, 8);
+  const down = movers.slice().sort((a, b) => a.d - b.d).slice(0, 8);
+  const moverRow = m => `<tr class="clickable" data-route="#/boat/${m.g.b.id}">
+      <td><strong>${esc(m.g.b.boat_name || '—')}</strong></td>
+      <td>${esc(m.g.b.boat_type || '')}</td>
+      <td class="num">${m.early}</td><td class="num">${m.late}</td>
+      <td class="num" style="color:${m.d > 0 ? 'var(--series-quantum)' : 'var(--series-one)'};font-weight:600;">${m.d > 0 ? '+' : ''}${m.d}</td></tr>`;
+  const moversBody = `<table><thead><tr><th>Rising</th><th>Type</th>
+      <th class="num">≤${mid}</th><th class="num">&gt;${mid}</th><th class="num">Δ</th></tr></thead>
+      <tbody>${up.map(moverRow).join('')}</tbody>
+      <thead><tr><th>Falling</th><th>Type</th><th class="num">≤${mid}</th><th class="num">&gt;${mid}</th><th class="num">Δ</th></tr></thead>
+      <tbody>${down.map(moverRow).join('')}</tbody></table>`;
+
+  // 4. ownership changes - the best moment to sell a full inventory
+  const owners = [];
+  DATA.boats.forEach(b => {
+    const h = (b.owner_history || []).filter(x => x.effective_from);
+    if (h.length < 2) return;
+    const sorted = h.slice().sort((a, c) => String(a.effective_from).localeCompare(String(c.effective_from)));
+    const last = sorted[sorted.length - 1];
+    const yr = parseInt(String(last.effective_from).slice(0, 4));
+    if (!yr || yr < ANALYSIS.from) return;
+    if (ANALYSIS.sailmaker && bucketOf(liveSailmaker(b)) !== ANALYSIS.sailmaker) return;
+    if (ANALYSIS.type && b.boat_type !== ANALYSIS.type) return;
+    owners.push({ b, yr, from: sorted[sorted.length - 2], to: last });
+  });
+  owners.sort((a, b) => b.yr - a.yr);
+  const ownBody = owners.length ? `<table><thead><tr><th>Boat</th><th>Type</th><th>Previous owner</th><th>Now</th><th class="num">Since</th><th>Sailmaker</th></tr></thead><tbody>` +
+    owners.slice(0, 20).map(o => `<tr class="clickable" data-route="#/boat/${o.b.id}">
+      <td><strong>${esc(o.b.boat_name || '—')}</strong></td>
+      <td>${esc(o.b.boat_type || '')}</td>
+      <td class="muted">${esc(o.from.owner_name || '—')}</td>
+      <td>${esc(o.to.owner_name || '—')}</td>
+      <td class="num">${o.yr}</td>
+      <td><span class="pill" style="${pillStyle(liveSailmaker(o.b))}">${esc(liveSailmaker(o.b) || 'Unknown')}</span></td>
+    </tr>`).join('') + '</tbody></table>'
+    : '<p class="muted" style="padding:0 20px 16px;">No ownership changes recorded in this window.</p>';
+
+  // 5. fleet strength - where we are weak AND the fleet is dense
+  const fleets = {};
+  boats.forEach(g => {
+    const t = g.b.boat_type; if (!t) return;
+    const f = (fleets[t] ||= { t, n: 0, known: 0, north: 0 });
+    f.n++;
+    const sm = liveSailmaker(g.b);
+    if (sm && !['Unknown', 'Partial'].includes(bucketOf(sm))) {
+      f.known++;
+      if (bucketOf(sm) === 'North Sails') f.north++;
+    }
+  });
+  const fleetRows = Object.values(fleets).filter(f => f.n >= 5)
+    .sort((a, b) => (b.n - b.known) - (a.n - a.known)).slice(0, 15);
+  const fleetBody = `<table><thead><tr><th>Fleet</th><th class="num">Boats</th>
+      <th class="num">Sailmaker known</th><th class="num">North</th><th class="num">Unknown</th><th>Where the room is</th></tr></thead><tbody>` +
+    fleetRows.map(f => {
+      const gap = f.n - f.known;
+      return `<tr><td><strong>${esc(f.t)}</strong></td><td class="num">${f.n}</td>
+        <td class="num">${f.known}</td><td class="num">${f.north}</td>
+        <td class="num" style="font-weight:600;">${gap}</td>
+        <td><span style="display:inline-block;height:8px;border-radius:2px;background:var(--series-doyle);width:${Math.round(gap / fleetRows[0].n * 100)}%"></span></td></tr>`;
+    }).join('') + '</tbody></table>';
+
+  // 6. event pull - which events are growing
+  const evAgg = {};
+  rows.forEach(r => {
+    const k = r.regatta.name;
+    const g = (evAgg[k] ||= { k, byYear: {}, boats: new Set() });
+    (g.byYear[r.year] ||= new Set()).add(r.b.id);
+    g.boats.add(r.b.id);
+  });
+  const evRows = Object.values(evAgg).map(g => {
+    const ys = Object.keys(g.byYear).map(Number).sort((a, b) => a - b);
+    const first = ys.length ? g.byYear[ys[0]].size : 0;
+    const last = ys.length ? g.byYear[ys[ys.length - 1]].size : 0;
+    return { k: g.k, seasons: ys.length, boats: g.boats.size, first, last, d: last - first };
+  }).filter(x => x.seasons >= 2).sort((a, b) => b.d - a.d);
+  const evBody = evRows.length ? `<table><thead><tr><th>Event</th><th class="num">Seasons</th>
+      <th class="num">Distinct boats</th><th class="num">First season</th><th class="num">Latest</th><th class="num">Δ</th></tr></thead><tbody>` +
+    evRows.slice(0, 10).map(x => `<tr><td>${esc(x.k)}</td><td class="num">${x.seasons}</td>
+      <td class="num">${x.boats}</td><td class="num">${x.first}</td><td class="num">${x.last}</td>
+      <td class="num" style="color:${x.d > 0 ? 'var(--series-quantum)' : x.d < 0 ? 'var(--series-one)' : 'inherit'};font-weight:600;">${x.d > 0 ? '+' : ''}${x.d}</td></tr>`).join('')
+    + '</tbody></table>'
+    : '<p class="muted" style="padding:0 20px 16px;">Not enough seasons in this selection.</p>';
+
+  // 7. people - crew who appear on the most boats. The owner is often not the
+  //    person who specifies the sails.
+  const people = {};
+  (DATA.crew || []).forEach(c => {
+    const g = (people[c.person] ||= { name: c.person, boats: new Set(), races: 0 });
+    g.boats.add(c.boat_id); g.races++;
+  });
+  const topPeople = Object.values(people).sort((a, b) => b.boats.size - a.boats.size || b.races - a.races).slice(0, 12);
+  const peopleBody = topPeople.length ? `<table><thead><tr><th>Person</th><th class="num">Boats</th><th class="num">Race entries</th></tr></thead><tbody>` +
+    topPeople.map(p => `<tr><td>${esc(p.name)}</td><td class="num">${p.boats.size}</td><td class="num">${p.races}</td></tr>`).join('')
+    + '</tbody></table>'
+    : `<p class="muted" style="padding:0 20px 16px;">Crew names are captured for JOG and the RORC races collected so far. Wider coverage needs the remaining RORC per-race results.</p>`;
+
+  // sample-size warning wherever a sailmaker slice is in play
+  // Coverage has to be measured against the selection WITHOUT the sailmaker
+  // filter. Measuring inside it always reads "9 of 9", which looks like full
+  // coverage when it is the opposite - it is only the boats we happen to know.
+  const sansMaker = { ...ANALYSIS, sailmaker: '' };
+  const poolIds = new Set(all.filter(r =>
+    (!sansMaker.type || r.b.boat_type === sansMaker.type) &&
+    (!sansMaker.club || r.club === sansMaker.club) &&
+    (!sansMaker.from || r.year >= sansMaker.from) &&
+    (!sansMaker.to || r.year <= sansMaker.to)).map(r => r.b.id));
+  const pool = [...poolIds].map(id => boatsById[id]).filter(Boolean);
+  const poolKnown = pool.filter(b => { const sm = liveSailmaker(b); return sm && !['Unknown', 'Partial'].includes(bucketOf(sm)); }).length;
+  const warn = ANALYSIS.sailmaker
+    ? `<div class="callout-warn">Showing <strong>${nBoats}</strong> ${esc(ANALYSIS.sailmaker)} boats. But a sailmaker is
+       known for only <strong>${poolKnown} of ${pool.length}</strong> boats in this selection
+       (${Math.round(poolKnown / Math.max(pool.length, 1) * 100)}%), and the ones we know are disproportionately the ones
+       we already sell to. Read this as a view of known boats, not of the fleet.</div>` : '';
+
+  return `
+    <h1>Analysis</h1>
+    <p class="subtitle">${rows.length.toLocaleString()} entries across ${nBoats.toLocaleString()} boats,
+      ${ANALYSIS.from}–${ANALYSIS.to}. Every panel below responds to these filters.</p>
+    <div class="card analysis-filters">
+      <label>Sailmaker<select id="an-sm"><option value="">All</option>${opt(makers, ANALYSIS.sailmaker)}</select></label>
+      <label>Boat type<select id="an-type"><option value="">All</option>${opt(types, ANALYSIS.type)}</select></label>
+      <label>Club<select id="an-club"><option value="">All</option>${opt(clubs, ANALYSIS.club)}</select></label>
+      <label>From<select id="an-from">${opt(years.map(String), String(ANALYSIS.from))}</select></label>
+      <label>To<select id="an-to">${opt(years.map(String), String(ANALYSIS.to))}</select></label>
+      <button class="btn secondary" id="an-reset" type="button">Reset</button>
+    </div>
+    ${warn}
+    ${panel('Boat attendance', 'Most active boats in the selection. Activity is the buying signal - a boat that sails is a boat that wears sails out.', attendBody)}
+    ${panel('Most successful boats', `Ranked on podium rate, not raw wins - raw wins just find the biggest fleets. Minimum ${ANALYSIS.minRaces} scored races. 58% of entries carry a finishing position, so this covers the races where results were recorded.`, succBody)}
+    ${panel('Movers', 'Change in race count between the halves of the window. A boat falling away has been sold or laid up; one climbing is campaigning, and campaigns buy sails.', moversBody)}
+    ${panel('Recent ownership changes', 'A new owner is the best moment to sell a full inventory. Derived from the names boats raced under, so it lags a private sale.', ownBody)}
+    ${panel('Fleet strength', 'Sorted by how many boats in each fleet we cannot identify. That last column is the size of the conversation nobody has had yet.', fleetBody)}
+    ${panel('Event pull', 'Distinct boats at each event, first season against latest. Where the fleet is going is where the rep should be.', evBody)}
+    ${panel('People', 'Crew appearing on the most boats. The registered owner is often not the person who specifies the sails.', peopleBody)}
+  `;
+}
+
+function attachAnalysisHandlers() {
+  const bind = (id, key, num) => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener('change', () => {
+      ANALYSIS[key] = num ? parseInt(el.value) : el.value;
+      if (ANALYSIS.from > ANALYSIS.to) ANALYSIS.to = ANALYSIS.from;
+      navigate();
+    });
+  };
+  bind('an-sm', 'sailmaker'); bind('an-type', 'type'); bind('an-club', 'club');
+  bind('an-from', 'from', true); bind('an-to', 'to', true);
+  const r = document.getElementById('an-reset');
+  if (r) r.addEventListener('click', () => {
+    ANALYSIS.sailmaker = ANALYSIS.type = ANALYSIS.club = '';
+    ANALYSIS.from = 0; ANALYSIS.to = 0; navigate();
+  });
 }
 
 // ---------- page: coverage ----------
@@ -2318,7 +2598,11 @@ function renderRegattaProfile(id, year, cls) {
     </tr>`;
   }).join('');
 
-  const attendancePts = regattaSummary(r).pts.map(p => ({x: p.x, y: p.y, solid: p.real}));
+  const _sum = regattaSummary(r);
+  const attendancePts = _sum.pts.map(p => ({x: p.x, y: p.y, solid: p.real}));
+  // second series, only for seasons where the organiser's own total is on file
+  const reportedPts = _sum.pts.filter(p => p.reported != null)
+                             .map(p => ({x: p.x, y: p.reported, solid: true}));
 
   // The selected season's actual entry list. Default to the most recent season
   // that has boat-level results rather than simply the most recent: several
@@ -2405,10 +2689,15 @@ function renderRegattaProfile(id, year, cls) {
     </div>
     ${attendancePts.length > 1 ? `<div class="card">
       <h2>Attendance over time</h2>
-      <p class="muted" style="font-size:12px;margin-top:0;">Distinct boats per season.
-        Hollow markers are seasons where only an aggregate entry count is on file, not boat-level results.
-        <a href="#/compare?r=${id}" data-route="#/compare?r=${id}">Compare with other regattas →</a></p>
-      ${svgLineChart([{label: r.name, points: attendancePts}])}
+      <p class="muted" style="font-size:12px;margin-top:0;">
+        <strong>Boats with results</strong> is how many distinct boats we hold named results for.
+        <strong>Reported entries</strong> is the total the organiser published. Where they differ, the gap is
+        our coverage of that season &mdash; not a change in the fleet.
+        <a href="#/compare?r=${id}" data-route="#/compare?r=${id}">Compare with other regattas &rarr;</a></p>
+      ${svgLineChart(reportedPts.length > 1
+          ? [{label: 'Boats with results', points: attendancePts},
+             {label: 'Reported entries', points: reportedPts, dashed: true}]
+          : [{label: 'Boats with results', points: attendancePts}])}
     </div>` : ''}
     ${classes.length ? `<div class="card" style="padding:0;overflow:auto;">
       <h2 style="padding:18px 20px 0;">Classes — ${focus}</h2>
