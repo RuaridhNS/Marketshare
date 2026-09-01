@@ -1296,12 +1296,22 @@ function renderBoatProfile(id) {
         <span class="boat-race-meta">${e.corrected_time ? 'corrected ' + esc(e.corrected_time) : ''}</span>
       </a>`;
     }).join('');
+    // A boat sailed ONE race but scores in two divisions - its own class and,
+    // say, the two-handed one - so it has two results for one race. Counting
+    // results as races doubled the season on paper.
+    // keyed on the race NAME, not the race id: results are stored one row per
+    // class, so the same start line is two race ids under two class labels
+    const nSailed = new Set(races.map(e =>
+      String((racesById[e.race_id] || {}).race_name || e.race_id))).size;
+    const countLabel = races.length > nSailed
+      ? `${nSailed} race${nSailed === 1 ? '' : 's'}, ${races.length} results`
+      : `${nSailed} race${nSailed === 1 ? '' : 's'}`;
     return `<details class="boat-regatta">
       <summary>
         <span class="br-name">${esc(g.regattaName)}</span>
         <span class="br-year">${g.year || ''}</span>
         <span class="br-meta">${esc(Array.from(g.classes).join(', '))}</span>
-        <span class="br-meta">${g.races} race${g.races === 1 ? '' : 's'}</span>
+        <span class="br-meta">${countLabel}</span>
         <span class="br-meta">${g.best != null ? 'best ' + ordinal(g.best) : '—'}</span>
         ${g.sailmaker ? `<span class="pill" style="${pillStyle(g.sailmaker)}">${esc(g.sailmaker)}</span>` : ''}
         <a class="br-open" href="#/regatta/${g.regattaId}?year=${g.year}">whole regatta &rsaquo;</a>
