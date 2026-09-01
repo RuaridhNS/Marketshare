@@ -206,7 +206,10 @@
 }
 .regatta-series>summary.tree-series::-webkit-details-marker{display:none;}
 .regatta-series>summary.tree-series::before{
-  content:"B8";font-size:12px;color:var(--text-muted);transition:transform .15s;
+  content:"";flex:none;width:0;height:0;
+  border-left:6px solid currentColor;
+  border-top:4.5px solid transparent;border-bottom:4.5px solid transparent;
+  opacity:.5;transition:transform .15s ease;transform-origin:35% 50%;
 }
 .regatta-series[open]>summary.tree-series::before{transform:rotate(90deg);}
 .tree-body{padding:0 8px 10px;}
@@ -217,7 +220,10 @@
 }
 .tree-node>summary::-webkit-details-marker{display:none;}
 .tree-node>summary::before{
-  content:"B8";font-size:11px;color:var(--text-muted);flex:none;transition:transform .15s;
+  content:"";flex:none;width:0;height:0;
+  border-left:5px solid currentColor;
+  border-top:4px solid transparent;border-bottom:4px solid transparent;
+  opacity:.45;transition:transform .15s ease;transform-origin:35% 50%;
 }
 .tree-node[open]>summary::before{transform:rotate(90deg);}
 .tree-node>summary:hover{background:var(--surface-2);}
