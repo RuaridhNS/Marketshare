@@ -250,6 +250,14 @@
 :root[data-theme="light"] { --flag-text: #8A5A00; }
 .tag-flag { color: var(--flag-text); }
 .nav-badge { color: #292524; }
+
+/* Sales rows stage their edits; Save commits them. */
+.sales-save-cell { white-space: nowrap; }
+.sales-save { padding: 5px 12px; font-size: 12px; }
+.sales-save[disabled] { opacity: .55; cursor: default; }
+tr.sales-dirty > td { background: var(--surface-2); }
+tr.sales-dirty > td:first-child { box-shadow: inset 3px 0 0 var(--series-doyle); }
+tr.sales-saved > td:first-child { box-shadow: inset 3px 0 0 var(--series-quantum); }
 </style>
 </head>
 <body>
@@ -2619,10 +2627,20 @@ function renderMarketShare() {
 // How many editable rows the Sales page renders. Kept small because each row
 // carries four form controls; "show all" is available but is genuinely heavy.
 let salesLimit = 50;
+// Edits used to commit on every 'change' and immediately re-render. Two things
+// went wrong: setting a boat's sailmaker to North Sails dropped it out of a
+// list that shows only NON-North boats, so the row vanished underneath you
+// mid-edit, taking lead rep and contacted-by with it; and the re-render threw
+// away your place in a long table. Edits are now staged per row and committed
+// by a Save button, and any boat edited this session is pinned to the list so
+// it cannot disappear while you are still working on it.
+const salesDraft = {};      // boat id -> staged {owner, sailmaker, leadRep, contactedBy}
+const salesKeep = new Set(); // boat ids pinned to the list for this session
 
 function renderSales() {
-  const allTargets = DATA.boats.filter(b => bucketOf(liveSailmaker(b)) !== 'North Sails');
-  const targets = allTargets.filter(b => b.active);
+  const allTargets = DATA.boats.filter(b =>
+    bucketOf(liveSailmaker(b)) !== 'North Sails' || salesKeep.has(String(b.id)));
+  const targets = allTargets.filter(b => b.active || salesKeep.has(String(b.id)));
   const inactiveCount = allTargets.length - targets.length;
   targets.sort((a,b) => (b.entries.length - a.entries.length));
   const sailmakerNames = DATA.sailmakers.map(s => s.name).concat(BUCKET_ORDER).filter((v,i,a) => a.indexOf(v)===i).sort();
@@ -2648,6 +2666,7 @@ function renderSales() {
       <td><select class="sales-edit-contactedby" data-boat-id="${b.id}">${selectOptions(team, p.contactedBy||b.contacted_by)}</select></td>
       <td class="${b.in_cs ? '' : 'tag-flag'}">${b.in_cs===1?'Yes':(b.in_cs===0?'No':'—')}</td>
       <td class="num">${b.entries.length}</td>
+      <td class="sales-save-cell"><button type="button" class="btn sales-save" data-boat-id="${b.id}" hidden>Save</button></td>
     </tr>`;
   }).join('');
   return `
@@ -2656,7 +2675,7 @@ function renderSales() {
       (raced in ${ACTIVE_CUTOFF_YEAR}–${MAX_SEASON_YEAR}).${inactiveCount ? ` ${inactiveCount} more are inactive (no entry in the last 5 seasons) and hidden here — see <a href="#/boats" data-route="#/boats">Boats</a> and filter to Inactive to find them.` : ''}</p>
     <div class="card" style="padding:0;overflow:auto;">
       <table>
-        <thead><tr><th>Boat</th><th>Owner</th><th>Current sailmaker</th><th>Lead rep</th><th>Contacted by</th><th>In CS</th><th class="num">Entries</th></tr></thead>
+        <thead><tr><th>Boat</th><th>Owner</th><th>Current sailmaker</th><th>Lead rep</th><th>Contacted by</th><th>In CS</th><th class="num">Entries</th><th></th></tr></thead>
         <tbody>${rows}</tbody>
       </table>
     </div>
@@ -2674,17 +2693,46 @@ function attachSalesHandlers() {
   if (more) more.addEventListener('click', () => { salesLimit += 50; navigate(); });
   const all=document.getElementById('sales-all');
   if (all) all.addEventListener('click', () => { salesLimit = Infinity; navigate(); });
-  document.querySelectorAll('.sales-edit-owner').forEach(el => el.addEventListener('change', () => {
-    setPendingEdit(el.dataset.boatId, { owner: el.value.trim() }); navigate();
-  }));
-  document.querySelectorAll('.sales-edit-sailmaker').forEach(el => el.addEventListener('change', () => {
-    setPendingEdit(el.dataset.boatId, { sailmaker: el.value }); navigate();
-  }));
-  document.querySelectorAll('.sales-edit-leadrep').forEach(el => el.addEventListener('change', () => {
-    setPendingEdit(el.dataset.boatId, { leadRep: el.value }); navigate();
-  }));
-  document.querySelectorAll('.sales-edit-contactedby').forEach(el => el.addEventListener('change', () => {
-    setPendingEdit(el.dataset.boatId, { contactedBy: el.value }); navigate();
+  // Staging only - nothing is committed and nothing re-renders until Save.
+  const stage = (el, field, value) => {
+    const id = el.dataset.boatId;
+    (salesDraft[id] ||= {})[field] = value;
+    const row = el.closest('tr');
+    row.classList.add('sales-dirty');
+    const btn = row.querySelector('.sales-save');
+    if (btn) { btn.hidden = false; btn.textContent = 'Save'; btn.disabled = false; }
+  };
+  document.querySelectorAll('.sales-edit-owner').forEach(el =>
+    el.addEventListener('input', () => stage(el, 'owner', el.value.trim())));
+  document.querySelectorAll('.sales-edit-sailmaker').forEach(el =>
+    el.addEventListener('change', () => stage(el, 'sailmaker', el.value)));
+  document.querySelectorAll('.sales-edit-leadrep').forEach(el =>
+    el.addEventListener('change', () => stage(el, 'leadRep', el.value)));
+  document.querySelectorAll('.sales-edit-contactedby').forEach(el =>
+    el.addEventListener('change', () => stage(el, 'contactedBy', el.value)));
+
+  document.querySelectorAll('.sales-save').forEach(btn => btn.addEventListener('click', () => {
+    const id = btn.dataset.boatId;
+    const draft = salesDraft[id];
+    if (!draft) return;
+    // Drop "no change" selections so a blank option cannot wipe a real value.
+    const patch = {};
+    Object.keys(draft).forEach(k => { if (draft[k] !== '' && draft[k] != null) patch[k] = draft[k]; });
+    if (Object.keys(patch).length) setPendingEdit(id, patch);
+    salesKeep.add(String(id));       // pin it so it stays visible
+    delete salesDraft[id];
+    const row = btn.closest('tr');
+    row.classList.remove('sales-dirty');
+    row.classList.add('sales-saved');
+    btn.textContent = 'Saved';
+    btn.disabled = true;
+    if (!row.querySelector('.edited-flag')) {
+      const flag = document.createElement('span');
+      flag.className = 'edited-flag';
+      flag.textContent = 'Edited';
+      row.querySelector('td').appendChild(flag);
+    }
+    updatePendingBadge();            // keep the nav count honest without a re-render
   }));
 }
 
