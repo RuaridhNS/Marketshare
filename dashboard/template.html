@@ -8,6 +8,7 @@
   :root {
     color-scheme: light;
     --surface-1:      #fcfcfb;
+    --surface-2:      #f1f0ec;   /* raised panels, hover, chips */
     --page:           #f9f9f7;
     --text-primary:   #0b0b0b;
     --text-secondary: #52514e;
@@ -33,6 +34,7 @@
     :root {
       color-scheme: dark;
       --surface-1:      #1a1a19;
+      --surface-2:      #262624;   /* raised panels, hover, chips */
       --page:           #0d0d0d;
       --text-primary:   #ffffff;
       --text-secondary: #c3c2b7;
@@ -218,7 +220,7 @@
   content:"B8";font-size:11px;color:var(--text-muted);flex:none;transition:transform .15s;
 }
 .tree-node[open]>summary::before{transform:rotate(90deg);}
-.tree-node>summary:hover{background:var(--surface-2,#f5f7f8);}
+.tree-node>summary:hover{background:var(--surface-2);}
 .tree-name{font-weight:600;flex:1 1 240px;}
 .tree-meta{display:flex;gap:14px;flex-wrap:wrap;align-items:center;
   font-size:12px;color:var(--text-muted);}
@@ -229,7 +231,7 @@
   display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;text-decoration:none;
   color:inherit;padding:6px 10px;border-radius:5px;border-left:2px solid var(--border);
 }
-.tree-leaf:hover{background:var(--surface-2,#f5f7f8);border-left-color:var(--series-north,#1b4f6e);}
+.tree-leaf:hover{background:var(--surface-2);border-left-color:var(--series-north,#1b4f6e);}
 .tree-leaf-name{font-weight:500;flex:1 1 200px;}
 .tree-leaf-meta{font-size:12px;color:var(--text-muted);font-variant-numeric:tabular-nums;}
 .tree-empty{padding:8px 10px;font-size:12.5px;color:var(--text-muted);margin:0;}
@@ -1031,7 +1033,7 @@ function renderBoatsList() {
     const edited = PENDING[b.id] ? '<span class="edited-flag">Edited</span>' : '';
     const statusPill = b.active
       ? `<span class="pill" style="background:var(--series-north);color:#fff;">Active</span>`
-      : `<span class="pill" style="background:var(--surface-2, #eee);color:var(--text-muted);border:1px solid var(--border);">Inactive</span>`;
+      : `<span class="pill" style="background:var(--surface-2);color:var(--text-muted);border:1px solid var(--border);">Inactive</span>`;
     return `<tr class="clickable" data-route="#/boat/${b.id}" data-hay="${esc(hayKeep)}" data-haytight="${esc(hayTight)}" data-bucket="${bucket}" data-active="${b.active?1:0}" data-type="${esc(normType(b.boat_type))}" data-boat-id="${b.id}">
       <td><strong>${esc(b.boat_name||'—')}</strong>${edited}</td>
       <td>${esc(b.sail_no||'')}</td>
@@ -1292,7 +1294,7 @@ function renderBoatProfile(id) {
     <a class="back-link" href="#/boats" data-route="#/boats">← All boats</a>
     <h1>${esc(b.boat_name||'Unnamed boat')} <span class="pill" style="${pillStyle(b.current_sailmaker)}">${esc(b.current_sailmaker||'Unknown')}</span> ${b.active
         ? `<span class="pill" style="background:var(--series-north);color:#fff;">Active</span>`
-        : `<span class="pill" style="background:var(--surface-2, #eee);color:var(--text-muted);border:1px solid var(--border);">Inactive</span>`
+        : `<span class="pill" style="background:var(--surface-2);color:var(--text-muted);border:1px solid var(--border);">Inactive</span>`
       }${pending?'<span class="edited-flag">Edited</span>':''}</h1>
     <p class="subtitle">${esc(b.sail_no||'')} · ${esc(b.boat_type||'')}${b.tcc ? ' · TCC '+b.tcc : ''}${b.lastActiveYear ? ' · last raced '+b.lastActiveYear : ' · no dated race entries on file'}</p>
     ${pendingBanner}
@@ -1991,7 +1993,7 @@ function renderQuality() {
       <td>${esc(h.sailmaker_name || '')}</td>
       <td><span class="pill" style="${h.confidence === 'low'
             ? 'background:var(--series-doyle);color:#292524;'
-            : 'background:var(--surface-2,#eee);color:var(--text-muted);border:1px solid var(--border);'}">${esc(h.confidence || '')}</span></td>
+            : 'background:var(--surface-2);color:var(--text-muted);border:1px solid var(--border);'}">${esc(h.confidence || '')}</span></td>
       <td style="font-size:12px;word-break:break-all;">${esc((h.source || '').replace(/^research:/, ''))}</td>
     </tr>`).join('');
 
@@ -2106,7 +2108,7 @@ function renderCompare(selectedIds) {
     .sort((a, b) => a.r.name.localeCompare(b.r.name));
   const chips = chosen.map((x, i) => `
     <span class="cmp-chip" style="display:inline-flex;align-items:center;gap:8px;margin:0 8px 8px 0;
-          padding:6px 10px;border-radius:999px;background:var(--surface-2,#f3f4f6);border:1px solid var(--border);">
+          padding:6px 10px;border-radius:999px;background:var(--surface-2);border:1px solid var(--border);">
       <span style="width:10px;height:10px;border-radius:50%;background:${LINE_COLOURS[i % LINE_COLOURS.length]};"></span>
       ${esc(x.r.name)}
       <button type="button" class="cmp-remove" data-id="${x.r.id}" aria-label="Remove ${esc(x.r.name)}"
@@ -2298,7 +2300,7 @@ function renderRegattaProfile(id, year, cls) {
     const nRaces = DATA.races.filter(ra => ra.event_id === ev.id).length;
     const totalRow = DATA.class_counts.find(c => c.event_id === ev.id && c.class_label.toLowerCase() === 'total');
     const agg = totalRow ? totalRow.entry_count : null;
-    const sel = (year === ev.season_year) ? ' style="background:var(--surface-2,#f3f4f6);font-weight:600;"' : '';
+    const sel = (year === ev.season_year) ? ' style="background:var(--surface-2);font-weight:600;"' : '';
     return `<tr class="clickable"${sel} data-route="#/regatta/${id}?year=${ev.season_year}">
       <td class="num">${ev.season_year}</td>
       <td class="num">${entries.length || (agg != null ? '<span class="muted">'+agg+' (aggregate)</span>' : '—')}</td>
@@ -2323,7 +2325,7 @@ function renderRegattaProfile(id, year, cls) {
   }
   const classes = focus != null ? regattaClassesFor(id, focus) : [];
   const classRows = classes.map(g => {
-    const sel = (cls === g.cls) ? ' style="background:var(--surface-2,#f3f4f6);font-weight:600;"' : '';
+    const sel = (cls === g.cls) ? ' style="background:var(--surface-2);font-weight:600;"' : '';
     const href = `#/regatta/${id}?year=${focus}` + (cls === g.cls ? '' : `&cls=${encodeURIComponent(g.cls)}`);
     return `<tr class="clickable"${sel} data-route="${esc(href)}">
       <td>${esc(g.cls)}</td><td class="num">${g.nBoats}</td><td class="num">${g.nRaces}</td></tr>`;
