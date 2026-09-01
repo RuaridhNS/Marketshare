@@ -319,6 +319,9 @@ tr.sales-saved > td:first-child { box-shadow: inset 3px 0 0 var(--series-quantum
 .boat-race-meta { font-size: 12px; color: var(--text-muted);
   font-variant-numeric: tabular-nums; }
 @media (max-width: 640px) { .boat-race { grid-template-columns: 1fr; gap: 2px; } }
+
+/* the organiser's published entry total, where we hold no named boats for it */
+.tree-reported { color: var(--text-muted); font-style: italic; opacity: .85; }
 </style>
 </head>
 <body>
@@ -1858,6 +1861,34 @@ function renderRegattasList() {
     });
   });
 
+  // REPORTED entries, per event. 80 of 385 event-seasons hold only the entry
+  // total the organiser published - nobody ever pulled the boat-level results.
+  // Showing those as "0 boats" made the whole Island Sailing Club card read as
+  // empty when it actually covers 5,270 reported entries. The two measures are
+  // kept apart on purpose (see regattaSummary): one is boats we can name, the
+  // other is a number we were told.
+  const reportedByEvent = {};
+  DATA.class_counts.forEach(cc => {
+    reportedByEvent[cc.event_id] = (reportedByEvent[cc.event_id] || 0) + (cc.entry_count || 0);
+  });
+  const trendByRegYear = {};
+  DATA.entry_trends.forEach(t => { trendByRegYear[t.regatta_id + ':' + t.season_year] = t.total; });
+  const reportedFor = ev => reportedByEvent[ev.id]
+    || trendByRegYear[ev.regatta_id + ':' + ev.season_year] || 0;
+  // Sum over the events actually under a node, so a club total is never double
+  // counted across seasons.
+  const reportedOver = evs => evs.reduce((a, ev) => a + reportedFor(ev), 0);
+  const eventsOf = (regId, yr) => DATA.events.filter(e =>
+    e.regatta_id == regId && (e.season_year || 0) == yr);
+  // "12 boats" when we have them; "· 48 reported" as a separate, muted figure
+  const countMeta = (nBoats, nReported) =>
+    '<span>' + nBoats + ' boat' + (nBoats === 1 ? '' : 's') + '</span>' +
+    (nReported > nBoats
+      ? '<span class="tree-reported" title="Entry total published by the organiser. '
+        + 'We hold named results for ' + nBoats + ' of them.">'
+        + nReported.toLocaleString() + ' reported</span>'
+      : '');
+
   // Boat rows are built on demand. Rendering every entry up front is ~54,000
   // rows of HTML, which is what made the old Sales page unusable.
   window.__treeData = {};
@@ -1868,6 +1899,10 @@ function renderRegattasList() {
     const years = Object.keys(idx[club]).map(Number).sort((a, b) => b - a);
     const clubBoats = new Set();
     let clubEvents = 0;
+    const clubReported = reportedOver(DATA.events.filter(ev => {
+      const rg = regattasById[ev.regatta_id];
+      return rg && seriesOf(rg) === club;
+    }));
 
     const yearNodes = years.map(yr => {
       const regs = idx[club][yr];
@@ -1903,9 +1938,11 @@ function renderRegattasList() {
         const sm = regattaSummary(rg);
         return '<details class="tree-node regatta-row" data-name="' +
           esc((rg.name + ' ' + club).toLowerCase()) + '" data-recent="' + sm.nRecent +
-          '" data-boatlevel="' + (sm.hasBoatLevel ? 1 : 0) + '">' +
+          '" data-boatlevel="' + (sm.hasBoatLevel ? 1 : 0) +
+          '" data-seasonboats="' + evBoats.size +
+          '" data-seasonreported="' + reportedOver(eventsOf(rg.id, yr)) + '">' +
           '<summary><span class="tree-name">' + esc(rg.name) + '</span>' +
-          '<span class="tree-meta"><span>' + evBoats.size + ' boat' + (evBoats.size === 1 ? '' : 's') + '</span>' +
+          '<span class="tree-meta">' + countMeta(evBoats.size, reportedOver(eventsOf(rg.id, yr))) +
           '<span>' + classes.length + ' class' + (classes.length === 1 ? '' : 'es') + '</span></span>' +
           '<a class="tree-open" href="#/regatta/' + rg.id + '?year=' + yr + '">open &rsaquo;</a></summary>' +
           '<div class="tree-kids">' + (clsNodes ||
@@ -1916,7 +1953,8 @@ function renderRegattasList() {
       return '<details class="tree-node tree-year"><summary>' +
         '<span class="tree-name">' + (yr || 'Season unrecorded') + '</span>' +
         '<span class="tree-meta"><span>' + regIds.length + ' event' + (regIds.length === 1 ? '' : 's') + '</span>' +
-        '<span>' + yearBoats.size + ' boat' + (yearBoats.size === 1 ? '' : 's') + '</span></span></summary>' +
+        countMeta(yearBoats.size,
+          reportedOver(regIds.flatMap(id => eventsOf(id, yr)))) + '</span></summary>' +
         '<div class="tree-kids">' + evNodes + '</div></details>';
     }).join('');
 
@@ -1924,7 +1962,11 @@ function renderRegattasList() {
       '<summary class="tree-series"><span>' + esc(club) + '</span>' +
       '<span class="muted" style="font-weight:400;font-size:13px;">' + years.length +
       ' season' + (years.length === 1 ? '' : 's') + ' &middot; ' + clubEvents +
-      ' event' + (clubEvents === 1 ? '' : 's') + ' &middot; ' + clubBoats.size + ' boats</span></summary>' +
+      ' event' + (clubEvents === 1 ? '' : 's') + ' &middot; ' + clubBoats.size + ' boats' +
+      (clubReported > clubBoats.size
+        ? ' &middot; <span class="tree-reported" style="display:inline;">'
+          + clubReported.toLocaleString() + ' reported</span>' : '') +
+      '</span></summary>' +
       '<div class="tree-body">' + yearNodes + '</div></details>';
   }).join('');
 
@@ -1937,6 +1979,7 @@ function renderRegattasList() {
       <select id="regatta-filter">
         <option value="recent">Active in last 5 seasons</option>
         <option value="boatlevel">Has boat-level results</option>
+        <option value="gap">Needs boat-level results</option>
         <option value="all">All events</option>
       </select>
     </div>
@@ -2613,6 +2656,10 @@ function attachRegattaListHandlers() {
       let ok = (!q || tr.dataset.name.includes(q));
       if (ok && f === 'recent') ok = parseInt(tr.dataset.recent) > 0;
       if (ok && f === 'boatlevel') ok = tr.dataset.boatlevel === '1';
+      // the work queue: a season the organiser reported entries for, where we
+      // still hold no named boats
+      if (ok && f === 'gap') ok = parseInt(tr.dataset.seasonboats || '0') === 0
+                              && parseInt(tr.dataset.seasonreported || '0') > 0;
       tr.style.display = ok ? '' : 'none';
       if (ok) shown++;
     });
