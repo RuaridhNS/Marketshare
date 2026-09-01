@@ -69,9 +69,22 @@ def split_name(name):
     return base, label
 
 
+# Names that mean the same event but share no derivable key. The Vice
+# Admiral's Cup is a RORC event recorded three ways: scraped boat-level results
+# 2017-2022, the spreadsheet's aggregate counts 2018-2026 under the club's own
+# spelling, and a stray 2017 Impala-class fragment. Left apart, the attendance
+# history breaks in two and neither half tells the truth about the event.
+ALIASES = {
+    "vice admirals cup/ rtyc": "RORC Vice Admiral's Cup",
+    "rorc vice admiral's cup impala": "RORC Vice Admiral's Cup",
+}
+
+
 def merge_key(name):
     """Names that mean the same event collapse to the same key."""
-    k = PREFIX.sub("", (name or "").lower())
+    n = (name or "").strip()
+    n = ALIASES.get(n.lower(), n)
+    k = PREFIX.sub("", n.lower())
     k = GENERIC.sub("", k)
     return re.sub(r"[^a-z0-9]", "", k)
 
@@ -104,8 +117,16 @@ def main():
         if len(members) == 1 and cls_of[members[0][0]] is None:
             continue                        # nothing to do
 
-        # survivor: the longest base name, which is the most complete spelling
+        # Survivor: normally the longest base name, as the most complete
+        # spelling. But where an alias names the canonical event, that one wins
+        # outright - otherwise the longest-name rule handed the Vice Admiral's
+        # Cup to its stray 7-entry Impala fragment and folded the real event,
+        # 283 entries and nine years of counts, into it.
+        canon_targets = {v.lower() for v in ALIASES.values()}
+        preferred = [m for m in members if (m[1] or "").lower() in canon_targets]
         members.sort(key=lambda m: (-len(base_of[m[0]]), m[0]))
+        if preferred:
+            members = preferred + [m for m in members if m not in preferred]
         keep_id, keep_name, _, keep_reg = members[0]
         canon = base_of[keep_id]
         # regattas.name is UNIQUE, so renaming onto a name that already exists
