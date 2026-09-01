@@ -511,7 +511,7 @@ function updatePendingBadge() {
 }
 const csvEsc = v => { v = (v==null?'':String(v)); return /[",\n]/.test(v) ? '"'+v.replace(/"/g,'""')+'"' : v; };
 function pendingEditsToCSV() {
-  const cols = ['SailNo', 'BoatName', 'NewSailmaker', 'NewOwner', 'NewTCC', 'NewLeadRep', 'NewContactedBy', 'Notes'];
+  const cols = ['SailNo', 'BoatName', 'NewSailmaker', 'NewPartialSailmaker', 'NewOwner', 'NewTCC', 'NewLeadRep', 'NewContactedBy', 'Notes'];
   const lines = [cols.join(',')];
   Object.keys(PENDING).forEach(boatId => {
     const b = boatsById[boatId];
@@ -519,6 +519,7 @@ function pendingEditsToCSV() {
     if (!b) return;
     lines.push([
       csvEsc(b.sail_no), csvEsc(b.boat_name), csvEsc(p.sailmaker||''),
+      csvEsc(p.partialSailmaker||''),
       csvEsc(p.owner||''), csvEsc(p.tcc||''), csvEsc(p.leadRep||''),
       csvEsc(p.contactedBy||''), csvEsc(p.notes||''),
     ].join(','));
@@ -1259,6 +1260,12 @@ function renderBoatProfile(id) {
     .concat(BUCKET_ORDER).filter((v,i,a) => a.indexOf(v)===i).sort()
     .map(name => `<option value="${esc(name)}" ${((pending&&pending.sailmaker)||b.current_sailmaker)===name?'selected':''}>${esc(name)}</option>`).join('');
   const team = teamOptions();
+  const currentPartial = partialSailmakerOf(b);
+  // Same list as the main dropdown; 'Partial' and 'Unknown' are states, not
+  // makers, so they are no use as a secondary inventory.
+  const partialOptions = DATA.sailmakers.map(x => x.name).concat(BUCKET_ORDER)
+    .filter((v,i,a) => a.indexOf(v)===i && !['Partial','Unknown','Other'].includes(v)).sort()
+    .map(name => `<option value="${esc(name)}" ${((pending && pending.partialSailmaker) || currentPartial) === name ? 'selected' : ''}>${esc(name)}</option>`).join('');
   const leadRepOptions = team.map(name => `<option value="${esc(name)}" ${((pending&&pending.leadRep)||b.lead_rep)===name?'selected':''}>${esc(name)}</option>`).join('');
   const contactedByOptions = team.map(name => `<option value="${esc(name)}" ${((pending&&pending.contactedBy)||b.contacted_by)===name?'selected':''}>${esc(name)}</option>`).join('');
 
@@ -1266,8 +1273,17 @@ function renderBoatProfile(id) {
     <div class="card" id="edit-card">
       <h2>Edit (saved locally, export to apply)</h2>
       <div class="field">
-        <label class="field-label">Sailmaker</label>
+        <label class="field-label">Sailmaker <span class="muted" style="font-weight:400;">(main inventory)</span></label>
         <select id="edit-sailmaker"><option value="">— no change —</option>${sailmakerOptions}</select>
+      </div>
+      <div class="field">
+        <label class="field-label">Partial inventory <span class="muted" style="font-weight:400;">(a second maker on the same boat)</span></label>
+        <select id="edit-partial-sailmaker">
+          <option value="">— no change —</option>
+          <option value="__none__" ${currentPartial ? '' : 'disabled'}>— none / clear —</option>
+          ${partialOptions}
+        </select>
+        ${currentPartial ? `<p class="muted" style="font-size:11.5px;margin:4px 0 0;">Currently carrying some <strong>${esc(currentPartial)}</strong>.</p>` : ''}
       </div>
       <div class="field">
         <label class="field-label">Owner</label>
@@ -1372,7 +1388,8 @@ function attachBoatEditHandlers() {
       const leadRep = document.getElementById('edit-lead-rep').value;
       const contactedBy = document.getElementById('edit-contacted-by').value;
       const notes = document.getElementById('edit-notes').value.trim();
-      setPendingEdit(boatId, { sailmaker, owner, tcc, leadRep, contactedBy, notes });
+      const partialSailmaker = document.getElementById('edit-partial-sailmaker').value;
+      setPendingEdit(boatId, { sailmaker, partialSailmaker, owner, tcc, leadRep, contactedBy, notes });
       navigate();
     });
   }
@@ -1400,10 +1417,29 @@ function attachBoatEditHandlers() {
 // pending list forever after they were live, and the only button offered was
 // "Discard", which reads as undo rather than done. Comparing each field against
 // the rebuilt data answers it without anyone having to remember.
+// A boat can carry a second, partial inventory - some sails from another
+// maker alongside its main wardrobe. Those split boats are the shortest
+// conquest there is, so the field is first-class rather than a note.
+function partialSailmakerOf(b) {
+  const h = (b.sailmaker_history || []).filter(x => x.confidence === 'partial');
+  if (!h.length) return '';
+  return h[h.length - 1].sailmaker_name || '';
+}
+function livePartial(b) {
+  const p = PENDING[b.id];
+  if (p && p.partialSailmaker != null && p.partialSailmaker !== '') return p.partialSailmaker;
+  if (p && p.partialSailmaker === '__none__') return '';
+  return partialSailmakerOf(b);
+}
+
 function pendingApplied(b, p) {
   const same = (a, c) => String(a ?? '').trim().toLowerCase() === String(c ?? '').trim().toLowerCase();
   const checks = [];
   if (p.sailmaker)   checks.push(same(b.current_sailmaker, p.sailmaker));
+  if (p.partialSailmaker)
+    checks.push(p.partialSailmaker === '__none__'
+      ? !partialSailmakerOf(b)
+      : same(partialSailmakerOf(b), p.partialSailmaker));
   if (p.owner)       checks.push(same(b.owner_name, p.owner));
   if (p.tcc)         checks.push(same(b.tcc, p.tcc));
   if (p.leadRep)     checks.push(same(b.lead_rep, p.leadRep));

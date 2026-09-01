@@ -41,7 +41,7 @@ def main():
         lines = [l for l in f if not l.startswith("#")]
     reader = csv.DictReader(lines)
 
-    n_sailmaker = n_owner = n_tcc = n_crm = 0
+    n_sailmaker = n_owner = n_tcc = n_crm = n_partial = 0
     skipped = []
 
     for row in reader:
@@ -72,6 +72,27 @@ def main():
                 "VALUES (?, ?, ?, 'manual:dashboard-edit', 'manual')",
                 (boat_id, sm_id, today))
             n_sailmaker += 1
+
+        # A boat can carry a SECOND, partial inventory alongside its main one -
+        # some sails from another maker. Recorded with confidence 'partial' so
+        # it never counts as that maker owning the boat, and so a split
+        # inventory is findable: a boat already flying some of your sails is
+        # the shortest conquest there is.
+        new_partial = norm(row.get("NewPartialSailmaker"))
+        if new_partial:
+            cur.execute(
+                "DELETE FROM boat_sailmaker_history "
+                "WHERE boat_id = ? AND confidence = 'partial' "
+                "AND source IN ('manual:dashboard-edit', 'ns:marketshare-sheet')",
+                (boat_id,))
+            if new_partial != "__none__":
+                pm_id = get_or_create_sailmaker(cur, new_partial)
+                cur.execute(
+                    "INSERT OR REPLACE INTO boat_sailmaker_history "
+                    "(boat_id, sailmaker_id, effective_from, source, confidence) "
+                    "VALUES (?, ?, ?, 'manual:dashboard-edit', 'partial')",
+                    (boat_id, pm_id, today))
+            n_partial += 1
 
         new_owner = norm(row.get("NewOwner"))
         if new_owner:
@@ -120,7 +141,7 @@ def main():
             n_crm += 1
 
     conn.commit()
-    print(f"Applied: {n_sailmaker} sailmaker change(s), {n_owner} owner change(s), "
+    print(f"Applied: {n_sailmaker} sailmaker change(s), {n_partial} partial-inventory change(s), {n_owner} owner change(s), "
           f"{n_tcc} TCC change(s), {n_crm} lead-rep/contacted-by change(s).")
     if skipped:
         print(f"Skipped (sail number not found in DB): {', '.join(skipped)}")

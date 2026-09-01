@@ -292,8 +292,13 @@ def main():
         d["name_history"] = namehist_by_boat.get(d["id"], [])
         # "current" sailmaker = most recent history row, else most recent entry's sailmaker
         current_sm = None
-        if d["sailmaker_history"]:
-            current_sm = d["sailmaker_history"][-1]["sailmaker_name"]
+        # A PARTIAL inventory is not the boat's sailmaker. GLADIATOR is a
+        # Quantum boat carrying some North; taking the most recent history row
+        # regardless of confidence made it read as a North boat, which
+        # overstates our share by exactly the boats we have only half of.
+        main_hist = [h for h in d["sailmaker_history"] if h.get("confidence") != "partial"]
+        if main_hist:
+            current_sm = main_hist[-1]["sailmaker_name"]
         elif d["entries"]:
             for e in d["entries"]:
                 if e["sailmaker_name"]:
