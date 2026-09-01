@@ -135,6 +135,9 @@ def main():
     p.add_argument("--dry-run", action="store_true")
     p.add_argument("--allow-non-irc", action="store_true",
                    help="load classes that do not look like IRC divisions")
+    p.add_argument("--assume-irc", action="store_true",
+                   help="the source races entirely under IRC even though its class "
+                        "labels do not say so (JOG: 'Class 1', 'Double Handed')")
     args = p.parse_args()
 
     with open(args.csv_file, newline="", encoding="utf-8-sig") as f:
@@ -161,7 +164,14 @@ def main():
         if not sail_no and not boat_name:
             skipped_blank += 1
             continue
-        if not args.allow_non_irc and (OD_HINT.search(cls) or not IRC_CLASS.search(cls)):
+        # JOG races entirely under IRC but labels its divisions "Class 1",
+        # "Double Handed", "Generation JOG" - none of which contain the word
+        # IRC. Requiring the word would have dropped the entire fleet, so
+        # --assume-irc trusts the source and still screens out one-designs.
+        irc_ok = (args.allow_non_irc
+                  or IRC_CLASS.search(cls)
+                  or (args.assume_irc and not OD_HINT.search(cls)))
+        if not irc_ok or (not args.allow_non_irc and OD_HINT.search(cls)):
             skipped_od += 1
             continue
 
@@ -199,7 +209,15 @@ def main():
         # Double-handed is a layer over the same fleet, not a separate class:
         # the boats also appear in their IRC division. Tagged, so an overlap can
         # be collapsed later instead of double-counting the entry.
-        tag = "2H" if truthy(row.get("DoubleHanded")) else None
+        # Double Handed, Generation JOG and the Women's Sailing Series are all
+        # layers over the same fleet: a boat in one is also in its own class.
+        # Tagged so an overlap can be collapsed rather than counted twice.
+        LAYER = {"double handed": "2H", "double-handed": "2H", "2h": "2H",
+                 "generation jog": "GenJOG", "women's sailing series": "Women",
+                 "womens sailing series": "Women", "women": "Women"}
+        tag = LAYER.get(cls.strip().lower())
+        if tag is None and truthy(row.get("DoubleHanded")):
+            tag = "2H"
 
         cur.execute(
             "INSERT OR REPLACE INTO race_entries "

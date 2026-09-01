@@ -72,6 +72,7 @@ def main():
     # activity for a boat that qualifies - only boats with no IRC signal at all
     # are dropped.
     irc_class_re = re.compile(r"\bIRC\b", re.I)
+    regatta_by_id = {r["id"]: r for r in regattas}
     # Boat types that are pure one-design fleets. A TCC on its own does NOT
     # qualify one of these: a handful of SB20s and J/70s carry a stray rating
     # yet have never started an IRC race, and they were leaking through.
@@ -80,9 +81,20 @@ def main():
         r"etchells|daring|sonar|mermaid|redwing|victory|flying\s?15|swallow|"
         r"rs\s?elite|rs\s?21|cork\s?1720|contessa\s?32|sonata|folkboat)\b", re.I)
 
+    # Some organisations race entirely under IRC but never write the word in a
+    # class label: JOG's divisions are "Class 1", "Double Handed", "Generation
+    # JOG". Requiring the word dropped the entire JOG fleet, so for those
+    # organisers the event itself is the IRC signal.
+    IRC_BY_ORGANISER = {"JOG", "RORC"}
+    irc_event_ids = {e["id"] for e in events
+                     if (regatta_by_id.get(e["regatta_id"]) or {}).get("category")
+                     in IRC_BY_ORGANISER}
+    irc_race_ids = {r["id"] for r in races if r["event_id"] in irc_event_ids}
+
     # First clause: actually started an IRC race - the strongest possible signal.
     irc_boat_ids = {e["boat_id"] for e in entries_rows
-                    if e["class"] and irc_class_re.search(e["class"])}
+                    if (e["class"] and irc_class_re.search(e["class"]))
+                    or e["race_id"] in irc_race_ids}
     # Second clause: holds an IRC rating and isn't a one-design. This rescues
     # boats whose entries carry no class label at all (~13k rows, mostly RORC),
     # which would otherwise be dropped despite plainly being IRC boats.
@@ -152,6 +164,12 @@ def main():
         cl = norm_div(e["class"])
         if not cl:
             kept.append(e)                      # unlabelled: mostly RORC IRC racing
+            continue
+        # JOG's divisions are "Class 1", "Double Handed", "Generation JOG" - it
+        # races only under IRC but never writes the word, so requiring it here
+        # threw away 4,200 of its 5,000 entries.
+        if e["race_id"] in irc_race_ids:
+            kept.append(e)
             continue
         if IRC_DIVISION_RE.search(cl):
             kept.append(e)
