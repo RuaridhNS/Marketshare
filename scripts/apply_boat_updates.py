@@ -63,7 +63,11 @@ def main():
                 "UPDATE boat_sailmaker_history SET effective_to = ? "
                 "WHERE boat_id = ? AND effective_to IS NULL", (today, boat_id))
             cur.execute(
-                "INSERT INTO boat_sailmaker_history "
+                # OR REPLACE, not plain INSERT: boat_sailmaker_history now has a
+                # uniqueness constraint (added so the NS market-share sheet could
+                # not load the same fact twice), and restating a maker for a boat
+                # is a no-op that should refresh the date, not abort the run.
+                "INSERT OR REPLACE INTO boat_sailmaker_history "
                 "(boat_id, sailmaker_id, effective_from, source, confidence) "
                 "VALUES (?, ?, ?, 'manual:dashboard-edit', 'manual')",
                 (boat_id, sm_id, today))

@@ -1614,6 +1614,7 @@ function seriesOf(r) {
   // from the club's other sixteen events put the same organiser in two
   // places, and left a bucket literally called "other".
   if (/^Royal Southern/i.test(n)) return 'Royal Southern';
+  if (/royal solent|taittinger/i.test(n)) return 'Royal Solent';
   if (/^Warsash/i.test(n)) return 'Warsash Spring';
   if (/^Hamble/i.test(n)) return 'Hamble';
   if (/^Cowes Week$/i.test(n)) return 'Cowes Week';
@@ -1628,7 +1629,13 @@ function seriesOf(r) {
   // than matching on the RORC prefix.
   if (/fastnet|myth of malham|cervantes|north sea race|roschier|caribbean|transatlantic|vice admiral|RTYC|^RORC|^NSR|easter challenge|inshore series/i.test(n)) return 'RORC';
   if (/^JOG/i.test(n)) return 'JOG';
-  return r.category || 'Other';
+  // Anything still unmatched falls back to its recorded organiser. Every
+  // regatta that reached this point with category RORC came from
+  // rorc.org or the RORC season points - the 2020 Summer, Autumn and
+  // Race the Wight series among them - so they belong with the club,
+  // not in a generic bucket labelled "Club".
+  if (r.category === 'RORC') return 'RORC';
+  return r.category === 'Club' ? 'Other clubs' : (r.category || 'Other');
 }
 
 // Per-regatta rollup used by the list: seasons covered and distinct boats,
