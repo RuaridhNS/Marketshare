@@ -2001,7 +2001,7 @@ function renderRegattasList() {
         const rg = meta[rid];
         const classes = Object.keys(regs[rid])
           .map(c => [c, regs[rid][c]])
-          .sort((a, b) => b[1].length - a[1].length);
+          .sort((a, b) => compareClasses(a[0], b[0]));
         const evBoats = new Set();
         const clsNodes = classes.map(pair => {
           const cls = pair[0], rows = pair[1];
@@ -2816,6 +2816,35 @@ function normClass(raw) {
 }
 
 // Classes raced within one regatta-season, with boats and races per class.
+// Classes belong in racing order, not in size order. Sorting by entry count
+// put IRC 4 above IRC 1 whenever Four was the bigger fleet, which reads as an
+// error every time.
+//
+// The catch is that a trailing number does not always mean a division: "IRC 2"
+// is division two, but "Class 40", "Cape 31", "HP30" and "J/109" are boat
+// classes that merely end in digits. Division numbers are single digits (with
+// an optional A/B split), so a trailing run of two or more digits is taken as
+// part of a class NAME and sorted alphabetically among the named classes.
+function classSortKey(label) {
+  const s = String(label == null ? '' : label).trim();
+  if (!s) return [9, 0, '', ''];                       // unlabelled, last
+  if (/division unrecorded/i.test(s)) return [8, 0, '', s];
+  if (/\boverall\b/i.test(s)) return [0, 0, '', s];    // the whole fleet, first
+  if (/\bsuper\s*zero\b/i.test(s)) return [1, -1, '', s];
+  if (/\bzero\b/i.test(s)) return [1, 0, '', s];
+  const split = s.match(/(\d)\s*\/\s*(\d)\s*$/);      // "IRC 1/2" sits between them
+  if (split) return [1, parseInt(split[1], 10) + 0.5, '', s];
+  const m = s.match(/(\d+)([A-Za-z])?\s*$/);
+  if (m && m[1].length === 1) return [1, parseInt(m[1], 10), (m[2] || '').toUpperCase(), s];
+  return [2, 0, '', s];                                // named divisions and one-designs
+}
+
+function compareClasses(a, b) {
+  const x = classSortKey(a), y = classSortKey(b);
+  return (x[0] - y[0]) || (x[1] - y[1]) || x[2].localeCompare(y[2])
+      || String(x[3]).localeCompare(String(y[3]), undefined, { sensitivity: 'base' });
+}
+
 function regattaClassesFor(regattaId, year) {
   const evIds = new Set(DATA.events
     .filter(e => e.regatta_id === regattaId && (year == null || e.season_year === year))
@@ -2832,7 +2861,7 @@ function regattaClassesFor(regattaId, year) {
   }));
   return Array.from(byClass.values())
     .map(g => ({ cls: g.cls, nBoats: g.boats.size, nRaces: g.races.size }))
-    .sort((a, b) => b.nBoats - a.nBoats || a.cls.localeCompare(b.cls));
+    .sort((a, b) => compareClasses(a.cls, b.cls));
 }
 
 function renderRegattaProfile(id, year, cls) {
