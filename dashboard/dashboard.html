@@ -952,12 +952,63 @@ function renderOverview() {
 }
 
 // ---------- page: boats list ----------
+// REGATTA ATTENDANCE, not race count. A boat that sails eight races at one
+// regatta is not eight times the prospect of one that turns up to eight
+// separate events - attendance is the buying signal, and the Entries column
+// was quietly rewarding boats that enter long series. Counted as distinct
+// (regatta, season) pairs, the same unit the boat page groups by.
+const _attCache = {};
+function regattaAttendance(b) {
+  if (_attCache[b.id] != null) return _attCache[b.id];
+  const seen = new Set();
+  b.entries.forEach(e => {
+    const ra = racesById[e.race_id]; if (!ra) return;
+    const ev = eventsById[ra.event_id]; if (!ev) return;
+    seen.add(ev.regatta_id + ':' + (ev.season_year || 0));
+  });
+  return (_attCache[b.id] = seen.size);
+}
+
+const BOAT_SORTS = {
+  attendance: { label: 'Regatta attendance (most first)', get: b => regattaAttendance(b), dir: -1 },
+  entries:    { label: 'Race entries (most first)',       get: b => b.entries.length,     dir: -1 },
+  recent:     { label: 'Most recently active',            get: b => b.lastActiveYear || 0, dir: -1 },
+  name:       { label: 'Name (A–Z)',                  get: b => b.boat_name || '￿', dir: 1 },
+  tcc:        { label: 'TCC (highest first)',             get: b => b.tcc || 0,           dir: -1 },
+};
+let BOAT_SORT = 'attendance';
+
+
 function attachBoatFilterHandlers() {
   const search = document.getElementById('boat-search');
   const filter = document.getElementById('boat-filter');
   const activityFilter = document.getElementById('boat-activity-filter');
   const typeFilter = document.getElementById('boat-type-filter');
   if (!search) return;
+  // Re-order the existing rows rather than re-rendering the page: a re-render
+  // would throw away every filter and checkbox the user had already set.
+  const sortSel = document.getElementById('boat-sort');
+  if (sortSel) sortSel.addEventListener('change', () => {
+    BOAT_SORT = sortSel.value;
+    const srt = BOAT_SORTS[BOAT_SORT] || BOAT_SORTS.attendance;
+    const tbody = document.getElementById('boats-tbody');
+    if (!tbody) return;
+    const trs = Array.from(tbody.children);
+    trs.sort((ta, tb) => {
+      const a = boatsById[ta.dataset.boatId], b = boatsById[tb.dataset.boatId];
+      if (!a || !b) return 0;
+      const x = srt.get(a), y = srt.get(b);
+      if (x !== y) return (typeof x === 'string'
+        ? String(x).localeCompare(String(y), undefined, { sensitivity: 'base' })
+        : (x < y ? -1 : 1)) * srt.dir;
+      return (a.boat_name || '￿').localeCompare(b.boat_name || '￿', undefined,
+        { sensitivity: 'base' });
+    });
+    const frag = document.createDocumentFragment();
+    trs.forEach(tr => frag.appendChild(tr));
+    tbody.appendChild(frag);
+  });
+
   const catBoxes = () => Array.from(document.querySelectorAll('.cat-chip:checked'));
   const regattaBoxes = () => Array.from(document.querySelectorAll('.regatta-box:checked'));
   const apply = () => {
@@ -1124,9 +1175,16 @@ function renderBoatsList() {
   // uses SQLite's default binary collation, which sorts by byte value - so
   // lower-case names fall after every upper-case one and accented names sort
   // last of all. localeCompare puts them where a reader expects.
+  const srt = BOAT_SORTS[BOAT_SORT] || BOAT_SORTS.attendance;
   const rows = DATA.boats.slice()
-    .sort((a, b) => (a.boat_name || '￿').localeCompare(b.boat_name || '￿',
-                     'en', {sensitivity: 'base', numeric: true}))
+    .sort((a, b) => {
+      const x = srt.get(a), y = srt.get(b);
+      if (x !== y) return (typeof x === 'string' ? String(x).localeCompare(String(y), undefined,
+        { sensitivity: 'base' }) : (x < y ? -1 : 1)) * srt.dir;
+      // stable tiebreak so equal scores don't shuffle between renders
+      return (a.boat_name || '￿').localeCompare(b.boat_name || '￿', undefined,
+        { sensitivity: 'base' });
+    })
     .map(b => {
     const bucket = bucketOf(liveSailmaker(b));
     const hayRaw = [b.boat_name,b.sail_no,b.owner_name,b.boat_type,b.current_sailmaker,b.tag].join(' ');
@@ -1145,6 +1203,7 @@ function renderBoatsList() {
       <td class="sm-cell">${smSelect(b, 'partialSailmaker')}</td>
       <td>${statusPill}${b.lastActiveYear ? ` <span class="muted" style="font-size:11px;">(${b.lastActiveYear})</span>` : ''}</td>
       <td>${esc(b.tag||'')}</td>
+      <td class="num">${regattaAttendance(b)}</td>
       <td class="num">${b.entries.length}</td>
     </tr>`;
   }).join('');
@@ -1192,6 +1251,10 @@ function renderBoatsList() {
         <option value="">All boat types</option>
         ${typeOptions}
       </select>
+      <select id="boat-sort" title="Order the list">
+        ${Object.keys(BOAT_SORTS).map(k =>
+          `<option value="${k}"${k === BOAT_SORT ? ' selected' : ''}>${esc(BOAT_SORTS[k].label)}</option>`).join('')}
+      </select>
     </div>
     <details class="filter-panel card">
       <summary>Filter by regatta / series</summary>
@@ -1217,7 +1280,7 @@ function renderBoatsList() {
     <div id="filtered-share"></div>
     <div class="card" style="padding:0; overflow:auto;">
       <table>
-        <thead><tr><th>Boat</th><th>Sail No</th><th>Type</th><th class="num">TCC</th><th>Owner</th><th>Sailmaker</th><th>Partial</th><th>Status</th><th>Tag</th><th class="num">Entries</th></tr></thead>
+        <thead><tr><th>Boat</th><th>Sail No</th><th>Type</th><th class="num">TCC</th><th>Owner</th><th>Sailmaker</th><th>Partial</th><th>Status</th><th>Tag</th><th class="num" title="Distinct regatta-seasons attended">Regattas</th><th class="num" title="Individual race entries">Entries</th></tr></thead>
         <tbody id="boats-tbody">${rows}</tbody>
       </table>
     </div>
