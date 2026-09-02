@@ -338,6 +338,11 @@ tr.sales-saved > td:first-child { box-shadow: inset 3px 0 0 var(--series-quantum
 .sm-select:hover { border-color: currentColor; }
 .sm-select:focus { outline: 2px solid var(--series-north); outline-offset: 1px; }
 .sm-select option { font-weight: 400; color: var(--text-primary); background: var(--surface-1); }
+
+/* a blank branch says why it is blank */
+.tree-why { display: block; margin-top: 4px; font-size: 12px;
+  color: var(--text-muted); line-height: 1.45; }
+.tree-why strong { color: var(--text-secondary); }
 </style>
 </head>
 <body>
@@ -1962,6 +1967,58 @@ function renderRegattasList() {
   DATA.entry_trends.forEach(t => { trendByRegYear[t.regatta_id + ':' + t.season_year] = t.total; });
   const reportedFor = ev => reportedByEvent[ev.id]
     || trendByRegYear[ev.regatta_id + ':' + ev.season_year] || 0;
+  // Which seasons of each regatta we hold NAMED boats for, and which we hold
+  // only a reported total for. coverageNote() turns that pair into the reason
+  // a season is empty, which is the first question anyone asks of a blank
+  // branch - and the answer already existed on the Coverage page.
+  const boatYearsByReg = {}, aggYearsByReg = {};
+  DATA.boats.forEach(b => b.entries.forEach(e => {
+    const ra = racesById[e.race_id]; if (!ra) return;
+    const ev = eventsById[ra.event_id]; if (!ev) return;
+    (boatYearsByReg[ev.regatta_id] = boatYearsByReg[ev.regatta_id] || new Set())
+      .add(ev.season_year);
+  }));
+  DATA.events.forEach(ev => {
+    if (reportedFor(ev) > 0) {
+      (aggYearsByReg[ev.regatta_id] = aggYearsByReg[ev.regatta_id] || new Set())
+        .add(ev.season_year);
+    }
+  });
+  const whyEmpty = (rg, yr, reported) => {
+    // coverageNote() answers "what is the state of this REGATTA", which is a
+    // different question from "why is THIS SEASON blank". Used raw it produced
+    // answers that contradict the branch they sit under - "Scraped weekly" on
+    // an empty season, or "Up to date with what the source publishes". So the
+    // season-level fact leads, and the source note is added only where it
+    // actually explains the gap.
+    const boatYears = Array.from(boatYearsByReg[rg.id] || [])
+      .filter(Boolean).sort((a, b) => a - b);
+    const cov = coverageNote(rg.name, boatYears,
+      Array.from(aggYearsByReg[rg.id] || []));
+    // don't say "no named boats" twice when the Why line is about to say it
+    const head = reported
+      ? reported.toLocaleString() + ' entries reported' +
+        (boatYears.length ? ', but no named boats for this season.' : '.')
+      : 'No results on file for this season.';
+    let why;
+    if (boatYears.length) {
+      const span = boatYears.length === 1 ? String(boatYears[0])
+        : boatYears[0] + '\u2013' + boatYears[boatYears.length - 1];
+      why = 'We hold named boats for this event in ' + boatYears.length +
+            ' other season' + (boatYears.length === 1 ? '' : 's') +
+            ' (' + span + '), but not ' + (yr || 'this one') + '. ';
+      why += (cov.status === 'blocked' || cov.status === 'todo')
+        ? cov.note
+        : 'This season was loaded from the entry-count spreadsheet only.';
+    } else if (cov.status === 'blocked' || cov.status === 'todo') {
+      why = 'No named boats for any season of this event. ' + cov.note;
+    } else {
+      why = 'No named boats for any season of this event \u2014 only entry counts ' +
+            'were ever loaded for it.';
+    }
+    return '<p class="tree-empty">' + head +
+      '<span class="tree-why"><strong>Why:</strong> ' + esc(why) + '</span></p>';
+  };
   // Sum over the events actually under a node, so a club total is never double
   // counted across seasons.
   const reportedOver = evs => evs.reduce((a, ev) => a + reportedFor(ev), 0);
@@ -2033,7 +2090,7 @@ function renderRegattasList() {
           '<span>' + classes.length + ' class' + (classes.length === 1 ? '' : 'es') + '</span></span>' +
           '<a class="tree-open" href="#/regatta/' + rg.id + '?year=' + yr + '">open &rsaquo;</a></summary>' +
           '<div class="tree-kids">' + (clsNodes ||
-            '<p class="tree-empty">Aggregate entry counts only &mdash; no boat-level results for this season.</p>') +
+            whyEmpty(rg, yr, reportedOver(eventsOf(rg.id, yr)))) +
           '</div></details>';
       }).join('');
 
