@@ -322,6 +322,22 @@ tr.sales-saved > td:first-child { box-shadow: inset 3px 0 0 var(--series-quantum
 
 /* the organiser's published entry total, where we hold no named boats for it */
 .tree-reported { color: var(--text-muted); font-style: italic; opacity: .85; }
+
+/* real dropdowns in the boats table, coloured like the pill they replaced */
+.sm-select {
+  font: inherit; font-size: 12px; font-weight: 600;
+  border-radius: 999px; padding: 2px 22px 2px 10px;
+  border: 1px solid transparent; cursor: pointer; max-width: 150px;
+  appearance: none; -webkit-appearance: none;
+  background-image: linear-gradient(45deg, transparent 50%, currentColor 50%),
+                    linear-gradient(135deg, currentColor 50%, transparent 50%);
+  background-position: calc(100% - 12px) 52%, calc(100% - 8px) 52%;
+  background-size: 4px 4px, 4px 4px;
+  background-repeat: no-repeat;
+}
+.sm-select:hover { border-color: currentColor; }
+.sm-select:focus { outline: 2px solid var(--series-north); outline-offset: 1px; }
+.sm-select option { font-weight: 400; color: var(--text-primary); background: var(--surface-1); }
 </style>
 </head>
 <body>
@@ -711,7 +727,7 @@ function svgLineChart(series, {width=760, height=280, yLabel='Boats'}={}) {
     body += `<path d="${d}" fill="none" stroke="${c}" stroke-width="2.2" stroke-linejoin="round"${dash}/>`;
     pts.forEach(p => {
       body += `<circle cx="${sx(p.x).toFixed(1)}" cy="${sy(p.y).toFixed(1)}" r="4"
-        fill="${p.solid === false ? 'var(--surface)' : c}" stroke="${c}" stroke-width="2">
+        fill="${p.solid === false ? 'var(--surface-1)' : c}" stroke="${c}" stroke-width="2">
         <title>${esc(s.label)} — ${p.x}: ${p.y}${p.solid === false ? ' (aggregate)' : ''}</title></circle>`;
     });
   });
@@ -1043,52 +1059,64 @@ function sailmakerChoices() {
     .filter((v, i, a) => a.indexOf(v) === i).sort();
 }
 
-// Click-to-edit sailmaker in the Boats table. Deliberately NOT a <select> on
-// every row: that is what made the Sales page unusable at 3,324 controls. The
-// cell stays a plain pill until you click it, so 3,000 rows cost nothing.
+// Every row carries a REAL dropdown, so a sailmaker can be changed without
+// first discovering that a pill is clickable.
+//
+// The reason this was a click-to-edit pill before is still true: a <select>
+// holding ~45 makers, on two columns of 3,587 boats, is roughly 290,000 DOM
+// nodes, and that volume of controls is exactly what made the old Sales page
+// unusable. So each select ships EMPTY - one option showing the current value -
+// and fills its list the first time you touch it. Visible dropdown on every
+// row, about 7,000 nodes instead of 290,000.
+function smOptionsFor(field) {
+  return sailmakerChoices()
+    .filter(n => field === 'sailmaker' || !['Partial', 'Unknown', 'Other'].includes(n));
+}
+
+function smCurrent(b, field) {
+  return (field === 'sailmaker' ? liveSailmaker(b) : livePartial(b)) || '';
+}
+
+function smSelect(b, field) {
+  const cur = smCurrent(b, field);
+  const label = cur || (field === 'sailmaker' ? 'Unknown' : '—');
+  return `<select class="sm-select" data-boat-id="${b.id}" data-field="${field}"
+      style="${pillStyle(cur)}"
+      title="${field === 'sailmaker' ? 'Main sail inventory' : 'Second, partial inventory'}">
+      <option value="${esc(cur)}" selected>${esc(label)}</option></select>`;
+}
+
 function attachInlineSailmakerHandlers() {
-  // One handler for both columns. The main inventory and the partial one are
-  // edited the same way; only the field written and the empty label differ.
-  const wire = (selector, field, emptyLabel, readCurrent) => {
-    document.querySelectorAll(selector).forEach(td => {
-      td.addEventListener('click', (ev) => {
-        if (td.querySelector('select')) return;    // already editing
-        ev.stopPropagation();                      // don't open the boat page
-        const b = boatsById[td.dataset.boatId];
-        if (!b) return;
-        const current = readCurrent(b) || '';
-        const sel = document.createElement('select');
-        sel.innerHTML = `<option value="">${emptyLabel}</option>` +
-          sailmakerChoices()
-            .filter(n => field === 'sailmaker' || !['Partial', 'Unknown', 'Other'].includes(n))
-            .map(n => `<option value="${esc(n)}" ${n === current ? 'selected' : ''}>${esc(n)}</option>`).join('');
-        sel.style.maxWidth = '150px';
-        td.innerHTML = '';
-        td.appendChild(sel);
-        sel.focus();
-        const paint = () => {
-          td.innerHTML = current
-            ? `<span class="pill" style="${pillStyle(current)};cursor:pointer;">${esc(current)}</span>`
-            : (field === 'sailmaker'
-                ? `<span class="pill" style="${pillStyle('')};cursor:pointer;">Unknown</span>`
-                : `<span class="muted" style="cursor:pointer;">—</span>`);
-        };
-        const close = (commit) => {
-          if (commit && sel.value !== current) {
-            // an emptied partial is a deliberate clear, not "no change"
-            const v = (field === 'partialSailmaker' && sel.value === '') ? '__none__' : sel.value;
-            setPendingEdit(b.id, { [field]: v });
-            navigate();                            // figures update immediately
-          } else { paint(); }
-        };
-        sel.addEventListener('change', () => close(true));
-        sel.addEventListener('blur', () => close(false));
-        sel.addEventListener('keydown', e => { if (e.key === 'Escape') close(false); });
-      });
-    });
+  const fill = (sel) => {
+    if (sel.dataset.filled) return;
+    sel.dataset.filled = '1';
+    const b = boatsById[sel.dataset.boatId];
+    if (!b) return;
+    const field = sel.dataset.field;
+    const cur = smCurrent(b, field);
+    const empty = field === 'sailmaker' ? '— unknown —' : '— none —';
+    sel.innerHTML = `<option value="">${empty}</option>` +
+      smOptionsFor(field).map(n =>
+        `<option value="${esc(n)}"${n === cur ? ' selected' : ''}>${esc(n)}</option>`).join('');
+    sel.value = cur;                      // '' selects the empty option
   };
-  wire('.sm-cell', 'sailmaker', '— unknown —', b => liveSailmaker(b));
-  wire('.sm-partial-cell', 'partialSailmaker', '— none —', b => livePartial(b));
+  document.querySelectorAll('.sm-select').forEach(sel => {
+    // fill before the native popup opens; focus covers keyboard use
+    sel.addEventListener('mousedown', () => fill(sel));
+    sel.addEventListener('focus', () => fill(sel));
+    // the row is a link to the boat page - a click on the control is not
+    sel.addEventListener('click', ev => ev.stopPropagation());
+    sel.addEventListener('change', (ev) => {
+      ev.stopPropagation();
+      const b = boatsById[sel.dataset.boatId];
+      if (!b) return;
+      const field = sel.dataset.field;
+      // an emptied partial is a deliberate clear, not "no change"
+      const v = (field === 'partialSailmaker' && sel.value === '') ? '__none__' : sel.value;
+      setPendingEdit(b.id, { [field]: v });
+      navigate();                          // figures update immediately
+    });
+  });
 }
 
 function renderBoatsList() {
@@ -1113,12 +1141,8 @@ function renderBoatsList() {
       <td>${esc(b.boat_type||'')}</td>
       <td class="num">${b.tcc||''}</td>
       <td>${esc(b.owner_name||'')}</td>
-      <td class="sm-cell" data-boat-id="${b.id}" title="Click to change the main inventory">
-        <span class="pill" style="${pillStyle(liveSailmaker(b))};cursor:pointer;">${esc(liveSailmaker(b)||'Unknown')}</span></td>
-      <td class="sm-partial-cell" data-boat-id="${b.id}" title="Click to record a second, partial inventory">
-        ${livePartial(b)
-          ? `<span class="pill" style="${pillStyle(livePartial(b))};cursor:pointer;">${esc(livePartial(b))}</span>`
-          : '<span class="muted" style="cursor:pointer;">—</span>'}</td>
+      <td class="sm-cell">${smSelect(b, 'sailmaker')}</td>
+      <td class="sm-cell">${smSelect(b, 'partialSailmaker')}</td>
       <td>${statusPill}${b.lastActiveYear ? ` <span class="muted" style="font-size:11px;">(${b.lastActiveYear})</span>` : ''}</td>
       <td>${esc(b.tag||'')}</td>
       <td class="num">${b.entries.length}</td>
@@ -1230,7 +1254,7 @@ function renderBoatProfile(id) {
           const vs = (h.variants || '').split('|').map(x => x.trim()).filter(x => x && x !== h.name);
           return `<li style="position:relative;padding:0 0 14px 18px;">
             <span style="position:absolute;left:-7px;top:4px;width:12px;height:12px;border-radius:50%;
-                  background:${cur ? dot : 'var(--surface)'};border:2px solid ${dot};"></span>
+                  background:${cur ? dot : 'var(--surface-1)'};border:2px solid ${dot};"></span>
             <div><strong>${esc(h.name)}</strong>
               ${cur ? '<span class="pill" style="background:var(--series-north);color:#fff;margin-left:6px;">current</span>' : ''}
               ${h.confidence === 'overlapping' ? '<span class="pill" style="background:var(--series-doyle);color:#292524;margin-left:6px;">overlaps</span>' : ''}</div>
@@ -1260,7 +1284,7 @@ function renderBoatProfile(id) {
                   : current ? 'var(--series-north)' : 'var(--text-muted)';
         return `<li style="position:relative;padding:0 0 14px 18px;">
           <span style="position:absolute;left:-7px;top:4px;width:12px;height:12px;border-radius:50%;
-                background:${current ? dot : 'var(--surface)'};border:2px solid ${dot};"></span>
+                background:${current ? dot : 'var(--surface-1)'};border:2px solid ${dot};"></span>
           <div><strong>${esc(h.owner_name || '—')}</strong>
             ${charter ? '<span class="pill" style="background:var(--series-doyle);color:#292524;margin-left:6px;">chartered</span>' : ''}
             ${current ? '<span class="pill" style="background:var(--series-north);color:#fff;margin-left:6px;">current owner</span>' : ''}</div>
