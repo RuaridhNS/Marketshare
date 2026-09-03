@@ -3891,12 +3891,32 @@ let salesLimit = 50;
 const salesDraft = {};      // boat id -> staged {owner, sailmaker, leadRep, contactedBy}
 const salesKeep = new Set(); // boat ids pinned to the list for this session
 
+let salesWho = 'unknown';   // the gap is the default view: it is the biggest one
+
 function renderSales() {
   const allTargets = DATA.boats.filter(b =>
     bucketOf(liveSailmaker(b)) !== 'North Sails' || salesKeep.has(String(b.id)));
-  const targets = allTargets.filter(b => b.active || salesKeep.has(String(b.id)));
+  let targets = allTargets.filter(b => b.active || salesKeep.has(String(b.id)));
   const inactiveCount = allTargets.length - targets.length;
-  targets.sort((a,b) => (b.entries.length - a.entries.length));
+  const activeTargets = targets.length;
+  // Two different jobs wearing one list. A boat on a competitor's sails is a
+  // conquest; a boat whose sailmaker nobody has ever recorded is not a sales
+  // problem at all until someone finds out what it is flying. Mixing them
+  // buried the second, which is 94% of the fleet.
+  const bucketNow = b => bucketOf(liveSailmaker(b));
+  if (salesWho === 'unknown') {
+    targets = targets.filter(b => ['Unknown', 'Partial'].includes(bucketNow(b))
+      || salesKeep.has(String(b.id)));
+  } else if (salesWho === 'competitor') {
+    targets = targets.filter(b => !['Unknown', 'Partial'].includes(bucketNow(b))
+      || salesKeep.has(String(b.id)));
+  }
+  const nUnknown = allTargets.filter(b => b.active && ['Unknown', 'Partial'].includes(bucketNow(b))).length;
+  const nCompetitor = allTargets.filter(b => b.active && !['Unknown', 'Partial'].includes(bucketNow(b))).length;
+  // Attendance, not race count: a boat sailing eight races at one regatta is
+  // not eight times the prospect of one that turns up to eight events.
+  targets.sort((a, b) => regattaAttendance(b) - regattaAttendance(a)
+    || (b.entries.length - a.entries.length));
   const sailmakerNames = DATA.sailmakers.map(s => s.name).concat(BUCKET_ORDER).filter((v,i,a) => a.indexOf(v)===i).sort();
   const team = teamOptions();
   const selectOptions = (options, current) => `<option value="">— no change —</option>` +
@@ -3922,17 +3942,32 @@ function renderSales() {
       <td><select class="sales-edit-leadrep" data-boat-id="${b.id}">${selectOptions(team, p.leadRep||b.lead_rep)}</select></td>
       <td><select class="sales-edit-contactedby" data-boat-id="${b.id}">${selectOptions(team, p.contactedBy||b.contacted_by)}</select></td>
       <td class="${b.in_cs ? '' : 'tag-flag'}">${b.in_cs===1?'Yes':(b.in_cs===0?'No':'—')}</td>
+      <td class="num">${regattaAttendance(b)}</td>
       <td class="num">${b.entries.length}</td>
       <td class="sales-save-cell"><button type="button" class="btn sales-save" data-boat-id="${b.id}" hidden>Save</button></td>
     </tr>`;
   }).join('');
   return `
     <h1>Sales opportunities</h1>
-    <p class="subtitle">Boats not on North Sails, most active first. Showing <strong>${shown.length}</strong> of ${targets.length} active boats
-      (raced in ${ACTIVE_CUTOFF_YEAR}–${MAX_SEASON_YEAR}).${inactiveCount ? ` ${inactiveCount} more are inactive (no entry in the last 5 seasons) and hidden here — see <a href="#/boats" data-route="#/boats">Boats</a> and filter to Inactive to find them.` : ''}</p>
+    <p class="subtitle">Boats not on North Sails, most regatta attendance first. Showing
+      <strong>${shown.length}</strong> of ${targets.length}${inactiveCount ? `; ${inactiveCount} inactive boats are hidden — see <a href="#/boats" data-route="#/boats">Boats</a> and filter to Inactive.` : '.'}</p>
+    <div class="search-row">
+      <select id="sales-who">
+        <option value="unknown"${salesWho === 'unknown' ? ' selected' : ''}>Sailmaker unknown (${nUnknown})</option>
+        <option value="competitor"${salesWho === 'competitor' ? ' selected' : ''}>On a competitor (${nCompetitor})</option>
+        <option value="all"${salesWho === 'all' ? ' selected' : ''}>All targets (${activeTargets})</option>
+      </select>
+      <button class="btn secondary" id="sales-export" type="button">Export this list</button>
+      <span class="muted" id="sales-export-note" style="font-size:12px;align-self:center;"></span>
+    </div>
+    ${salesWho === 'unknown' ? `<p class="callout-warn"><strong>${nUnknown} active boats have no sailmaker on file.</strong>
+      They are not competitor boats — nobody has recorded what they fly. That is the single
+      biggest limit on every share figure in this tool: we know the sailmaker for
+      ${Math.round(100 * DATA.boats.filter(b => bucketOf(liveSailmaker(b)) !== 'Unknown' && bucketOf(liveSailmaker(b)) !== 'Partial').length / DATA.boats.length)}%
+      of the fleet. Ranked by regatta attendance, so the boats you see most often come first.</p>` : ''}
     <div class="card" style="padding:0;overflow:auto;">
       <table>
-        <thead><tr><th>Boat</th><th>Owner</th><th>Current sailmaker</th><th>Partial</th><th>Lead rep</th><th>Contacted by</th><th>In CS</th><th class="num">Entries</th><th></th></tr></thead>
+        <thead><tr><th>Boat</th><th>Owner</th><th>Current sailmaker</th><th>Partial</th><th>Lead rep</th><th>Contacted by</th><th>In CS</th><th class="num">Regattas</th><th class="num">Entries</th><th></th></tr></thead>
         <tbody>${rows}</tbody>
       </table>
     </div>
@@ -3946,6 +3981,61 @@ function renderSales() {
 }
 
 function attachSalesHandlers() {
+  const who = document.getElementById('sales-who');
+  if (who) who.addEventListener('change', () => { salesWho = who.value; salesLimit = 50; navigate(); });
+
+  const ex = document.getElementById('sales-export');
+  const exNote = document.getElementById('sales-export-note');
+  if (ex) ex.addEventListener('click', async () => {
+    const bucketNow = b => bucketOf(liveSailmaker(b));
+    let list = DATA.boats.filter(b => b.active && bucketNow(b) !== 'North Sails');
+    if (salesWho === 'unknown') list = list.filter(b => ['Unknown','Partial'].includes(bucketNow(b)));
+    else if (salesWho === 'competitor') list = list.filter(b => !['Unknown','Partial'].includes(bucketNow(b)));
+    list.sort((a, b) => regattaAttendance(b) - regattaAttendance(a));
+    const esc2 = v => { v = String(v == null ? '' : v);
+      return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; };
+    const head = ['SailNo','BoatName','BoatType','Owner','CurrentSailmaker','Regattas',
+                  'Entries','LastRaced','LeadRep','ContactedBy','NewSailmaker','NewLeadRep','Notes'];
+    const lines = [head.join(',')].concat(list.map(b => [
+      b.sail_no, b.boat_name, b.boat_type, b.owner_name, liveSailmaker(b) || '',
+      regattaAttendance(b), b.entries.length, b.lastActiveYear || '',
+      b.lead_rep || '', b.contacted_by || '', '', '', ''
+    ].map(esc2).join(',')));
+    const csv = lines.join('\n');
+    const base = 'marketshare-' + salesWho + '-worklist';
+    // The last three columns are blank on purpose: fill them in, and
+    // apply_boat_updates.py reads the file straight back into the database.
+    let saved = false;
+    try {
+      const downloads = window.claude && claude.use ? await claude.use('downloads') : null;
+      if (downloads) {
+        try { await downloads.save({ filename: base + '.csv', data: csv }); saved = true;
+              if (exNote) exNote.textContent = list.length + ' boats saved.'; }
+        catch (err) {
+          const code = err && err.code;
+          if (code === 'declined') { if (exNote) exNote.textContent = 'Cancelled.'; return; }
+          if (code === 'extension_not_enabled') {
+            await downloads.save({ filename: base + '.csv.txt', data: csv }); saved = true;
+            if (exNote) exNote.textContent = 'Saved as .csv.txt — rename to .csv.';
+          }
+        }
+      }
+    } catch (e) { /* fall through */ }
+    if (!saved) {
+      try {
+        const blob = new Blob([csv], { type: 'text/csv' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = base + '.csv';
+        document.body.appendChild(a); a.click();
+        setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 1500);
+        if (exNote) exNote.textContent = 'Download sent for ' + list.length + ' boats.';
+      } catch (e) {
+        if (exNote) exNote.textContent = 'Downloads are blocked here.';
+      }
+    }
+  });
+
   const more=document.getElementById('sales-more');
   if (more) more.addEventListener('click', () => { salesLimit += 50; navigate(); });
   const all=document.getElementById('sales-all');

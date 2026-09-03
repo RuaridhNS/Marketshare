@@ -1,0 +1,17 @@
+SailNo,ScanName,ScanType,OurName,OurType,Verdict,Why
+GBR2747R,Ino Noir,CARKEEK 45 2022,INO NOIR,Carkeek 45 (23) Custom Wb,accept,name and type agree
+GBR315X,Jiraffe,CAPE 31 OD,JIRAFFE,Cape 31,accept,name and type agree
+GBR3598R,Flight of Durgan,SPIRIT 52,FLIGHT OF DURGAN,Spirit Yacht,accept,name and type agree
+GBR4321,Oystercatcher XXX 01,JUDEL VROLIJK HH42,OYSTERCATCHER XXXV,,accept,same boat name series
+GBR5040L,Mittere,MELGES IC 37,ICY,IC37,accept,type agrees; boat renamed
+GBR56X,Khumbu,BOTIN 56,KHUMBU,,accept,name agrees
+GBR6255N,Lisa R,KER 46 (2012),LISA R,Ker 46,accept,name and type agree
+GBR6890R,Red Ruby,SUN FAST 3300,RED RUBY,Sun Fast 3300,accept,name and type agree
+GBR74R,Southern Rig,JV 77 (JETHOU),JETHOU,Mini Maxi,accept,scan type names the boat
+GBR8728R,Caol Ila R 1,MILLS 72,NOTORIOUS,Mills 72,accept,type agrees; boat renamed
+GBR8901R,Jiraffe*,ONE DESIGN J-109,JIRAFFE,J/109,accept,name and type agree
+GBR809,Lutine,X-YACHT X-55 CARBON MAST,LUTINE,X-55 3.20,accept,name and type agree
+GBR4866R,Oystercatcher,CORBY 36,STILETTO,,reject,different name and we hold no type to corroborate
+GBR52,Mena,6 METER CLASSIC,SWISH,Class40,reject,6 Metre vs Class40 - sail number reused
+GBR7777L,Atalante 02,HOEK DESIGN 90 TC,PASSION,Elan 410,reject,90ft vs Elan 410 - sail number reused
+GBR8654R,Holding Pattern 01,ST 370,SPIRIT OF ISIS,Farr Millenium 65,reject,ST 370 vs Farr 65 - sail number reused
