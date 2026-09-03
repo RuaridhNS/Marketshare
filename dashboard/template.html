@@ -350,6 +350,21 @@ tr.sales-saved > td:first-child { box-shadow: inset 3px 0 0 var(--series-quantum
 .drop-zone.drag { border-color: var(--series-north); background: var(--surface-2); }
 tr.enrich-miss > td { background: var(--surface-2); }
 tr.enrich-miss > td:first-child { box-shadow: inset 3px 0 0 var(--series-doyle); }
+
+/* market share at every level of the regatta tree */
+.share-wrap { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.share-bar { display: inline-flex; width: 54px; height: 7px; border-radius: 4px;
+  overflow: hidden; background: var(--surface-2); flex: none; }
+.share-bar i { display: block; height: 100%; }
+.sb-north   { background: var(--series-north); }
+.sb-other   { background: var(--series-doyle); }
+.sb-unknown { background: var(--border); }
+.share-text { font-size: 11.5px; color: var(--text-secondary);
+  font-variant-numeric: tabular-nums; }
+.share-unknown { color: var(--text-muted); }
+.share-none { color: var(--text-muted); font-style: italic; }
+.tree-series .share-wrap { margin-left: 10px; }
+@media (max-width: 720px) { .share-text { display: none; } }
 </style>
 </head>
 <body>
@@ -2042,6 +2057,51 @@ function renderRegattasList() {
         + nReported.toLocaleString() + ' reported</span>'
       : '');
 
+  // Market share at every level of the tree. The same three numbers are asked
+  // of a club, a season, an event and a class - the question "how are we doing
+  // here" does not change with the depth, only the set of boats it is asked
+  // about.
+  //
+  // The share is of boats whose sailmaker we KNOW, and the unknown count is
+  // shown beside it rather than folded in, because those two numbers mean
+  // opposite things: one is how we are doing, the other is how much of the
+  // fleet we cannot yet see. Coverage is 6% of the fleet, so a share quoted
+  // without the unknown count next to it would be worse than no number.
+  const shareOf = (ids) => {
+    let north = 0, other = 0, unknown = 0;
+    ids.forEach(id => {
+      const b = boatsById[id];
+      if (!b) return;
+      const bucket = bucketOf(liveSailmaker(b));
+      if (bucket === 'North Sails') north++;
+      else if (bucket === 'Unknown' || bucket === 'Partial') unknown++;
+      else other++;
+    });
+    return { north, other, unknown, known: north + other, total: north + other + unknown };
+  };
+  const shareMeta = (ids) => {
+    const s = shareOf(ids);
+    if (!s.total) return '';
+    if (!s.known) {
+      return '<span class="share-wrap" title="No sailmaker known for any of these ' +
+        s.total + ' boats."><span class="share-bar">' +
+        '<i class="sb-unknown" style="width:100%"></i></span>' +
+        '<span class="share-text share-none">no sailmaker known</span></span>';
+    }
+    const pct = Math.round(100 * s.north / s.known);
+    const w = n => (100 * n / s.total).toFixed(1) + '%';
+    return '<span class="share-wrap" title="' + s.north + ' North, ' + s.other +
+      ' competitor, ' + s.unknown + ' unknown, of ' + s.total + ' boats. The percentage is ' +
+      'North\u2019s share of the ' + s.known + ' we know.">' +
+      '<span class="share-bar">' +
+      '<i class="sb-north" style="width:' + w(s.north) + '"></i>' +
+      '<i class="sb-other" style="width:' + w(s.other) + '"></i>' +
+      '<i class="sb-unknown" style="width:' + w(s.unknown) + '"></i></span>' +
+      '<span class="share-text">' + pct + '% of ' + s.known + ' known' +
+      (s.unknown ? '<span class="share-unknown">, ' + s.unknown + ' unknown</span>' : '') +
+      '</span></span>';
+  };
+
   // Boat rows are built on demand. Rendering every entry up front is ~54,000
   // rows of HTML, which is what made the old Sales page unusable.
   window.__treeData = {};
@@ -2084,7 +2144,8 @@ function renderRegattasList() {
           return '<details class="tree-node tree-class" data-leaf="' + key + '">' +
             '<summary><span class="tree-name">' + esc(cls) + '</span>' +
             '<span class="tree-meta"><span>' + n + ' boat' + (n === 1 ? '' : 's') + '</span>' +
-            '<span>' + rows.length + ' entr' + (rows.length === 1 ? 'y' : 'ies') + '</span></span></summary>' +
+            '<span>' + rows.length + ' entr' + (rows.length === 1 ? 'y' : 'ies') + '</span>' +
+            shareMeta(Object.keys(byBoat)) + '</span></summary>' +
             '<div class="tree-kids tree-boats"><p class="tree-empty">Opening&hellip;</p></div></details>';
         }).join('');
         clubEvents++;
@@ -2096,7 +2157,8 @@ function renderRegattasList() {
           '" data-seasonreported="' + reportedOver(eventsOf(rg.id, yr)) + '">' +
           '<summary><span class="tree-name">' + esc(rg.name) + '</span>' +
           '<span class="tree-meta">' + countMeta(evBoats.size, reportedOver(eventsOf(rg.id, yr))) +
-          '<span>' + classes.length + ' class' + (classes.length === 1 ? '' : 'es') + '</span></span>' +
+          '<span>' + classes.length + ' class' + (classes.length === 1 ? '' : 'es') + '</span>' +
+          shareMeta(Array.from(evBoats)) + '</span>' +
           '<a class="tree-open" href="#/regatta/' + rg.id + '?year=' + yr + '">open &rsaquo;</a></summary>' +
           '<div class="tree-kids">' + (clsNodes ||
             whyEmpty(rg, yr, reportedOver(eventsOf(rg.id, yr)))) +
@@ -2107,7 +2169,8 @@ function renderRegattasList() {
         '<span class="tree-name">' + (yr || 'Season unrecorded') + '</span>' +
         '<span class="tree-meta"><span>' + regIds.length + ' event' + (regIds.length === 1 ? '' : 's') + '</span>' +
         countMeta(yearBoats.size,
-          reportedOver(regIds.flatMap(id => eventsOf(id, yr)))) + '</span></summary>' +
+          reportedOver(regIds.flatMap(id => eventsOf(id, yr)))) +
+        shareMeta(Array.from(yearBoats)) + '</span></summary>' +
         '<div class="tree-kids">' + evNodes + '</div></details>';
     }).join('');
 
@@ -2119,7 +2182,7 @@ function renderRegattasList() {
       (clubReported > clubBoats.size
         ? ' &middot; <span class="tree-reported" style="display:inline;">'
           + clubReported.toLocaleString() + ' reported</span>' : '') +
-      '</span></summary>' +
+      '</span>' + shareMeta(Array.from(clubBoats)) + '</summary>' +
       '<div class="tree-body">' + yearNodes + '</div></details>';
   }).join('');
 

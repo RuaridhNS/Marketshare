@@ -76,17 +76,21 @@ def main():
     # Boat types that are pure one-design fleets. A TCC on its own does NOT
     # qualify one of these: a handful of SB20s and J/70s carry a stray rating
     # yet have never started an IRC race, and they were leaking through.
+    # Hulls that race ONLY as a one-design. A class comes off this list the
+    # moment it is shown to race under IRC as well - the boat then enters the
+    # dataset, while the entry-level filter below still drops its one-design
+    # starts, so only its IRC racing counts.
+    #
+    # Removed after checking how each class actually races: Contessa 32
+    # (114 IRC-division starts), J/80 (63 of its 100 classed entries), Cork
+    # 1720 (15 of 48), Etchells (9 of 46), XOD (19 of 530), Daring (4 of 48),
+    # J/70 (12 of 1,640), RS 21 (2 of 15). The last four race IRC only
+    # occasionally, but occasionally is not never, and dropping the hull threw
+    # those starts away along with the boat.
     OD_TYPE_RE = re.compile(
-        r"^\s*(sb\s?20|j\s?/?70|j\s?/?80|x\s?od|x one design|squib|sunbeam|dragon|"
-        r"etchells|daring|sonar|mermaid|redwing|victory|flying\s?15|swallow|"
-        r"rs\s?elite|rs\s?21|cork\s?1720|sonata|folkboat)\b", re.I)
-    # Contessa 32 was on this list and should not have been. The class races
-    # one-design AND under IRC: all 16 on file carry an IRC TCC (0.855-0.876)
-    # and between them have 53 starts in IRC 4, 47 in IRC Overall and 14 in IRC
-    # Class 6, alongside 83 in a one-design Contessa 32 class. Excluding the
-    # hull threw away the IRC racing with it. The entry-level filter below
-    # still drops their one-design starts, so the boats come in and only their
-    # IRC racing counts - which is the distinction this rule was reaching for.
+        r"^\s*(sb\s?20|squib|sunbeam|dragon|"
+        r"sonar|mermaid|redwing|victory|flying\s?15|swallow|"
+        r"rs\s?elite|sonata|folkboat)\b", re.I)
 
     # Some organisations race entirely under IRC but never write the word in a
     # class label: JOG's divisions are "Class 1", "Double Handed", "Generation
