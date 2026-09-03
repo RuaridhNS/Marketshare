@@ -343,6 +343,13 @@ tr.sales-saved > td:first-child { box-shadow: inset 3px 0 0 var(--series-quantum
 .tree-why { display: block; margin-top: 4px; font-size: 12px;
   color: var(--text-muted); line-height: 1.45; }
 .tree-why strong { color: var(--text-secondary); }
+
+/* entry-list drop zone */
+.drop-zone { border: 2px dashed var(--border); border-radius: 10px; padding: 22px;
+  text-align: center; background: var(--surface-1); transition: border-color .15s, background .15s; }
+.drop-zone.drag { border-color: var(--series-north); background: var(--surface-2); }
+tr.enrich-miss > td { background: var(--surface-2); }
+tr.enrich-miss > td:first-child { box-shadow: inset 3px 0 0 var(--series-doyle); }
 </style>
 </head>
 <body>
@@ -358,6 +365,7 @@ tr.sales-saved > td:first-child { box-shadow: inset 3px 0 0 var(--series-quantum
     <a class="nav-item" href="#/market-analysis" data-route="#/market-analysis">Market analysis</a>
     <a class="nav-item" href="#/market-share" data-route="#/market-share">Market share</a>
     <a class="nav-item" href="#/sales" data-route="#/sales">Sales opportunities</a>
+    <a class="nav-item" href="#/enrich" data-route="#/enrich">Entry list</a>
     <a class="nav-item" href="#/duplicates" data-route="#/duplicates">Duplicates<span class="nav-badge" id="duplicates-badge" style="display:none;"></span></a>
     <a class="nav-item" href="#/quality" data-route="#/quality">Data quality</a>
     <a class="nav-item" href="#/changes" data-route="#/changes">Pending changes<span class="nav-badge" id="pending-badge" style="display:none;"></span></a>
@@ -818,6 +826,7 @@ function navigate() {
     else if (route === 'market-analysis') main.innerHTML = renderMarketAnalysis();
     else if (route === 'market-share') main.innerHTML = renderMarketShare();
     else if (route === 'sales') main.innerHTML = renderSales();
+    else if (route === 'enrich') { main.innerHTML = renderEnrich(); attachEnrichHandlers(); }
     else if (route === 'coverage') main.innerHTML = renderCoverage();
     else if (route === 'quality') main.innerHTML = renderQuality();
     else if (route === 'compare') main.innerHTML = renderCompare((query.get('r')||'').split(',').filter(Boolean));
@@ -2410,6 +2419,438 @@ function attachAnalysisHandlers() {
   if (r) r.addEventListener('click', () => {
     ANALYSIS.sailmaker = ANALYSIS.type = ANALYSIS.club = '';
     ANALYSIS.from = 0; ANALYSIS.to = 0; navigate();
+  });
+}
+
+
+// ---------- page: entry list enrichment ----------
+// An event sends the marketing team an entry list: sail number, yacht, owner,
+// type, and a Sailmaker column that is mostly blank. Filling it by hand means
+// looking up several hundred boats one at a time. This page does the lookup:
+// drop the file in, and every boat we already know is filled from the
+// database, with the rest flagged so the gap is visible rather than silent.
+//
+// Deliberately fills BLANKS ONLY. What the team typed is theirs and is never
+// overwritten - where the sheet and the database disagree, both are kept and
+// the disagreement is reported, because that is a fact worth seeing rather
+// than a conflict to resolve silently.
+const ENRICH = { rows: null, headers: [], sheets: [], sheet: null, name: '', stats: null };
+
+const XLSX_CDN = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+let _xlsxPromise = null;
+function loadXLSX() {
+  if (window.XLSX) return Promise.resolve(window.XLSX);
+  if (_xlsxPromise) return _xlsxPromise;
+  // ~880KB, so it is fetched only when a spreadsheet is actually dropped
+  _xlsxPromise = new Promise((res, rej) => {
+    const t = document.createElement('script');
+    t.src = XLSX_CDN;
+    t.onload = () => res(window.XLSX);
+    t.onerror = () => rej(new Error('could not load the spreadsheet reader'));
+    document.head.appendChild(t);
+  });
+  return _xlsxPromise;
+}
+
+const sailKey = v => String(v == null ? '' : v).toUpperCase().replace(/[^A-Z0-9]/g, '');
+const nameKey = v => String(v == null ? '' : v).toUpperCase().replace(/[^A-Z0-9]/g, '');
+
+let _bySail = null, _byName = null;
+function enrichIndex() {
+  if (_bySail) return { bySail: _bySail, byName: _byName };
+  _bySail = {}; _byName = {};
+  DATA.boats.forEach(b => {
+    const k = sailKey(b.sail_no);
+    if (k && !_bySail[k]) _bySail[k] = b;
+    const n = nameKey(b.boat_name);
+    // a name shared by two boats is not an identification, so drop it
+    if (n) _byName[n] = (_byName[n] === undefined) ? b : null;
+  });
+  return { bySail: _bySail, byName: _byName };
+}
+
+function lastRaced(b) {
+  let y = 0;
+  b.entries.forEach(e => {
+    const ra = racesById[e.race_id]; if (!ra) return;
+    const ev = eventsById[ra.event_id]; if (!ev) return;
+    if ((ev.season_year || 0) > y) y = ev.season_year;
+  });
+  return y || '';
+}
+
+// columns we can fill in the sheet's own vocabulary
+// `same` decides whether the sheet and the database actually disagree, which
+// is not the same question as whether the two strings match.
+//
+// The entry list writes a boat's TYPE as its rating string - "SUN FAST 3600
+// 2.20 Fin6" - where we hold the canonical type, "Sun Fast 3600". Comparing
+// them literally reported a disagreement on every single matched boat, which
+// is noise that would teach the team to ignore the column. Same for the
+// sailmaker: the sheet writes "North", we write "North Sails".
+// The entry list writes makers in short form - "North", "Other", "Partial" -
+// where our buckets are full names. bucketOf("North") returns "Other", so
+// every North boat on the sheet read as a disagreement with our own record of
+// it. Match on the maker, not on how it is spelled.
+const BUCKET_ALIAS = [
+  [/^north/i, 'North Sails'], [/^doyle/i, 'Doyle'], [/^quantum/i, 'Quantum'],
+  [/^onesails|^one\b/i, 'One'], [/^sanders/i, 'Sanders'], [/^elvstr/i, 'Elvstrom'],
+  [/^partial/i, 'Partial'], [/^unknown/i, 'Unknown'],
+];
+function makerBucket(v) {
+  const t = String(v == null ? '' : v).trim();
+  if (!t) return 'Unknown';
+  for (let i = 0; i < BUCKET_ALIAS.length; i++) {
+    if (BUCKET_ALIAS[i][0].test(t)) return BUCKET_ALIAS[i][1];
+  }
+  return bucketOf(t);
+}
+
+// Fill in the sheet's own vocabulary. Writing "North Sails" into a column that
+// already says "North" would leave the team with two spellings of one maker -
+// exactly the mess this project exists to clean up - so the spelling already
+// in use wins.
+function houseSpelling(rows, i) {
+  const tally = {};
+  if (i < 0) return {};
+  rows.forEach(r => {
+    const v = String(r[i] == null ? '' : r[i]).trim();
+    if (!v) return;
+    const b = makerBucket(v);
+    (tally[b] = tally[b] || {})[v] = ((tally[b] || {})[v] || 0) + 1;
+  });
+  const out = {};
+  Object.keys(tally).forEach(b => {
+    out[b] = Object.keys(tally[b]).sort((x, y) => tally[b][y] - tally[b][x])[0];
+  });
+  return out;
+}
+
+// "ED MOCKRIDGE" and "EDWARD MOCKRIDGE" are one man, and reporting them as a
+// disagreement buries the cases where the sheet and the database really do
+// name different people. Same surname plus a first name that is a prefix of
+// the other counts as the same person. Deliberately conservative: NICK and
+// NICHOLAS do not share a prefix, so that pair still gets flagged rather than
+// being merged on a guess.
+function samePerson(a, b) {
+  const norm = v => String(v == null ? '' : v).toUpperCase()
+    .replace(/[^A-Z\s]/g, ' ').split(/\s+/).filter(Boolean);
+  const x = norm(a), y = norm(b);
+  if (!x.length || !y.length) return true;
+  if (x.join(' ') === y.join(' ')) return true;
+  if (x[x.length - 1] !== y[y.length - 1]) return false;      // different surname
+  if (x.length < 2 || y.length < 2) return true;              // surname only
+  const f = x[0], g = y[0];
+  return f === g || f.indexOf(g) === 0 || g.indexOf(f) === 0;
+}
+
+const ENRICH_FIELDS = [
+  { re: /sail\s*maker|sailmaker/i,          key: 'sailmaker', get: b => liveSailmaker(b) || '',
+    // compare the maker, not the spelling of it
+    same: (a, b) => makerBucket(a) === makerBucket(b), house: true },
+  { re: /owner/i,                           key: 'owner',     get: b => b.owner_name || '',
+    same: (a, b) => samePerson(a, b) },
+  { re: /^type$|boat\s*type|yacht\s*type/i, key: 'type',      get: b => b.boat_type || '',
+    // the sheet's type carries the rating; ours is the bare type. One
+    // containing the other is agreement, not conflict.
+    same: (a, b) => { const x = normType(a), y = normType(b);
+                      const cx = nameKey(x), cy = nameKey(y);
+                      return !cx || !cy || cx === cy || cx.indexOf(cy) === 0 || cy.indexOf(cx) === 0; } },
+  { re: /sales\s*lead|lead\s*rep/i,         key: 'lead',      get: b => b.lead_rep || '',
+    same: (a, b) => samePerson(a, b) },
+];
+const ADDED = ['MS match', 'MS partial inventory', 'MS regattas attended', 'MS last raced',
+               'MS lead rep', 'MS contacted by', 'MS filled', 'MS disagrees'];
+
+function enrichRows(headers, rows) {
+  const { bySail, byName } = enrichIndex();
+  const iSail = headers.findIndex(h => /sail\s*(number|no)/i.test(h));
+  const iName = headers.findIndex(h => /yacht\s*name|boat\s*name|^name$/i.test(h));
+  const cols = ENRICH_FIELDS.map(f => ({ f, i: headers.findIndex(h => f.re.test(h)) }));
+  const smCol = cols.find(c => c.f.key === 'sailmaker');
+  const house = smCol ? houseSpelling(rows, smCol.i) : {};
+  const st = { total: 0, matched: 0, bySail: 0, byName: 0, unmatched: 0,
+               filled: {}, disagree: {}, unmatchedRows: [] };
+  ENRICH_FIELDS.forEach(f => { st.filled[f.key] = 0; st.disagree[f.key] = 0; });
+
+  const out = rows.map(r => {
+    const row = headers.map((_, i) => (r[i] == null ? '' : String(r[i]).trim()));
+    st.total++;
+    let b = null, how = '';
+    if (iSail > -1 && sailKey(row[iSail])) { b = bySail[sailKey(row[iSail])] || null; if (b) how = 'sail number'; }
+    if (!b && iName > -1 && nameKey(row[iName])) {
+      const cand = byName[nameKey(row[iName])];
+      if (cand) { b = cand; how = 'boat name'; }
+    }
+    const add = { 'MS match': '', 'MS partial inventory': '', 'MS regattas attended': '',
+                  'MS last raced': '', 'MS lead rep': '', 'MS contacted by': '',
+                  'MS filled': '', 'MS disagrees': '' };
+    if (!b) {
+      st.unmatched++;
+      add['MS match'] = 'not found';
+      if (st.unmatchedRows.length < 40) {
+        st.unmatchedRows.push({ sail: iSail > -1 ? row[iSail] : '', name: iName > -1 ? row[iName] : '' });
+      }
+      return { row, add };
+    }
+    st.matched++;
+    if (how === 'sail number') st.bySail++; else st.byName++;
+    add['MS match'] = how;
+    add['MS partial inventory'] = livePartial(b) || '';
+    add['MS regattas attended'] = String(regattaAttendance(b));
+    add['MS last raced'] = String(lastRaced(b));
+    add['MS lead rep'] = b.lead_rep || '';
+    add['MS contacted by'] = b.contacted_by || '';
+    const filled = [], differs = [];
+    cols.forEach(({ f, i }) => {
+      if (i < 0) return;
+      let ours = f.get(b);
+      if (!ours) return;
+      if (f.house) ours = house[makerBucket(ours)] || ours;
+      if (!row[i]) { row[i] = ours; filled.push(f.key); st.filled[f.key]++; }
+      else if (!f.same(row[i], ours)) {
+        differs.push(f.key + ': ours "' + ours + '"'); st.disagree[f.key]++;
+      }
+    });
+    add['MS filled'] = filled.join(', ');
+    add['MS disagrees'] = differs.join('; ');
+    return { row, add };
+  });
+  ENRICH.stats = st;
+  return out;
+}
+
+function enrichToCSV() {
+  if (!ENRICH.rows) return '';
+  const esc2 = v => { v = String(v == null ? '' : v);
+    return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; };
+  const head = ENRICH.headers.concat(ADDED);
+  const lines = [head.map(esc2).join(',')];
+  ENRICH.rows.forEach(r => {
+    lines.push(r.row.concat(ADDED.map(k => r.add[k])).map(esc2).join(','));
+  });
+  return lines.join('\n');
+}
+
+function renderEnrich() {
+  const st = ENRICH.stats;
+  const drop = `
+    <div class="card">
+      <h2 style="margin-top:0;">Fill an entry list from Marketshare</h2>
+      <p class="muted" style="font-size:13px;margin-top:0;">
+        Drop an event entry list in — the spreadsheet with Sail Number, Yacht Name and a
+        mostly-empty Sailmaker column. Every boat already in Marketshare is filled in, and the
+        ones we do not hold are listed so the gap is visible. <strong>Blanks only:</strong> what
+        your team has typed is never overwritten. Where the sheet and the database disagree,
+        both are kept and the disagreement is reported.
+        Nothing leaves your browser — the file is read on this page.
+      </p>
+      <div id="drop-zone" class="drop-zone">
+        <input type="file" id="enrich-file" accept=".xlsx,.xls,.csv" style="display:none;">
+        <p style="margin:0 0 8px;"><strong>Drop a .xlsx or .csv here</strong></p>
+        <button class="btn" id="enrich-pick" type="button">Choose a file</button>
+        <p class="muted" style="font-size:12px;margin:10px 0 0;" id="enrich-status">No file loaded.</p>
+      </div>
+    </div>`;
+  if (!st) return `<h1>Entry list</h1>${drop}`;
+
+  const sheetPick = ENRICH.sheets.length > 1
+    ? `<label style="font-size:12px;font-weight:600;">Sheet
+         <select id="enrich-sheet">${ENRICH.sheets.map(n =>
+           `<option value="${esc(n)}"${n === ENRICH.sheet ? ' selected' : ''}>${esc(n)}</option>`).join('')}</select>
+       </label>` : '';
+  const pct = st.total ? Math.round(100 * st.matched / st.total) : 0;
+  const fillRows = ENRICH_FIELDS.filter(f => st.filled[f.key] || st.disagree[f.key]).map(f =>
+    `<tr><td>${esc(f.key)}</td><td class="num">${st.filled[f.key]}</td>
+     <td class="num">${st.disagree[f.key]}</td></tr>`).join('')
+    || `<tr><td colspan="3" class="muted">No matching columns found in this sheet.</td></tr>`;
+
+  const preview = ENRICH.rows.slice(0, 25).map(r => {
+    const cells = r.row.map(v => `<td>${esc(v)}</td>`).join('');
+    const cls = r.add['MS match'] === 'not found' ? ' class="enrich-miss"' : '';
+    return `<tr${cls}>${cells}<td>${esc(r.add['MS match'])}</td>
+      <td>${esc(r.add['MS filled'])}</td>
+      <td class="num">${esc(r.add['MS regattas attended'])}</td>
+      <td>${esc(r.add['MS disagrees'])}</td></tr>`;
+  }).join('');
+
+  const missing = st.unmatchedRows.length
+    ? `<details class="card"><summary><strong>${st.unmatched} boat${st.unmatched === 1 ? '' : 's'} not in Marketshare</strong></summary>
+       <p class="muted" style="font-size:12px;">These are the boats the database has never seen. Each one
+       is either genuinely new to the circuit or is on file under a different sail number.</p>
+       <table><thead><tr><th>Sail number</th><th>Yacht name</th></tr></thead><tbody>
+       ${st.unmatchedRows.map(u => `<tr><td>${esc(u.sail)}</td><td>${esc(u.name)}</td></tr>`).join('')}
+       </tbody></table></details>` : '';
+
+  return `
+    <h1>Entry list</h1>
+    ${drop}
+    <div class="card">
+      <div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap;margin-bottom:10px;">
+        <strong>${esc(ENRICH.name)}</strong>${sheetPick}
+        <span class="muted" style="font-size:13px;">${st.total} boats &middot;
+          ${st.matched} matched (${pct}%) &middot; ${st.unmatched} not found</span>
+        <span style="margin-left:auto;display:flex;gap:8px;">
+          <button class="btn" id="enrich-dl" type="button">Download CSV</button>
+          <button class="btn secondary" id="enrich-copy" type="button">Copy</button>
+        </span>
+      </div>
+      <p class="muted" id="enrich-dl-note" style="font-size:12px;margin:0 0 10px;"></p>
+      <table style="max-width:520px;">
+        <thead><tr><th>Column</th><th class="num">Filled</th><th class="num">Disagrees</th></tr></thead>
+        <tbody>${fillRows}</tbody>
+      </table>
+      <p class="muted" style="font-size:12px;">Matched ${st.bySail} on sail number and
+        ${st.byName} on boat name. A name shared by two boats is not treated as an
+        identification.</p>
+    </div>
+    ${missing}
+    <div class="card" style="padding:0;overflow:auto;">
+      <table><thead><tr>
+        ${ENRICH.headers.map(h => `<th>${esc(h)}</th>`).join('')}
+        <th>MS match</th><th>MS filled</th><th class="num">Regattas</th><th>MS disagrees</th>
+      </tr></thead><tbody>${preview}</tbody></table>
+    </div>
+    <p class="muted" style="font-size:12px;padding:0 4px;">Showing the first
+      ${Math.min(25, ENRICH.rows.length)} of ${ENRICH.rows.length} rows. The download has them all,
+      plus every added column.</p>
+  `;
+}
+
+function parseCSVText(text) {
+  const rows = []; let row = [], cell = '', q = false;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (q) {
+      if (ch === '"') { if (text[i + 1] === '"') { cell += '"'; i++; } else q = false; }
+      else cell += ch;
+    } else if (ch === '"') q = true;
+    else if (ch === ',') { row.push(cell); cell = ''; }
+    else if (ch === '\n') { row.push(cell); rows.push(row); row = []; cell = ''; }
+    else if (ch !== '\r') cell += ch;
+  }
+  if (cell || row.length) { row.push(cell); rows.push(row); }
+  return rows;
+}
+
+function useSheet(matrix, sheetName) {
+  // the header is the first row with two or more non-empty cells
+  let h = 0;
+  while (h < matrix.length && matrix[h].filter(c => String(c || '').trim()).length < 2) h++;
+  const headers = (matrix[h] || []).map(c => String(c == null ? '' : c).replace(/\s+/g, ' ').trim());
+  let last = headers.length; while (last > 0 && !headers[last - 1]) last--;
+  ENRICH.headers = headers.slice(0, last);
+  const body = matrix.slice(h + 1).filter(r => r.some(c => String(c == null ? '' : c).trim()));
+  ENRICH.sheet = sheetName;
+  ENRICH.rows = enrichRows(ENRICH.headers, body);
+}
+
+function attachEnrichHandlers() {
+  const zone = document.getElementById('drop-zone');
+  const input = document.getElementById('enrich-file');
+  const pick = document.getElementById('enrich-pick');
+  const status = document.getElementById('enrich-status');
+  if (!zone) return;
+  const say = m => { if (status) status.textContent = m; };
+
+  const handle = async (file) => {
+    if (!file) return;
+    ENRICH.name = file.name;
+    say('Reading ' + file.name + '…');
+    try {
+      if (/\.csv$/i.test(file.name)) {
+        ENRICH.sheets = [];
+        useSheet(parseCSVText(await file.text()), '');
+      } else {
+        const X = await loadXLSX();
+        const wb = X.read(await file.arrayBuffer(), { type: 'array' });
+        ENRICH.sheets = wb.SheetNames.slice();
+        ENRICH.book = wb;
+        const first = wb.SheetNames[0];
+        useSheet(X.utils.sheet_to_json(wb.Sheets[first], { header: 1, raw: false, defval: '' }), first);
+      }
+      navigate();
+    } catch (err) {
+      say('Could not read that file: ' + err.message);
+    }
+  };
+
+  if (pick) pick.addEventListener('click', () => input.click());
+  if (input) input.addEventListener('change', () => handle(input.files[0]));
+  ['dragenter', 'dragover'].forEach(ev => zone.addEventListener(ev, e => {
+    e.preventDefault(); zone.classList.add('drag');
+  }));
+  ['dragleave', 'drop'].forEach(ev => zone.addEventListener(ev, e => {
+    e.preventDefault(); zone.classList.remove('drag');
+  }));
+  zone.addEventListener('drop', e => handle(e.dataTransfer.files[0]));
+
+  const sheetSel = document.getElementById('enrich-sheet');
+  if (sheetSel) sheetSel.addEventListener('change', () => {
+    const X = window.XLSX, wb = ENRICH.book;
+    if (!X || !wb) return;
+    useSheet(X.utils.sheet_to_json(wb.Sheets[sheetSel.value], { header: 1, raw: false, defval: '' }),
+      sheetSel.value);
+    navigate();
+  });
+
+  const note = document.getElementById('enrich-dl-note');
+  const dl = document.getElementById('enrich-dl');
+  if (dl) dl.addEventListener('click', async () => {
+    const csv = enrichToCSV();
+    const base = (ENRICH.name || 'entry-list').replace(/\.[^.]+$/, '') +
+                 (ENRICH.sheet ? '-' + ENRICH.sheet : '') + '-marketshare';
+    // Published pages hand files to the viewer through the downloads
+    // capability; a plain blob link is inert there. Locally there is no
+    // capability, and the blob link is the only route - so try both.
+    let saved = false;
+    try {
+      const downloads = window.claude && claude.use ? await claude.use('downloads') : null;
+      if (downloads) {
+        try {
+          await downloads.save({ filename: base + '.csv', data: csv });
+          saved = true;
+          if (note) note.textContent = 'Saved.';
+        } catch (err) {
+          const code = err && err.code;
+          if (code === 'declined') { if (note) note.textContent = 'Save cancelled.'; return; }
+          if (code === 'extension_not_enabled') {
+            // CSV is not enabled for this viewer; .txt holds the same text
+            await downloads.save({ filename: base + '.csv.txt', data: csv });
+            saved = true;
+            if (note) note.textContent = 'Saved as .csv.txt — rename to .csv to open it in Excel.';
+          } else if (note) {
+            note.textContent = 'Could not save (' + (code || 'unknown') + '). Use Copy instead.';
+          }
+        }
+      }
+    } catch (e) { /* fall through to the blob route */ }
+    if (!saved) {
+      try {
+        const blob = new Blob([csv], { type: 'text/csv' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = base + '.csv';
+        document.body.appendChild(a); a.click();
+        setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 1500);
+        // A blob click cannot be confirmed: some hosts silently drop it. Say
+        // what was attempted rather than claiming a save that may not exist.
+        if (note) note.textContent = 'Download sent to the browser. If nothing ' +
+          'appears, this page is sandboxed — use Copy and paste into a sheet.';
+      } catch (e) {
+        if (note) note.textContent = 'Downloads are blocked here — use Copy instead.';
+      }
+    }
+  });
+
+  const cp = document.getElementById('enrich-copy');
+  if (cp) cp.addEventListener('click', async () => {
+    try {
+      await navigator.clipboard.writeText(enrichToCSV());
+      if (note) note.textContent = 'Copied — paste straight into Excel or Sheets.';
+    } catch (e) {
+      if (note) note.textContent = 'Could not reach the clipboard.';
+    }
   });
 }
 
