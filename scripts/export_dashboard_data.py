@@ -79,7 +79,14 @@ def main():
     OD_TYPE_RE = re.compile(
         r"^\s*(sb\s?20|j\s?/?70|j\s?/?80|x\s?od|x one design|squib|sunbeam|dragon|"
         r"etchells|daring|sonar|mermaid|redwing|victory|flying\s?15|swallow|"
-        r"rs\s?elite|rs\s?21|cork\s?1720|contessa\s?32|sonata|folkboat)\b", re.I)
+        r"rs\s?elite|rs\s?21|cork\s?1720|sonata|folkboat)\b", re.I)
+    # Contessa 32 was on this list and should not have been. The class races
+    # one-design AND under IRC: all 16 on file carry an IRC TCC (0.855-0.876)
+    # and between them have 53 starts in IRC 4, 47 in IRC Overall and 14 in IRC
+    # Class 6, alongside 83 in a one-design Contessa 32 class. Excluding the
+    # hull threw away the IRC racing with it. The entry-level filter below
+    # still drops their one-design starts, so the boats come in and only their
+    # IRC racing counts - which is the distinction this rule was reaching for.
 
     # Some organisations race entirely under IRC but never write the word in a
     # class label: JOG's divisions are "Class 1", "Double Handed", "Generation
