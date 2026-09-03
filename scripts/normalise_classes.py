@@ -45,6 +45,14 @@ from collections import defaultdict
 WORDS = [("zero", "0"), ("two handed", "2h"), ("one", "1"), ("two", "2"),
          ("three", "3"), ("four", "4"), ("five", "5"), ("six", "6"), ("seven", "7")]
 
+# A race number is not a class. Cowes Week publishes the one-design fleets as
+# "Cape 31 (Race 1)", "J/70 (Mini-series 3)" and so on, which mints a fresh
+# class for every race of every regatta - 113 labels covering 5,250 entries,
+# all of which are really 13 classes. The race name already carries the number
+# ("Cape 31 (Race 1) - Day 1"), and races are keyed on it, so stripping the
+# suffix from the CLASS cannot merge two races into one.
+RACE_SUFFIX = re.compile(r"\s*\((?:race|mini-?series|r)\s*\d+\)\s*$", re.I)
+
 IRC_DIVISION = re.compile(r"^IRC\s+(\d|zero|one|two|three|four|five|six|seven)$", re.I)
 NUM_WORD = {"zero": "0", "one": "1", "two": "2", "three": "3",
             "four": "4", "five": "5", "six": "6", "seven": "7"}
@@ -84,6 +92,28 @@ def load_verdicts(path):
     return out
 
 
+def strip_race_number(cur, dry_run):
+    """Fold "Cape 31 (Race 1)" into "Cape 31". Not a judgement: see RACE_SUFFIX."""
+    rows = cur.execute(
+        "SELECT class, COUNT(*) FROM race_entries WHERE class IS NOT NULL "
+        "GROUP BY class").fetchall()
+    moves = [(cl, RACE_SUFFIX.sub("", cl), n) for cl, n in rows if RACE_SUFFIX.search(cl)]
+    moves = [(a, b, n) for a, b, n in moves if b and b != a]
+    if not moves:
+        return 0
+    bases = {}
+    for _, b, n in moves:
+        bases[b] = bases.get(b, 0) + n
+    print(f"race numbers in class labels: {len(moves)} labels -> {len(bases)} classes, "
+          f"{sum(n for _, _, n in moves)} entries")
+    for b, n in sorted(bases.items(), key=lambda x: -x[1]):
+        print(f"    {b:24} +{n}")
+    if not dry_run:
+        for a, b, _ in moves:
+            cur.execute("UPDATE race_entries SET class = ? WHERE class = ?", (b, a))
+    return len(moves)
+
+
 def main():
     p = argparse.ArgumentParser()
     p.add_argument("db")
@@ -93,6 +123,8 @@ def main():
 
     conn = sqlite3.connect(args.db)
     cur = conn.cursor()
+    strip_race_number(cur, args.dry_run)
+    print()
 
     counts = {cl: n for cl, n in cur.execute(
         "SELECT class, COUNT(*) FROM race_entries WHERE class IS NOT NULL "
