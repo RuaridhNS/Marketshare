@@ -1,144 +1,134 @@
 #!/usr/bin/env python3
 """
-Merge duplicate/renamed boat records identified in the dashboard (e.g. a
-sail-number suffix typo like GBR9091R vs GBR9091, or a boat that changed
-name and got re-registered as a "new" boat) into a single canonical boat,
-without losing any history.
+Fold one boat record into another, or rescue entries filed onto the wrong boat.
 
-- race_entries and boat_sailmaker_history move from the merged-away boat
-  to the keeper. If both boats somehow have an entry for the exact same
-  race (a true duplicate row), the keeper's entry wins and the other is
-  dropped.
-- Scalar fields (owner, boat type, TCC) are backfilled onto the keeper
-  from the merged-away boat only where the keeper's value is missing.
-- Per-entry historical fields (sail_no_used, boat_name_used, owner_name_used
-  etc.) are untouched, so a boat's full name/owner history across a rename
-  stays visible on the merged race_entries rows even after the merge.
+Cape 31 sail numbers carry an X - GBR3113X, GBR314X, GBR3110X - and the Royal
+Southern June Regatta publishes them without it. Two different things then
+happen, and they need different treatment:
+
+  A PHANTOM. Nothing else owns the bare number, so a second boat record is
+  created. GBR3110 and GBR314R are JUBILEE and KATABATIC a second time, same
+  owner, same class. Fold the whole record in.
+
+  A COLLISION. Another boat already owns the bare number, so the entries land
+  on IT. GBR3113 is ECLIPSE, a 0.924-rated boat that raced IRC 4 in 2018; six
+  2026 entries for SWIFT HALF, a Cape 31, were filed onto it. Folding the whole
+  record would merge two genuinely different boats. Only the wrongly-filed
+  entries move, named by the boat name they were recorded under.
+
+That is what OnlyNamed is for: blank folds the whole record, a name moves just
+the entries recorded under it and leaves the rest where they are.
+
+Decisions live in data/boat_merges.csv. Run --dry-run first; it prints what
+each row would move before anything is written.
 
 Usage:
-  python3 merge_boats.py <db.sqlite> <merges.csv>
-
-CSV columns: KeepSailNo,MergeSailNo,Notes
+  python3 merge_boats.py <db.sqlite> [--file data/boat_merges.csv] [--dry-run]
 """
-import sys
 import csv
 import argparse
 import sqlite3
+import pathlib
 
-sys.path.insert(0, str(__import__("pathlib").Path(__file__).resolve().parent))
-from build_db import norm
-
-
-def parse_args():
-    p = argparse.ArgumentParser()
-    p.add_argument("db")
-    p.add_argument("csv_file")
-    return p.parse_args()
+# tables that point at a boat, and the columns that make a row unique there
+CARRIED = [("race_entries", "boat_id", ["race_id"]),
+           ("boat_owner_history", "boat_id", ["owner_id", "effective_from"]),
+           ("boat_sailmaker_history", "boat_id", ["sailmaker_id", "effective_from"]),
+           ("boat_name_history", "boat_id", ["name", "effective_from"]),
+           ("boat_sail_aliases", "boat_id", ["alias_sail_no"])]
 
 
-def merge_one(cur, keep_id, merge_id):
-    # Record the merged-away sail number as an alias of the keeper FIRST, so a
-    # later scrape that meets that number again resolves to the keeper instead
-    # of re-creating the boat. Without this every merge was undone by the next
-    # scrape - 20 of them had silently come back.
-    cur.execute("""CREATE TABLE IF NOT EXISTS boat_sail_aliases (
-                     alias_sail_no TEXT PRIMARY KEY,
-                     boat_id       INTEGER NOT NULL REFERENCES boats(id) ON DELETE CASCADE,
-                     created_at    TEXT NOT NULL DEFAULT (datetime('now')))""")
-    cur.execute("SELECT sail_no FROM boats WHERE id = ?", (merge_id,))
-    row = cur.fetchone()
-    if row and row[0]:
-        cur.execute("INSERT OR REPLACE INTO boat_sail_aliases (alias_sail_no, boat_id) VALUES (?, ?)",
-                    (row[0], keep_id))
-    # any aliases already pointing at the merged-away boat must follow it
-    cur.execute("UPDATE boat_sail_aliases SET boat_id = ? WHERE boat_id = ?", (keep_id, merge_id))
+def table_exists(cur, name):
+    return cur.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?",
+                       (name,)).fetchone() is not None
 
-    # race_entries: reassign, but drop the merged-away row if the keeper
-    # already has an entry for that race (true duplicate row).
-    cur.execute("SELECT race_id FROM race_entries WHERE boat_id = ?", (keep_id,))
-    keeper_races = {r[0] for r in cur.fetchall()}
-    cur.execute("SELECT id, race_id FROM race_entries WHERE boat_id = ?", (merge_id,))
-    for entry_id, race_id in cur.fetchall():
-        if race_id in keeper_races:
-            cur.execute("DELETE FROM race_entries WHERE id = ?", (entry_id,))
+
+def move_entries(cur, src, dst, only_named, dry):
+    """Move race entries, skipping any the destination already has for that race."""
+    rows = cur.execute(
+        "SELECT id, race_id FROM race_entries WHERE boat_id = ?" +
+        (" AND UPPER(boat_name_used) = UPPER(?)" if only_named else ""),
+        (src, only_named) if only_named else (src,)).fetchall()
+    moved = dropped = 0
+    for eid, race_id in rows:
+        clash = cur.execute("SELECT 1 FROM race_entries WHERE race_id = ? AND boat_id = ?",
+                            (race_id, dst)).fetchone()
+        if clash:
+            if not dry:
+                cur.execute("DELETE FROM race_entries WHERE id = ?", (eid,))
+            dropped += 1
         else:
-            cur.execute("UPDATE race_entries SET boat_id = ? WHERE id = ?", (keep_id, entry_id))
+            if not dry:
+                cur.execute("UPDATE race_entries SET boat_id = ? WHERE id = ?", (dst, eid))
+            moved += 1
+    return moved, dropped
 
-    cur.execute("UPDATE boat_sailmaker_history SET boat_id = ? WHERE boat_id = ?", (keep_id, merge_id))
-    # Ownership timeline must survive the merge too. Without this the
-    # merged-away boat's owner history died with it (ON DELETE CASCADE), losing
-    # exactly the previous-owner record a duplicate pair usually exists to
-    # document - the two records often ARE the same hull under two owners.
-    cur.execute("UPDATE boat_owner_history SET boat_id = ? WHERE boat_id = ?", (keep_id, merge_id))
 
-    # backfill scalar fields onto the keeper where missing
-    cur.execute("SELECT boat_name, boat_type, tcc, current_owner_id FROM boats WHERE id = ?", (keep_id,))
-    k_name, k_type, k_tcc, k_owner = cur.fetchone()
-    cur.execute("SELECT boat_type, tcc, current_owner_id FROM boats WHERE id = ?", (merge_id,))
-    m_type, m_tcc, m_owner = cur.fetchone()
-    cur.execute(
-        "UPDATE boats SET boat_type = COALESCE(?, boat_type), tcc = COALESCE(?, tcc), "
-        "current_owner_id = COALESCE(?, current_owner_id) WHERE id = ?",
-        (k_type or m_type, k_tcc if k_tcc is not None else m_tcc, k_owner or m_owner, keep_id))
+def fold(cur, keep_sail, fold_sail, only_named, dry):
+    k = cur.execute("SELECT id, boat_name FROM boats WHERE sail_no = ?", (keep_sail,)).fetchone()
+    f = cur.execute("SELECT id, boat_name FROM boats WHERE sail_no = ?", (fold_sail,)).fetchone()
+    if not k or not f or k[0] == f[0]:
+        print(f"  skip {fold_sail!r} -> {keep_sail!r}: not found or same record")
+        return 0
+    dst, src = k[0], f[0]
 
-    # boat_crm: backfill any field the keeper is missing
-    cur.execute("SELECT lead_rep, contacted_by, in_cs, tag, notes, boat_captain, programme_manager FROM boat_crm WHERE boat_id = ?", (keep_id,))
-    keep_crm = cur.fetchone()
-    cur.execute("SELECT lead_rep, contacted_by, in_cs, tag, notes, boat_captain, programme_manager FROM boat_crm WHERE boat_id = ?", (merge_id,))
-    merge_crm = cur.fetchone()
-    if merge_crm:
-        if keep_crm:
-            # 7 CRM fields now (boat_captain and programme_manager added);
-            # keep whatever the keeper already has, fall back to the other record
-            merged = [keep_crm[i] if keep_crm[i] not in (None, "") else merge_crm[i]
-                      for i in range(7)]
-            cur.execute(
-                "UPDATE boat_crm SET lead_rep=?, contacted_by=?, in_cs=?, tag=?, notes=?, "
-                "boat_captain=?, programme_manager=? WHERE boat_id=?",
-                (*merged, keep_id))
-        else:
-            cur.execute(
-                "INSERT INTO boat_crm (boat_id, lead_rep, contacted_by, in_cs, tag, notes, "
-                "boat_captain, programme_manager) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?)", (keep_id, *merge_crm))
+    moved, dropped = move_entries(cur, src, dst, only_named, dry)
+    note = f" (only entries named {only_named!r})" if only_named else ""
+    print(f"  {fold_sail} {f[1]!r} -> {keep_sail} {k[1]!r}{note}: "
+          f"{moved} entr{'y' if moved == 1 else 'ies'} moved, {dropped} already present")
 
-    cur.execute("DELETE FROM boats WHERE id = ?", (merge_id,))
+    if only_named:
+        left = cur.execute("SELECT COUNT(*) FROM race_entries WHERE boat_id = ?", (src,)).fetchone()[0]
+        print(f"    {fold_sail} keeps its own {left} entr{'y' if left == 1 else 'ies'}")
+        return 1
+
+    # whole-record fold: carry the history across, then drop the empty record
+    for table, col, keys in CARRIED[1:]:
+        if not table_exists(cur, table):
+            continue
+        if not dry:
+            cur.execute(f"UPDATE OR IGNORE {table} SET {col} = ? WHERE {col} = ?", (dst, src))
+            cur.execute(f"DELETE FROM {table} WHERE {col} = ?", (src,))
+    if not dry:
+        if table_exists(cur, "boat_crm"):
+            cur.execute("DELETE FROM boat_crm WHERE boat_id = ?", (src,))
+        # keep the fuller sail number findable
+        if table_exists(cur, "boat_sail_aliases"):
+            cur.execute("INSERT OR IGNORE INTO boat_sail_aliases (boat_id, alias_sail_no) VALUES (?,?)",
+                        (dst, fold_sail))
+        cur.execute("DELETE FROM boats WHERE id = ?", (src,))
+    print(f"    {fold_sail} record removed; its sail number kept as an alias of {keep_sail}")
+    return 1
 
 
 def main():
-    args = parse_args()
+    p = argparse.ArgumentParser()
+    p.add_argument("db")
+    p.add_argument("--file", default="data/boat_merges.csv")
+    p.add_argument("--dry-run", action="store_true")
+    args = p.parse_args()
+
+    path = pathlib.Path(args.file)
+    if not path.exists():
+        print(f"no decisions file at {path}")
+        return
     conn = sqlite3.connect(args.db)
-    conn.execute("PRAGMA foreign_keys = ON")
     cur = conn.cursor()
-
-    with open(args.csv_file, encoding="utf-8") as f:
-        lines = [l for l in f if not l.startswith("#")]
-    reader = csv.DictReader(lines)
-
-    merged = 0
-    skipped = []
-    for row in reader:
-        keep_sail_no = norm(row.get("KeepSailNo"))
-        merge_sail_no = norm(row.get("MergeSailNo"))
-        if not keep_sail_no or not merge_sail_no:
-            continue
-        cur.execute("SELECT id FROM boats WHERE sail_no = ?", (keep_sail_no,))
-        keep_row = cur.fetchone()
-        cur.execute("SELECT id FROM boats WHERE sail_no = ?", (merge_sail_no,))
-        merge_row = cur.fetchone()
-        if not keep_row or not merge_row:
-            skipped.append(f"{keep_sail_no} <- {merge_sail_no} (boat not found)")
-            continue
-        if keep_row[0] == merge_row[0]:
-            skipped.append(f"{keep_sail_no} <- {merge_sail_no} (same boat)")
-            continue
-        merge_one(cur, keep_row[0], merge_row[0])
-        merged += 1
-
-    conn.commit()
-    print(f"Merged {merged} boat pair(s).")
-    if skipped:
-        print("Skipped: " + "; ".join(skipped))
+    n = 0
+    with open(path, newline="", encoding="utf-8-sig") as fh:
+        for row in csv.DictReader(fh):
+            keep = (row.get("Keep") or "").strip()
+            fld = (row.get("Fold") or "").strip()
+            only = (row.get("OnlyNamed") or "").strip()
+            if keep and fld:
+                n += fold(cur, keep, fld, only, args.dry_run)
+    print(f"\n{n} record(s) processed")
+    if args.dry_run:
+        conn.rollback()
+        print("(dry run - nothing written)")
+    else:
+        conn.commit()
+        print("committed")
     conn.close()
 
 
