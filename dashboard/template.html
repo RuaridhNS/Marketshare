@@ -581,7 +581,8 @@ function updatePendingBadge() {
   }).length;
   // a merge is done once the merged-away boat is gone from the data
   const outstandingMerges = PENDING_MERGES.filter(m => boatsById[m.mergeId]).length;
-  const n = outstandingEdits + outstandingMerges;
+  const outstandingTimelines = Object.keys(OWNER_TIMELINES || {}).length;
+  const n = outstandingEdits + outstandingMerges + outstandingTimelines;
   const badge = document.getElementById('pending-badge');
   if (badge) { badge.style.display = n ? '' : 'none'; badge.textContent = n; }
   const dupBadge = document.getElementById('duplicates-badge');
@@ -607,6 +608,104 @@ function pendingEditsToCSV() {
     ].join(','));
   });
   return lines.join('\n') + '\n';
+}
+
+// ---------- pending ownership-timeline edits ----------
+// Ownership is inferred from whoever a results page printed in the owner
+// column, and results pages print whoever entered the boat - the manager, the
+// charterer, a co-skipper. 248 timelines show a one-season owner sandwiched
+// between the same owner either side, and no rule can tell which of those is a
+// typo, which is a stand-in and which is a real sale. Only a person can.
+//
+// So a timeline is edited as a WHOLE: the rows you leave behind are the
+// timeline. That is easier to reason about than a list of patches, and it is
+// what the apply script writes - the boat's history is replaced by exactly
+// what is here, marked as manual, which is true: a human said so.
+const OWNER_TL_KEY = 'marketshare_owner_timelines_v1';
+function loadOwnerTimelines() {
+  try { return JSON.parse(localStorage.getItem(OWNER_TL_KEY) || '{}'); }
+  catch (e) { return {}; }
+}
+let OWNER_TIMELINES = loadOwnerTimelines();
+function saveOwnerTimelines() {
+  localStorage.setItem(OWNER_TL_KEY, JSON.stringify(OWNER_TIMELINES));
+  updatePendingBadge();
+}
+function setOwnerTimeline(boatId, rows) {
+  if (!rows || !rows.length) delete OWNER_TIMELINES[boatId];
+  else OWNER_TIMELINES[boatId] = rows;
+  saveOwnerTimelines();
+}
+function clearOwnerTimeline(boatId) { delete OWNER_TIMELINES[boatId]; saveOwnerTimelines(); }
+function ownerTimelinesToCSV() {
+  const lines = ['SailNo,BoatName,Seq,OwnerName,FromYear,ToYear,Charter'];
+  Object.keys(OWNER_TIMELINES).forEach(boatId => {
+    const b = boatsById[boatId];
+    if (!b) return;
+    OWNER_TIMELINES[boatId].forEach((r, i) => {
+      lines.push([csvEsc(b.sail_no), csvEsc(b.boat_name), i + 1, csvEsc(r.owner),
+                  csvEsc(r.from || ''), csvEsc(r.to || ''),
+                  r.charter ? 'yes' : ''].join(','));
+    });
+  });
+  return lines.join('\n') + '\n';
+}
+
+// Everything a thorough look at one boat's ownership needs, in one block. The
+// dashboard is a static file and cannot ask anybody anything; what it CAN do
+// is assemble the question so that no digging is needed to answer it.
+function boatResearchPrompt(b) {
+  const seasons = {};
+  b.entries.forEach(e => {
+    const ra = racesById[e.race_id]; if (!ra) return;
+    const ev = eventsById[ra.event_id]; if (!ev) return;
+    const rg = regattasById[ev.regatta_id] || {};
+    const y = ev.season_year || '?';
+    const key = [y, rg.name || '?', e.owner_name_used || '', e.skipper_name_used || '',
+                 e.boat_name_used || '', e.tcc || ''].join('|');
+    seasons[key] = (seasons[key] || 0) + 1;
+  });
+  const rows = Object.keys(seasons).sort().map(k => {
+    const [y, rg, own, skip, nm, tcc] = k.split('|');
+    return `  ${y}  ${rg}  entered as "${nm}"` +
+           (own ? `, owner printed "${own}"` : '') +
+           (skip && skip !== own ? `, skipper "${skip}"` : '') +
+           (tcc ? `, TCC ${tcc}` : '') + `  (${seasons[k]} entries)`;
+  });
+  const tl = (b.owner_history || []).slice().sort((x, y) =>
+      String(x.effective_from || '').localeCompare(String(y.effective_from || '')))
+    .map(h => `  ${h.effective_from || '?'} - ${h.effective_to || 'present'}  ${h.owner_name || '?'}` +
+              (h.is_charter ? '  [recorded as a charter]' : '') +
+              (h.confidence ? `  (${h.confidence})` : ''));
+  return [
+    `Please work out the ownership history of this boat and give me a corrected timeline.`,
+    ``,
+    `BOAT`,
+    `  Name: ${b.boat_name || '?'}`,
+    `  Sail number: ${b.sail_no || '?'}`,
+    `  Type: ${b.boat_type || 'unknown'}${b.tcc ? `, TCC ${b.tcc}` : ''}`,
+    `  Currently recorded owner: ${b.owner_name || 'none'}`,
+    ``,
+    `TIMELINE WE HOLD (inferred from results pages, so it may be wrong)`,
+    ...(tl.length ? tl : ['  none']),
+    ``,
+    `WHAT THE RESULTS ACTUALLY PRINTED, season by season`,
+    ...(rows.length ? rows : ['  no entries on file']),
+    ``,
+    `WHY THIS IS UNRELIABLE`,
+    `  Ownership here is inferred from whoever a results page printed in its owner`,
+    `  column. Those pages print whoever entered the boat, which is often the boat`,
+    `  captain, the programme manager, a charter operator or a co-skipper rather`,
+    `  than the owner. A one-season name sitting between the same owner either`,
+    `  side is usually one of those, or a spelling variant, not a sale.`,
+    ``,
+    `WHAT I NEED BACK`,
+    `  A timeline of real OWNERS with year ranges, and for each row say whether it`,
+    `  is an owner, a charter/corporate entry, or the same person under a different`,
+    `  spelling. Flag anything you are unsure of rather than guessing. Give it as`,
+    `  CSV with these columns so it can be loaded straight back:`,
+    `  SailNo,BoatName,Seq,OwnerName,FromYear,ToYear,Charter`,
+  ].join('\n');
 }
 
 // ---------- pending boat merges (duplicate / rename cleanup) ----------
@@ -833,7 +932,8 @@ function navigate() {
   try {
     if (!route || route === 'overview') main.innerHTML = renderOverview();
     else if (route === 'boats') main.innerHTML = renderBoatsList();
-    else if (route === 'boat') main.innerHTML = renderBoatProfile(parseInt(arg));
+    else if (route === 'boat') { main.innerHTML = renderBoatProfile(parseInt(arg));
+                                attachOwnerTimelineHandlers(); }
     else if (route === 'regattas') main.innerHTML = renderRegattasList();
     else if (route === 'regatta') main.innerHTML = renderRegattaProfile(parseInt(arg), qYear, qCls);
     else if (route === 'race') main.innerHTML = renderRacePage(parseInt(arg));
@@ -1007,6 +1107,113 @@ const BOAT_SORTS = {
 };
 let BOAT_SORT = 'attendance';
 
+
+// The timeline is edited whole: what you leave behind IS the timeline. A list
+// of patches would be harder to read back and much harder to be sure about.
+function attachOwnerTimelineHandlers() {
+  const card = document.getElementById('owner-tl-card');
+  if (!card) return;
+  const b = boatsById[card.dataset.boatId];
+  if (!b) return;
+  const view = document.getElementById('owner-tl-view');
+  const box = document.getElementById('owner-tl-editor');
+  const note = document.getElementById('owner-tl-note');
+
+  const startRows = () => {
+    const staged = OWNER_TIMELINES[b.id];
+    if (staged) return staged.map(r => ({ ...r }));
+    return (b.owner_history || []).slice()
+      .sort((x, y) => String(x.effective_from || '').localeCompare(String(y.effective_from || '')))
+      .map(h => ({ owner: h.owner_name || '', from: h.effective_from || '',
+                   to: h.effective_to || '', charter: !!h.is_charter }));
+  };
+  let rows = startRows();
+
+  const draw = () => {
+    box.innerHTML = `
+      <table style="width:100%;">
+        <thead><tr><th>Owner</th><th style="width:90px;">From</th><th style="width:90px;">To</th>
+          <th style="width:80px;">Charter</th><th style="width:40px;"></th></tr></thead>
+        <tbody>${rows.map((r, i) => `
+          <tr>
+            <td><input type="text" class="tl-owner" data-i="${i}" value="${esc(r.owner || '')}"
+                  placeholder="Owner name" style="width:100%;" list="tl-owners"></td>
+            <td><input type="text" class="tl-from" data-i="${i}" value="${esc(r.from || '')}"
+                  placeholder="year" style="width:100%;"></td>
+            <td><input type="text" class="tl-to" data-i="${i}" value="${esc(r.to || '')}"
+                  placeholder="present" style="width:100%;"></td>
+            <td style="text-align:center;"><input type="checkbox" class="tl-charter" data-i="${i}"
+                  ${r.charter ? 'checked' : ''} title="Entered under a charter or corporate name, not an ownership change"></td>
+            <td><button class="btn secondary tl-del" data-i="${i}" type="button"
+                  style="padding:2px 8px;" title="Remove this period">&times;</button></td>
+          </tr>`).join('') || '<tr><td colspan="5" class="muted">No periods. Add one below.</td></tr>'}
+        </tbody>
+      </table>
+      <datalist id="tl-owners">${
+        Array.from(new Set(DATA.boats.map(x => x.owner_name).filter(Boolean)))
+          .sort().slice(0, 900).map(n => `<option value="${esc(n)}">`).join('')}</datalist>
+      <p class="muted" style="font-size:12px;margin:8px 0;">Leave <strong>To</strong> empty for the
+        current owner. Tick <strong>Charter</strong> where a name is a charter or corporate entry
+        rather than a change of ownership &mdash; it stays on the timeline but never counts as the owner.</p>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="btn secondary" type="button" id="tl-add">Add a period</button>
+        <button class="btn" type="button" id="tl-save">Save timeline</button>
+        <button class="btn secondary" type="button" id="tl-cancel">Cancel</button>
+        ${OWNER_TIMELINES[b.id] ? '<button class="btn secondary" type="button" id="tl-revert">Discard my correction</button>' : ''}
+      </div>`;
+
+    box.querySelectorAll('.tl-owner').forEach(el => el.addEventListener('input',
+      () => { rows[el.dataset.i].owner = el.value; }));
+    box.querySelectorAll('.tl-from').forEach(el => el.addEventListener('input',
+      () => { rows[el.dataset.i].from = el.value.trim(); }));
+    box.querySelectorAll('.tl-to').forEach(el => el.addEventListener('input',
+      () => { rows[el.dataset.i].to = el.value.trim(); }));
+    box.querySelectorAll('.tl-charter').forEach(el => el.addEventListener('change',
+      () => { rows[el.dataset.i].charter = el.checked; }));
+    box.querySelectorAll('.tl-del').forEach(el => el.addEventListener('click',
+      () => { rows.splice(parseInt(el.dataset.i, 10), 1); draw(); }));
+    document.getElementById('tl-add').addEventListener('click', () => {
+      rows.push({ owner: '', from: '', to: '', charter: false }); draw();
+      const last = box.querySelectorAll('.tl-owner');
+      if (last.length) last[last.length - 1].focus();
+    });
+    document.getElementById('tl-cancel').addEventListener('click', () => {
+      rows = startRows(); box.hidden = true; view.hidden = false; note.textContent = '';
+    });
+    const rev = document.getElementById('tl-revert');
+    if (rev) rev.addEventListener('click', () => { clearOwnerTimeline(b.id); navigate(); });
+    document.getElementById('tl-save').addEventListener('click', () => {
+      const clean = rows.filter(r => (r.owner || '').trim());
+      // a timeline with two current owners is the one mistake worth catching here
+      const open = clean.filter(r => !r.to && !r.charter);
+      if (open.length > 1) {
+        note.textContent = 'Two periods are both open-ended, so the boat would have two current ' +
+          'owners. Give the earlier one a To year.';
+        return;
+      }
+      setOwnerTimeline(b.id, clean);
+      navigate();
+    });
+  };
+
+  document.getElementById('owner-tl-edit').addEventListener('click', () => {
+    rows = startRows();
+    if (box.hidden) { draw(); box.hidden = false; view.hidden = true; }
+    else { box.hidden = true; view.hidden = false; }
+  });
+
+  const rb = document.getElementById('owner-tl-research');
+  if (rb) rb.addEventListener('click', async () => {
+    const text = boatResearchPrompt(b);
+    try {
+      await navigator.clipboard.writeText(text);
+      note.textContent = 'Question copied. Paste it to Claude; it comes back as CSV you can ' +
+        'load with apply_owner_timeline.py, or type the answer in here with Edit.';
+    } catch (e) {
+      note.textContent = 'Could not reach the clipboard.';
+    }
+  });
+}
 
 function attachBoatFilterHandlers() {
   const search = document.getElementById('boat-search');
@@ -1566,11 +1773,23 @@ function renderBoatProfile(id) {
       <table><thead><tr><th>Sailmaker</th><th>Source</th><th>Confidence</th></tr></thead><tbody>${smHistoryRows}</tbody></table>
     </div>
     ${nameTimeline}
-    <div class="card">
-      <h2>Ownership timeline</h2>
-      <p class="muted" style="font-size:12px;margin-top:0;">Derived from who this boat was entered under, season by season —
-        including any records merged into it, so a previous owner survives the merge.</p>
-      ${ownerTimeline}
+    <div class="card" id="owner-tl-card" data-boat-id="${b.id}">
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+        <h2 style="margin:0;">Ownership timeline</h2>
+        <span style="margin-left:auto;display:flex;gap:8px;">
+          <button class="btn secondary" type="button" id="owner-tl-edit">Edit</button>
+          <button class="btn secondary" type="button" id="owner-tl-research"
+            title="Copies everything known about this boat's ownership as a question you can paste to Claude">Research this boat</button>
+        </span>
+      </div>
+      <p class="muted" style="font-size:12px;margin-top:6px;">Derived from who this boat was entered under, season by season &mdash;
+        including any records merged into it, so a previous owner survives the merge.
+        Results pages print whoever <em>entered</em> the boat, so this is a guess until someone checks it.</p>
+      ${OWNER_TIMELINES[b.id] ? `<p class="callout-warn" style="margin:0 0 10px;"><strong>You have an unsaved correction to this timeline.</strong>
+        It is held in this browser &mdash; see <a href="#/changes" data-route="#/changes">Pending changes</a> to export and apply it.</p>` : ''}
+      <div id="owner-tl-view">${ownerTimeline}</div>
+      <div id="owner-tl-editor" hidden></div>
+      <p class="muted" id="owner-tl-note" style="font-size:12px;margin:8px 0 0;"></p>
     </div>
     <div class="card" style="padding:0;overflow:auto;">
       <h2 style="padding:18px 20px 0;">Regatta entries (${regattaEntries.length})</h2>
@@ -1692,10 +1911,47 @@ function renderPendingChanges() {
   }).join('');
   const mergesCsv = pendingMergesToCSV();
 
+  const tlIds = Object.keys(OWNER_TIMELINES);
+  const tlCsv = ownerTimelinesToCSV();
+  const tlRows = tlIds.map(id => {
+    const b = boatsById[id];
+    if (!b) return '';
+    const rows = OWNER_TIMELINES[id];
+    return `<tr>
+      <td><a href="#/boat/${b.id}" data-route="#/boat/${b.id}">${esc(b.boat_name||b.sail_no)}</a>
+          <span class="muted">(${esc(b.sail_no||'')})</span></td>
+      <td style="font-size:13px;">${rows.map(r =>
+        `${esc(r.owner)} <span class="muted">${esc(r.from||'?')}&ndash;${esc(r.to||'present')}` +
+        `${r.charter ? ' · charter' : ''}</span>`).join('<br>')}</td>
+      <td><button class="btn secondary" type="button" data-discard-tl="${b.id}">Discard</button></td>
+    </tr>`;
+  }).join('');
+
+  const tlSection = tlIds.length ? `
+    <div class="card">
+      <h2>Ownership timelines (${tlIds.length})</h2>
+      <p class="muted" style="font-size:12px;margin-top:0;">Corrections to who owned a boat and when.
+        Applying one <strong>replaces</strong> that boat's ownership history with exactly these rows,
+        marked as manual &mdash; which is the point: a person decided, and that outranks a name
+        scraped off a results page.</p>
+      <table><thead><tr><th>Boat</th><th>Corrected timeline</th><th></th></tr></thead>
+        <tbody>${tlRows}</tbody></table>
+      <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;">
+        <button class="btn" type="button" id="copy-tl-csv-btn">Copy CSV to clipboard</button>
+        <button class="btn secondary" type="button" id="download-tl-csv-btn">Download CSV</button>
+      </div>
+      <textarea id="tl-csv-box" readonly rows="4"
+        style="width:100%;margin-top:10px;font-family:monospace;font-size:12px;">${esc(tlCsv)}</textarea>
+      <p class="muted" style="font-size:12px;">Apply with
+        <code>python3 scripts/apply_owner_timeline.py db/marketshare.db timelines.csv</code></p>
+    </div>` : '';
+
   return `
     <h1>Pending changes</h1>
     <p class="subtitle">${ids.length - appliedIds.length} edit(s) still to apply${appliedIds.length ? `, ${appliedIds.length} already in the database` : ''},
-      ${PENDING_MERGES.length} pending merge(s). Edits are held in this browser until applied.</p>
+      ${PENDING_MERGES.length} pending merge(s)${Object.keys(OWNER_TIMELINES).length ?
+        `, ${Object.keys(OWNER_TIMELINES).length} ownership timeline correction(s)` : ''}.
+      Edits are held in this browser until applied.</p>
     ${appliedIds.length ? `<div class="card" style="border-left:3px solid var(--series-quantum);">
       <p style="margin:0 0 8px;"><strong>${appliedIds.length} of these ${ids.length} edit(s) are already in the database.</strong>
         They were exported and applied, but the export cannot tell this browser that, so they stayed on the list.</p>
@@ -1743,6 +1999,7 @@ function renderPendingChanges() {
       </div>
       <textarea class="csv-box" id="merges-csv-box" readonly>${esc(mergesCsv)}</textarea>
     </div>` : ''}
+    ${tlSection}
   `;
 }
 
@@ -1763,6 +2020,10 @@ function attachPendingChangesHandlers() {
   });
   wireCsvExportButtons('copy-csv-btn', 'download-csv-btn', 'csv-box', 'changes.csv', pendingEditsToCSV);
   wireCsvExportButtons('copy-merges-csv-btn', 'download-merges-csv-btn', 'merges-csv-box', 'merges.csv', pendingMergesToCSV);
+  wireCsvExportButtons('copy-tl-csv-btn', 'download-tl-csv-btn', 'tl-csv-box', 'timelines.csv', ownerTimelinesToCSV);
+  document.querySelectorAll('[data-discard-tl]').forEach(btn => btn.addEventListener('click', () => {
+    clearOwnerTimeline(btn.dataset.discardTl); navigate();
+  }));
   const clearAllBtn = document.getElementById('clear-all-btn');
   if (clearAllBtn) clearAllBtn.addEventListener('click', () => {
     if (confirm('Discard all pending edits? This cannot be undone.')) { clearAllPendingEdits(); navigate(); }
