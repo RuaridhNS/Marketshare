@@ -2244,13 +2244,23 @@ function renderRegattasList() {
   // empty when it actually covers 5,270 reported entries. The two measures are
   // kept apart on purpose (see regattaSummary): one is boats we can name, the
   // other is a number we were told.
-  const reportedByEvent = {};
+  // A "Total" row is a total OF the class rows beside it, not another class.
+  // Summing everything counted every entry twice: Round the Island 2025 read
+  // 532 where the real figure is 266, and 54 event-seasons across 11 regattas
+  // were doubled the same way. Where a Total exists it is authoritative;
+  // otherwise the classes are added up.
+  const reportedByEvent = {}, totalByEvent = {};
   DATA.class_counts.forEach(cc => {
-    reportedByEvent[cc.event_id] = (reportedByEvent[cc.event_id] || 0) + (cc.entry_count || 0);
+    const lab = String(cc.class_label || '').trim().toLowerCase();
+    if (lab === 'total' || lab === 'overall' || lab === 'all') {
+      totalByEvent[cc.event_id] = (totalByEvent[cc.event_id] || 0) + (cc.entry_count || 0);
+    } else {
+      reportedByEvent[cc.event_id] = (reportedByEvent[cc.event_id] || 0) + (cc.entry_count || 0);
+    }
   });
   const trendByRegYear = {};
   DATA.entry_trends.forEach(t => { trendByRegYear[t.regatta_id + ':' + t.season_year] = t.total; });
-  const reportedFor = ev => reportedByEvent[ev.id]
+  const reportedFor = ev => totalByEvent[ev.id] || reportedByEvent[ev.id]
     || trendByRegYear[ev.regatta_id + ':' + ev.season_year] || 0;
   // Which seasons of each regatta we hold NAMED boats for, and which we hold
   // only a reported total for. coverageNote() turns that pair into the reason
@@ -3183,13 +3193,19 @@ function attachEnrichHandlers() {
 // that something is missing. Keyed by a test on the regatta name.
 const COVERAGE_NOTES = [
   [/^Rolex Fastnet|^RORC |^IRC |^NSR |Easter Challenge|Inshore Series|Two-Handed|Myth of Malham|Cervantes|North Sea|Roschier|Caribbean|Transatlantic/i,
-   'blocked', 'RORC results moved to sailracehq.com, which disallows our crawler. Legacy archive covers 2007–2022 only. Needs RORC permission or an export.'],
+   'blocked', 'RORC results moved to sailracehq.com, which disallows our crawler, so the legacy '
+   + 'archive stops at 2022. Easter Challenge 2023–2026, the Vice Admiral\'s Cup 2023–2024, '
+   + 'Cervantes 2023–2025 and the 2026 Double Handed Nationals were since read through a browser '
+   + 'and are complete. sailracehq only publishes back to 2023, so earlier seasons need RORC directly.'],
   [/^JOG/i, 'blocked',
    'myjog.jog.org.uk disallows our crawler (Cloudflare managed AI list). Needs JOG to allow it, or a member-side export.'],
   [/^ORC /i, 'manual',
    'ORC championships, aggregate counts only from the IRC Solent Report. Boat-level would need the event sites season by season.'],
-  [/^Round the Island/i, 'todo',
-   'Aggregate counts only. Results are published — no scraper written yet. Biggest unmined fleet in the Solent.'],
+  [/^Round the Island/i, 'blocked',
+   'Aggregate counts only, and still the biggest single gap: 2,635 reported entries, no named boats. '
+   + 'Results ARE published, at racing.islandsc.org.uk — the same platform RORC uses, so the same '
+   + 'extraction works. That site\'s robots.txt disallows our crawler outright, so it needs the '
+   + 'browser route rather than a scraper.'],
   [/^Cowes Week/i, 'auto', 'Scraped weekly. 2017 lost ~80 of 348 fetches to a DNS drop and is worth a re-run.'],
   [/^Royal Southern|^Taittinger|^Hamble|^Warsash/i, 'auto', 'Scraped weekly.'],
 ];
