@@ -1569,8 +1569,17 @@ function renderBoatProfile(id) {
   // rather than that record's owner being lost - which is usually the whole
   // point of the pair: the same hull under two owners.
   const ownerTimeline = (() => {
-    const hs = (b.owner_history || []).slice().sort((a, c) =>
-      String(c.effective_from || '').localeCompare(String(a.effective_from || '')));
+    // Show the CORRECTION if one is staged. Saving an edit used to leave this
+    // view rendering the database, so the "current owner" tag stayed on the
+    // name you had just demoted to charterer and the edit looked ignored.
+    const staged = OWNER_TIMELINES[b.id];
+    const hs = staged
+      ? staged.map(r => ({ owner_name: r.owner, effective_from: r.from,
+                           effective_to: r.to, is_charter: r.charter,
+                           confidence: 'your correction, not yet applied' }))
+          .sort((a, c) => String(c.effective_from || '').localeCompare(String(a.effective_from || '')))
+      : (b.owner_history || []).slice().sort((a, c) =>
+          String(c.effective_from || '').localeCompare(String(a.effective_from || '')));
     if (!hs.length) return '<p class="muted" style="margin:0;">No owner history recorded.</p>';
     return `<ol style="list-style:none;padding:0;margin:0;border-left:2px solid var(--border);">` +
       hs.map(h => {

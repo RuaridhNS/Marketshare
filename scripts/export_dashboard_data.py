@@ -246,7 +246,7 @@ def main():
     """).fetchall()
 
     owner_history_rows = cur.execute("""
-        SELECT boat_id, owner_id, effective_from, effective_to, source, confidence
+        SELECT boat_id, owner_id, effective_from, effective_to, source, confidence, is_charter
         FROM boat_owner_history ORDER BY boat_id, id
     """).fetchall()
 
@@ -289,8 +289,15 @@ def main():
     for r in owner_history_rows:
         d = dict(r)
         d["owner_name"] = owner_by_id.get(d["owner_id"], {}).get("name") if d["owner_id"] else None
-        # a charter operator entering the boat is not a change of ownership
-        d["is_charter"] = bool(owner_by_id.get(d["owner_id"], {}).get("is_charter_operator")) or None
+        # Two ways a name on the timeline is not an owner. Some owners ARE
+        # charter companies, which the owners table knows. But a person can
+        # charter one boat for one season without being a charter operator -
+        # Jock Wishart chartering SUNRISE is not the same fact about Jock as it
+        # is about Sunsail - so the period carries its own flag, and either is
+        # enough.
+        d["is_charter"] = (bool(d.pop("is_charter", 0))
+                           or bool(owner_by_id.get(d["owner_id"], {}).get("is_charter_operator"))
+                           or None)
         ownerhist_by_boat.setdefault(d["boat_id"], []).append(d)
 
     boats = []
