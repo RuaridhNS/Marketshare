@@ -91,6 +91,59 @@ def name_clash(cur, dst, src):
             for y in sorted(set(a) & set(b)) if not (a[y] & b[y])]
 
 
+def rederive_identity(cur, bid, sail, dry):
+    """Give a partially-merged record back its own identity.
+
+    A partial move takes the entries that belonged to the other boat and leaves
+    the rest - but the boats row keeps whatever name, type and rating it had,
+    and after a collision that is the DEPARTED boat's. GBR7017R sat as
+    VENOMOUS, a Carroll Marine 60 rating 1.333, while all twelve entries it
+    still held were BLACK PEARL, a Botin 56 rating 1.46. GBR918R was JARHEAD
+    holding four OLWYN entries. GBR3113 was SWIFT HALF, a Cape 31, holding
+    four ECLIPSE entries rated 0.924.
+
+    That state is worse than cosmetic. The record cannot be found by its real
+    name, a loader matching on name will not resolve to it - and the duplicate
+    detector reads exactly these two fields, so a record left wearing the other
+    boat's name and type is what gets proposed for the same bad merge next
+    time. The fix for a bad merge has to clean up after itself or it feeds one.
+
+    Fires only when the stored name appears in NONE of the remaining entries,
+    which is the same test as the audit that found these three. A spelling
+    variant (WATERMARK II holding WATERMARK 2) or a real rename is left alone -
+    those need a human call about which name is current, and this is not it.
+    """
+    row = cur.execute("SELECT boat_name, boat_type, tcc FROM boats WHERE id = ?", (bid,)).fetchone()
+    if not row:
+        return
+    name, btype, tcc = row
+    if not name:
+        return
+    left = cur.execute(
+        "SELECT UPPER(IFNULL(re.boat_name_used,'')), IFNULL(re.boat_type_used,''), re.tcc "
+        "FROM race_entries re JOIN races ra ON ra.id = re.race_id "
+        "JOIN events e ON e.id = ra.event_id WHERE re.boat_id = ? "
+        "ORDER BY IFNULL(e.season_year, 0) DESC", (bid,)).fetchall()
+    if not left or any(n == name.upper() for n, _, _ in left):
+        return
+
+    new_name = next((n for n, _, _ in left if n), None)
+    if not new_name:
+        return
+    # Most recent non-empty wins for type and rating. Where nothing remaining
+    # records a type, NULL is the honest answer and not the old one: keeping
+    # "Cape 31" on the boat that is not a Cape 31 is precisely what would let
+    # the detector pair it with the real one again.
+    new_type = next((t for _, t, _ in left if t), None)
+    new_tcc = next((c for _, _, c in left if c), None)
+    if not dry:
+        cur.execute("UPDATE boats SET boat_name = ?, boat_type = ?, tcc = ? WHERE id = ?",
+                    (new_name, new_type, new_tcc, bid))
+    print(f"    {sail} re-identified: {name!r} [{btype or '?'}] tcc={tcc} "
+          f"-> {new_name!r} [{new_type or '?'}] tcc={new_tcc}"
+          f"{' (dry run)' if dry else ''}")
+
+
 def fold(cur, keep_sail, fold_sail, only_named, dry, force=False):
     k = cur.execute("SELECT id, boat_name FROM boats WHERE sail_no = ?", (keep_sail,)).fetchone()
     f = cur.execute("SELECT id, boat_name FROM boats WHERE sail_no = ?", (fold_sail,)).fetchone()
@@ -116,7 +169,18 @@ def fold(cur, keep_sail, fold_sail, only_named, dry, force=False):
 
     if only_named:
         left = cur.execute("SELECT COUNT(*) FROM race_entries WHERE boat_id = ?", (src,)).fetchone()[0]
+        # A dry run has written nothing, so the stored count is still the
+        # pre-move total - it reported GBR918R keeping all 17 of its entries
+        # when 13 were about to leave. "What stays behind" is the whole point of
+        # checking a partial move before committing it, so take the moved and
+        # dropped rows off by hand.
+        if dry:
+            left -= moved + dropped
         print(f"    {fold_sail} keeps its own {left} entr{'y' if left == 1 else 'ies'}")
+        # Runs whether or not anything moved this time, so re-running the
+        # ledger repairs a record left mis-identified by an earlier partial
+        # merge instead of only catching the ones being applied today.
+        rederive_identity(cur, src, fold_sail, dry)
         return 1
 
     # whole-record fold: carry the history across, then drop the empty record
