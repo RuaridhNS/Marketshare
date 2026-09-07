@@ -10,11 +10,16 @@
 # 105 races in and would have re-done all 105). With it, re-running this script
 # is how you finish an interrupted season, so it is safe to run repeatedly.
 #
-# Seasons deliberately absent from the list: 2015, 2018 and 2020 publish no
-# results at all - discover_races returns zero races for each. 2020 is the
-# cancelled season; 2015 and 2018 are simply missing from the site, so their
-# gap in the database is the source's, not ours, and re-running them forever
-# would never fill it.
+# Seasons deliberately absent from the list: 2007, 2008, 2009, 2015, 2018 and
+# 2020. Their DAILY results pages return zero rows, which is all this scraper
+# reads - so running them here only spends an hour fetching empty pages, as one
+# run of this script proved.
+#
+# Only 2020 is genuinely empty (the cancelled season). The other five publish
+# overall series standings instead, on page=points<year>, and that is real
+# boat-level data nobody has loaded: about 240 class-seasons. It needs its own
+# loader, not this one - the tables carry no sail numbers. See the Cowes Week
+# section of README_scraping.md.
 PY="/c/Users/ruari/AppData/Local/Python/bin/python.exe"
 DB="db/marketshare.db"
 YEARS=("$@")

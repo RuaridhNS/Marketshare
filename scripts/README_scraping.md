@@ -86,3 +86,43 @@ several hundred individual race pages. `exports/rorc_2021_castlerock_ircoverall.
 is the one proof-of-concept race loaded so far (32 boats, real data) —
 extending this to the full archive is mechanical repetition of steps 1-3
 and is the natural next piece of work, best done a season at a time.
+
+## Cowes Week: five seasons are behind a different page (found 2026-09-07)
+
+`scrape_cowes_week.py` reads the DAILY results page (`page=results<year>`,
+`dayrequest`/`classrequest`). Five seasons publish nothing there, which for a
+while looked like the site simply not holding them:
+
+    2007  2008  2009  2015  2018   - daily results return zero rows
+    2020                           - genuinely nothing; the cancelled season
+
+They are not missing. Those seasons publish OVERALL SERIES STANDINGS instead,
+on the page the daily view links to as "View Overall Results":
+
+    main_c.php?section=racing&page=points<year>&resultrequest=<seriesId>
+
+`page=points<year>` with no `resultrequest` returns the series picker - a
+`<select name="resultrequest">` whose options are the class list with numeric
+ids. Class-level series available per season:
+
+    2007: 49    2008: 43    2009: 44    2015: 51    2018: 55
+
+That is roughly 240 class-seasons of boat-level data for five seasons that
+currently hold none, and for market share it is arguably the better shape:
+one row per boat per class, no per-race repetition to collapse afterwards.
+
+Two things to get right when loading it:
+
+  - **Skip "Black Group Overall" and "White Group Overall".** They are
+    re-cuts of the same boats across the class series, exactly like the
+    Double Handed and Line Honours views on Round the Island. Loading them
+    alongside the class series enters every boat twice and inflates share.
+
+  - **There are no sail numbers.** The table gives Pos, Boat Name and points
+    per day. 2015 and 2018 append the owner to the name cell
+    ("ANTILOPE (Willem Wester)", "FARGO Bertie Bicket"); 2007-2009 give the
+    name alone. Since boats are keyed on sail number, these rows have to
+    resolve by name - which is the same matching that produced the collisions
+    in `data/boat_merges.csv`. Resolve on name plus class plus season, treat
+    anything ambiguous as a new record rather than guessing at an existing
+    one, and expect to adjudicate a list afterwards.
