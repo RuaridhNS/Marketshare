@@ -221,26 +221,54 @@ def parse_event_page(slug):
     }
 
 
+# Sailwave lets each event pick its own column captions, so the same field is
+# not spelled the same way twice. "Sail Number" on most pages is "Sail Num" on
+# the 2024 July Regatta, and reading only the first spelling dropped every row
+# of all 36 of its races - silently, because a race that yields no rows just
+# gets skipped. 36 races of real results looked like an empty page for a year.
+COLUMN_ALIASES = {
+    "sail":     ["sail number", "sail num", "sail no", "sailno", "sail_no", "sail"],
+    "mna":      ["boat mna", "mna"],
+    "boat":     ["boat name", "boat", "yacht name", "yacht"],
+    "type":     ["boat type", "type", "design", "class type"],
+    "owner":    ["owner", "owner/helm", "owner name"],
+    "rank":     ["rank", "place", "pos", "position"],
+    "points":   ["points", "nett", "total"],
+    "finish":   ["finish", "finish time"],
+    "elapsed":  ["elapsed", "elapsed time"],
+    "corrected": ["corrected", "corrected time"],
+    "tcc":      ["irc tcc", "tcc", "rating", "irc"],
+    "comments": ["comments", "code", "notes"],
+}
+
+
+def pick(row, field):
+    for name in COLUMN_ALIASES[field]:
+        v = row.get(name)
+        if v not in (None, ""):
+            return v
+    return ""
+
+
 def race_to_csv_rows(race):
     out = []
     for row in race["rows"]:
-        sail_no = norm_sailno(row.get("sail number"), row.get("boat mna"))
+        sail_no = norm_sailno(pick(row, "sail"), pick(row, "mna"))
         if not sail_no:
             continue
-        comments = row.get("comments") or row.get("code") or ""
         out.append({
-            "Position": row.get("rank", ""),
-            "Points": row.get("points", ""),
+            "Position": pick(row, "rank"),
+            "Points": pick(row, "points"),
             "SailNo": sail_no,
-            "Boat": row.get("boat name") or row.get("boat", ""),
-            "BoatType": row.get("boat type", ""),
-            "Owner": row.get("owner", ""),
+            "Boat": pick(row, "boat"),
+            "BoatType": pick(row, "type"),
+            "Owner": pick(row, "owner"),
             "SailedBy": "",
-            "FinishTime": row.get("finish", ""),
-            "Elapsed": row.get("elapsed", ""),
-            "Handicap": row.get("irc tcc", ""),
-            "Corrected": row.get("corrected", ""),
-            "Comments": comments,
+            "FinishTime": pick(row, "finish"),
+            "Elapsed": pick(row, "elapsed"),
+            "Handicap": pick(row, "tcc"),
+            "Corrected": pick(row, "corrected"),
+            "Comments": pick(row, "comments"),
         })
     return out
 
@@ -321,6 +349,12 @@ def main():
         for race in event["races"]:
             rows = race_to_csv_rows(race)
             if not rows:
+                # Saying which captions the page used turns "nothing happened"
+                # into a fixable report - this is exactly how the July 2024
+                # Regatta went missing without a single line of output.
+                seen = sorted((race["rows"] or [{}])[0].keys())
+                print(f"  {race['label']!r} - {len(race['rows'])} table row(s) but none "
+                      f"usable; columns were: {', '.join(seen) or '(none)'}")
                 continue
             race_name = f"{event['event_name']} - {race['label']}"
             safe_label = re.sub(r"[^\w\- ]", "_", race["label"])

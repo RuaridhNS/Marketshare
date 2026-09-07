@@ -154,6 +154,20 @@ def get_or_create_event(cur, regatta_id, season_year, notes=None, source_url=Non
     return cur.lastrowid
 
 
+# Kept in step with normalise_classes.RACE_SUFFIX. Duplicated rather than
+# imported because build_db is the bottom of the import graph and importing
+# upward from it would make a cycle; the pattern is two lines and changes
+# roughly never.
+_RACE_SUFFIX = re.compile(r"\s*\((?:race|mini-?series|r)\s*\d+\)\s*$", re.I)
+
+
+def canonical_class(label):
+    """The form a class label settles on once normalise_classes.py has run."""
+    if not label:
+        return None
+    return _RACE_SUFFIX.sub("", str(label).strip()).strip() or None
+
+
 def create_race(cur, event_id, race_name, race_number=None, status=None, class_label=None,
                 race_date=None):
     """Get-or-create, keyed on (event, race name, class).
@@ -169,15 +183,25 @@ def create_race(cur, event_id, race_name, race_number=None, status=None, class_l
     race_entries rather than races, so an existing race is matched by looking
     at the class its entries already carry; a race with no entries yet is
     treated as a match so an interrupted load can be resumed.
+
+    The comparison is on the CANONICAL form of the label, not the raw string.
+    normalise_classes.py rewrites stored labels - "J/70 (Race 1)" becomes
+    "J/70" - while a scraper always sends the site's raw wording. Comparing
+    raw strings meant every re-run after a canonicalisation pass saw the
+    stored class as different and minted a second race: re-scraping Cowes Week
+    2026 produced 17 duplicate races, each an exact copy of one already there.
+    That is the same duplication this function was written to prevent, coming
+    back through a side door.
     """
     candidates = cur.execute(
         "SELECT id FROM races WHERE event_id = ? AND IFNULL(race_name,'') = IFNULL(?,'')",
         (event_id, race_name),
     ).fetchall()
+    want = canonical_class(class_label)
     for (rid,) in candidates:
-        existing = {r[0] for r in cur.execute(
+        existing = {canonical_class(r[0]) for r in cur.execute(
             "SELECT DISTINCT class FROM race_entries WHERE race_id = ?", (rid,))}
-        if not existing or existing == {class_label}:
+        if not existing or existing == {want}:
             # fill the date in on a re-run if we didn't have it first time
             if race_date:
                 cur.execute("UPDATE races SET race_date = COALESCE(race_date, ?) WHERE id = ?",

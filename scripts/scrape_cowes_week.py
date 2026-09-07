@@ -27,6 +27,7 @@ import re
 import csv
 import time
 import argparse
+import sqlite3
 import subprocess
 
 import requests
@@ -155,6 +156,32 @@ def load_into_db(db, csv_path, year, race_name, class_label, source_url):
     return True
 
 
+def already_loaded(db, year):
+    """Labels of races this season that already have entries.
+
+    A full season is 250-360 fetches, which is longer than some runners allow,
+    so a run can be cut off part way through. Without this every restart began
+    at day 1 again and spent its whole budget re-fetching what was already in
+    the database - 2016 got 105 races in and would have re-done all 105.
+    Skipping those makes the scrape resumable, and makes a re-run after a
+    partial season cheap enough to be routine.
+    """
+    con = sqlite3.connect(db)
+    try:
+        rows = con.execute(
+            "SELECT ra.race_name FROM races ra "
+            "JOIN events e ON e.id = ra.event_id "
+            "JOIN regattas r ON r.id = e.regatta_id "
+            "WHERE r.name = 'Cowes Week' AND e.season_year = ? "
+            "AND EXISTS (SELECT 1 FROM race_entries re WHERE re.race_id = ra.id)",
+            (year,)).fetchall()
+    except sqlite3.Error:
+        return set()
+    finally:
+        con.close()
+    return {r[0] for r in rows}
+
+
 def main():
     p = argparse.ArgumentParser()
     p.add_argument("db")
@@ -162,10 +189,18 @@ def main():
     p.add_argument("--limit", type=int, default=None)
     p.add_argument("--delay", type=float, default=DELAY)
     p.add_argument("--dry-run", action="store_true")
+    p.add_argument("--resume", action="store_true",
+                   help="skip day/class combinations that already have entries loaded")
     args = p.parse_args()
 
     print(f"Discovering races for {args.year}...")
     races = discover_races(args.year)
+    if args.resume:
+        done = already_loaded(args.db, args.year)
+        before = len(races)
+        races = [r for r in races
+                 if f"{r['class_name']} - Day {r['day_num']}" not in done]
+        print(f"  resuming: {before - len(races)} already loaded, {len(races)} to go")
     if args.limit:
         races = races[: args.limit]
     print(f"Found {len(races)} day/class combination(s) to scrape.")
