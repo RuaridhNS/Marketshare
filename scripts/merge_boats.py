@@ -64,13 +64,50 @@ def move_entries(cur, src, dst, only_named, dry):
     return moved, dropped
 
 
-def fold(cur, keep_sail, fold_sail, only_named, dry):
+def name_clash(cur, dst, src):
+    """Seasons where the two records raced under different names.
+
+    A hull has one name in a given season. If these two were the same boat,
+    every season they share would show the same name on both sides - so a
+    season where one is ESCAPADO and the other is NORTH STAR means they are two
+    boats, not one record duplicated.
+
+    This is not a theoretical worry. GBR7557 was merged into GBR7775R on a name
+    match; they were two different Quarter Tonners, the merged record ended up
+    carrying one boat's sail number with the other's name, and a later load
+    silently overwrote a real result because both now resolved to one boat.
+    The overlap was visible in boat_name_history the whole time.
+    """
+    def by_season(bid):
+        d = {}
+        for nm, yr in cur.execute(
+                "SELECT UPPER(IFNULL(re.boat_name_used,'?')), e.season_year "
+                "FROM race_entries re JOIN races ra ON ra.id = re.race_id "
+                "JOIN events e ON e.id = ra.event_id WHERE re.boat_id = ?", (bid,)):
+            d.setdefault(yr, set()).add(nm)
+        return d
+    a, b = by_season(dst), by_season(src)
+    return [(y, sorted(a[y]), sorted(b[y]))
+            for y in sorted(set(a) & set(b)) if not (a[y] & b[y])]
+
+
+def fold(cur, keep_sail, fold_sail, only_named, dry, force=False):
     k = cur.execute("SELECT id, boat_name FROM boats WHERE sail_no = ?", (keep_sail,)).fetchone()
     f = cur.execute("SELECT id, boat_name FROM boats WHERE sail_no = ?", (fold_sail,)).fetchone()
     if not k or not f or k[0] == f[0]:
         print(f"  skip {fold_sail!r} -> {keep_sail!r}: not found or same record")
         return 0
     dst, src = k[0], f[0]
+
+    clashes = name_clash(cur, dst, src)
+    if clashes and not only_named and not force:
+        print(f"  REFUSED {fold_sail} {f[1]!r} -> {keep_sail} {k[1]!r}: "
+              f"both raced in the same season under different names, so these look "
+              f"like two boats:")
+        for yr, an, bn in clashes:
+            print(f"      {yr}: {keep_sail} as {'/'.join(an)}, {fold_sail} as {'/'.join(bn)}")
+        print("      Re-run with --force if you know they are the same hull.")
+        return 0
 
     moved, dropped = move_entries(cur, src, dst, only_named, dry)
     note = f" (only entries named {only_named!r})" if only_named else ""
@@ -106,6 +143,9 @@ def main():
     p.add_argument("db")
     p.add_argument("--file", default="data/boat_merges.csv")
     p.add_argument("--dry-run", action="store_true")
+    p.add_argument("--force", action="store_true",
+                   help="merge even when the two records raced under different "
+                        "names in the same season")
     args = p.parse_args()
 
     path = pathlib.Path(args.file)
@@ -117,11 +157,15 @@ def main():
     n = 0
     with open(path, newline="", encoding="utf-8-sig") as fh:
         for row in csv.DictReader(fh):
-            keep = (row.get("Keep") or "").strip()
-            fld = (row.get("Fold") or "").strip()
+            # The Duplicates page exports KeepSailNo/MergeSailNo; this script
+            # was written for Keep/Fold. Reading both means a file copied
+            # straight out of the dashboard just works, instead of silently
+            # matching nothing and reporting "0 records processed".
+            keep = (row.get("Keep") or row.get("KeepSailNo") or "").strip()
+            fld = (row.get("Fold") or row.get("MergeSailNo") or "").strip()
             only = (row.get("OnlyNamed") or "").strip()
             if keep and fld:
-                n += fold(cur, keep, fld, only, args.dry_run)
+                n += fold(cur, keep, fld, only, args.dry_run, args.force)
     print(f"\n{n} record(s) processed")
     if args.dry_run:
         conn.rollback()
