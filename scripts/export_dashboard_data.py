@@ -97,9 +97,22 @@ def main():
     # JOG". Requiring the word dropped the entire JOG fleet, so for those
     # organisers the event itself is the IRC signal.
     IRC_BY_ORGANISER = {"JOG", "RORC"}
+    # The same problem reaches one club event. Round the Island splits its whole
+    # fleet into IRC 0-3 and writes them as bare digits ("0", "1"), which is how
+    # those divisions are stored in event_class_counts too. Requiring the word
+    # dropped all 551 of its boat-level entries while leaving the aggregate
+    # counts standing, so the biggest fleet in the Solent read as "no named
+    # boats" at the exact moment we finally had every one of them. Matched on
+    # name rather than category because its category is "Club", which covers a
+    # lot of racing that genuinely is not IRC.
+    IRC_BY_NAME_RE = re.compile(r"^Round the Island", re.I)
+
+    def irc_organiser(reg):
+        return bool(reg) and (reg.get("category") in IRC_BY_ORGANISER
+                              or IRC_BY_NAME_RE.match(reg.get("name") or ""))
+
     irc_event_ids = {e["id"] for e in events
-                     if (regatta_by_id.get(e["regatta_id"]) or {}).get("category")
-                     in IRC_BY_ORGANISER}
+                     if irc_organiser(regatta_by_id.get(e["regatta_id"]))}
     irc_race_ids = {r["id"] for r in races if r["event_id"] in irc_event_ids}
 
     # First clause: actually started an IRC race - the strongest possible signal.

@@ -2311,10 +2311,10 @@ function renderRegattasList() {
       why = 'We hold named boats for this event in ' + boatYears.length +
             ' other season' + (boatYears.length === 1 ? '' : 's') +
             ' (' + span + '), but not ' + (yr || 'this one') + '. ';
-      why += (cov.status === 'blocked' || cov.status === 'todo')
+      why += (cov.status === 'blocked' || cov.status === 'todo' || cov.status === 'partial')
         ? cov.note
         : 'This season was loaded from the entry-count spreadsheet only.';
-    } else if (cov.status === 'blocked' || cov.status === 'todo') {
+    } else if (cov.status === 'blocked' || cov.status === 'todo' || cov.status === 'partial') {
       why = 'No named boats for any season of this event. ' + cov.note;
     } else {
       why = 'No named boats for any season of this event \u2014 only entry counts ' +
@@ -3201,6 +3201,15 @@ function attachEnrichHandlers() {
 // Why a source is incomplete, so the gap list says what to DO rather than just
 // that something is missing. Keyed by a test on the regatta name.
 const COVERAGE_NOTES = [
+  // Ahead of the general RORC rule, because the answer here is not "blocked"
+  // but "there is nothing to fetch", and those need different actions.
+  [/^IRC National Championship/i, 'blocked',
+   'Boat-level for 2012–2022. The five missing seasons were each checked on sailracehq '
+   + 'through a browser: 2023 is listed but its View leads nowhere, 2024 is not listed at all, '
+   + '2025 ran one race and abandoned it (so no result exists), and 2026 is absent — only the '
+   + 'Double Handed Nationals appear. sailracehq only goes back to 2023, so 2018 needs RORC '
+   + 'directly. Note 2025 and 2026 carry identical class counts in the source spreadsheet, '
+   + 'which is unlikely to be real.'],
   [/^Rolex Fastnet|^RORC |^IRC |^NSR |Easter Challenge|Inshore Series|Two-Handed|Myth of Malham|Cervantes|North Sea|Roschier|Caribbean|Transatlantic/i,
    'blocked', 'RORC results moved to sailracehq.com, which disallows our crawler, so the legacy '
    + 'archive stops at 2022. Easter Challenge 2023–2026, the Vice Admiral\'s Cup 2023–2024, '
@@ -3210,11 +3219,14 @@ const COVERAGE_NOTES = [
    'myjog.jog.org.uk disallows our crawler (Cloudflare managed AI list). Needs JOG to allow it, or a member-side export.'],
   [/^ORC /i, 'manual',
    'ORC championships, aggregate counts only from the IRC Solent Report. Boat-level would need the event sites season by season.'],
-  [/^Round the Island/i, 'blocked',
-   'Aggregate counts only, and still the biggest single gap: 2,635 reported entries, no named boats. '
-   + 'Results ARE published, at racing.islandsc.org.uk — the same platform RORC uses, so the same '
-   + 'extraction works. That site\'s robots.txt disallows our crawler outright, so it needs the '
-   + 'browser route rather than a scraper.'],
+  [/^Round the Island/i, 'partial',
+   '2025 and 2026 are now boat-level: 551 entries, every one with an owner, read off '
+   + 'racing.islandsc.org.uk through a browser because that site\'s robots.txt disallows our '
+   + 'crawler. The four IRC divisions partition the fleet exactly (266 and 285), and 2025 matched '
+   + 'the aggregate counts already on file class for class. 2017–2024 are still counts only. '
+   + 'Their View buttons on the club site do nothing — 2024 was retested and behaves the same '
+   + 'as the older years, the race\'s own site links straight back to that page, and the Internet '
+   + 'Archive holds no capture of any results page. About 2,300 entries that need the club directly.'],
   [/^Cowes Week/i, 'auto', 'Scraped weekly. 2017 lost ~80 of 348 fetches to a DNS drop and is worth a re-run.'],
   [/^Royal Southern|^Taittinger|^Hamble|^Warsash/i, 'auto', 'Scraped weekly.'],
 ];
@@ -3250,6 +3262,10 @@ const COVERAGE_BADGE = {
   todo:    ['Needs work',  'var(--series-doyle)', '#292524'],
   manual:  ['Manual only', 'var(--series-other)', '#fff'],
   blocked: ['Blocked',     'var(--series-one)',   '#fff'],
+  // Some of the seasons are boat-level and the rest are counts. Neither
+  // "blocked" nor "automated" is true of a source in that state, and calling
+  // it either one hides which half still needs doing.
+  partial: ['Part loaded', 'var(--series-quantum)', '#fff'],
   historical: ['Historical', 'var(--series-unknown)', 'var(--series-unknown-text)'],
 };
 
@@ -3268,7 +3284,7 @@ function renderCoverage() {
   // headline counts
   const tally = {};
   rows.forEach(x => { tally[x.status] = (tally[x.status]||0)+1; });
-  const chips = ['blocked','todo','manual','auto','historical'].filter(k=>tally[k]).map(k => {
+  const chips = ['blocked','partial','todo','manual','auto','historical'].filter(k=>tally[k]).map(k => {
     const [lbl, bg, fg] = COVERAGE_BADGE[k];
     return `<span class="pill" style="background:${bg};color:${fg};margin-right:6px;">${lbl}: ${tally[k]}</span>`;
   }).join('');
