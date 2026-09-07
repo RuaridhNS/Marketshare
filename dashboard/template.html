@@ -716,11 +716,17 @@ function loadPendingMerges() {
 }
 let PENDING_MERGES = loadPendingMerges();
 function savePendingMerges() { localStorage.setItem(MERGES_KEY, JSON.stringify(PENDING_MERGES)); }
-function addPendingMerge(keepId, mergeId, notes) {
+function addPendingMerge(keepId, mergeId, notes, onlyNamed) {
   PENDING_MERGES = PENDING_MERGES.filter(m => m.mergeId !== mergeId); // one pending merge per boat
-  PENDING_MERGES.push({ keepId, mergeId, notes: notes||'' });
+  PENDING_MERGES.push({ keepId, mergeId, notes: notes||'', onlyNamed: onlyNamed||'' });
   savePendingMerges();
   updatePendingBadge();
+}
+function setPendingMergeOnlyNamed(mergeId, onlyNamed) {
+  const m = PENDING_MERGES.find(x => String(x.mergeId) === String(mergeId));
+  if (!m) return;
+  m.onlyNamed = onlyNamed || '';
+  savePendingMerges();
 }
 function removePendingMerge(mergeId) {
   PENDING_MERGES = PENDING_MERGES.filter(m => m.mergeId !== mergeId);
@@ -728,12 +734,19 @@ function removePendingMerge(mergeId) {
   updatePendingBadge();
 }
 function isPendingMergeAway(boatId) { return PENDING_MERGES.some(m => String(m.mergeId) === String(boatId)); }
+// OnlyNamed is in the header whether or not any row uses it. data/boat_merges.csv
+// is a ledger this file gets pasted over, and five of its rows depend on that
+// column to say "move only the entries under this name". An export without it
+// silently turned those five partial moves into whole-record folds, which is
+// how a Swan 53, a Class40 and a Botin 56 came within one script run of being
+// absorbed into other boats.
 function pendingMergesToCSV() {
-  const lines = ['KeepSailNo,MergeSailNo,Notes'];
+  const lines = ['KeepSailNo,MergeSailNo,OnlyNamed,Notes'];
   PENDING_MERGES.forEach(m => {
     const keep = boatsById[m.keepId], merge = boatsById[m.mergeId];
     if (!keep || !merge) return;
-    lines.push([csvEsc(keep.sail_no), csvEsc(merge.sail_no), csvEsc(m.notes)].join(','));
+    lines.push([csvEsc(keep.sail_no), csvEsc(merge.sail_no),
+                csvEsc(m.onlyNamed||''), csvEsc(m.notes)].join(','));
   });
   return lines.join('\n') + '\n';
 }
@@ -755,6 +768,41 @@ function sailNoBase(s) { return (s||'').replace(/[A-Z]+$/, ''); }
 // so real matches aren't missed, without being so loose it stops meaning
 // anything.
 function normType(t) { return (t||'').toUpperCase().replace(/\s+\d+\.\d+.*$/, '').trim(); }
+
+// Seasons in which two records raced under DIFFERENT names. A hull has one
+// name in a given season, so an overlap where the names disagree means these
+// are two boats - whatever their name and type fields say.
+//
+// This is the same test merge_boats.py refuses on, run here where the merge is
+// PROPOSED rather than where it is applied. The detector matches on name and
+// type alone, and that is how a Cape 31 came to swallow ECLIPSE, how JARHEAD
+// nearly swallowed a Swan 53 called OLWYN, and how GBR7557 and GBR7775R - two
+// different Quarter Tonners - spent a while as one record. Naming the clash on
+// the card means the OnlyNamed decision gets made by the person looking at the
+// evidence, instead of being discovered later by a script that says no.
+function nameClashSeasons(a, b) {
+  const spanOf = x => (x.name_history||[]).map(h => ({
+    name: (h.name||'').toUpperCase(),
+    from: h.first_season, to: h.last_season,
+  })).filter(h => h.name && h.from && h.to);
+  const A = spanOf(a), B = spanOf(b);
+  const out = [];
+  A.forEach(x => B.forEach(y => {
+    if (x.name === y.name) return;
+    const from = Math.max(x.from, y.from), to = Math.min(x.to, y.to);
+    if (from <= to) out.push({ from, to, a: x.name, b: y.name });
+  }));
+  return out;
+}
+
+// The name the two records genuinely share, which is the value OnlyNamed wants:
+// move the entries entered under it and leave everything else where it is.
+function sharedName(a, b) {
+  const names = x => new Set([(x.boat_name||'').toUpperCase(),
+                              ...(x.name_history||[]).map(h => (h.name||'').toUpperCase())]);
+  const nb = names(b);
+  return Array.from(names(a)).find(n => n && nb.has(n)) || '';
+}
 
 function findDuplicateGroups() {
   const byName = {};
@@ -1911,9 +1959,14 @@ function renderPendingChanges() {
   const mergeRows = PENDING_MERGES.map(m => {
     const keep = boatsById[m.keepId], merge = boatsById[m.mergeId];
     if (!keep || !merge) return '';
+    const partial = !!(m.onlyNamed||'').trim();
     return `<tr>
       <td><a href="#/boat/${keep.id}" data-route="#/boat/${keep.id}">${esc(keep.boat_name||keep.sail_no)}</a> (${esc(keep.sail_no)})</td>
-      <td>${esc(merge.boat_name||merge.sail_no)} (${esc(merge.sail_no)}) <span class="muted">— will be removed, history moved to the keeper</span></td>
+      <td>${esc(merge.boat_name||merge.sail_no)} (${esc(merge.sail_no)}) <span class="muted">${partial
+        ? '— keeps its own entries; only the named ones move'
+        : '— will be removed, history moved to the keeper'}</span></td>
+      <td><input type="text" data-merge-only="${merge.id}" value="${esc(m.onlyNamed||'')}"
+                 placeholder="(all entries)" style="font-family:monospace;font-size:12px;padding:2px 5px;width:150px;"></td>
       <td>${esc(m.notes||'')}</td>
       <td><button class="btn secondary" type="button" data-discard-merge="${merge.id}">Discard</button></td>
     </tr>`;
@@ -1993,8 +2046,8 @@ function renderPendingChanges() {
     <div class="card" style="padding:0;overflow:auto;">
       <h2 style="padding:18px 20px 0;">Boat merges</h2>
       <table>
-        <thead><tr><th>Keep</th><th>Merge away</th><th>Notes</th><th></th></tr></thead>
-        <tbody>${mergeRows || '<tr><td colspan="4" class="muted">No pending merges. See <a href="#/duplicates" data-route="#/duplicates">Duplicates</a>, or use the Merge with another boat section on a boat profile.</td></tr>'}</tbody>
+        <thead><tr><th>Keep</th><th>Merge away</th><th>Only entries named</th><th>Notes</th><th></th></tr></thead>
+        <tbody>${mergeRows || '<tr><td colspan="5" class="muted">No pending merges. See <a href="#/duplicates" data-route="#/duplicates">Duplicates</a>, or use the Merge with another boat section on a boat profile.</td></tr>'}</tbody>
       </table>
     </div>
     ${PENDING_MERGES.length ? `
@@ -2026,6 +2079,16 @@ function attachPendingChangesHandlers() {
   });
   document.querySelectorAll('[data-discard-merge]').forEach(btn => {
     btn.addEventListener('click', () => { removePendingMerge(btn.dataset.discardMerge); navigate(); });
+  });
+  // The CSV box is what actually gets copied out, so it has to follow the
+  // field rather than wait for a re-render - an edit that is visible on the
+  // row but missing from the text below it is the same silent loss again.
+  document.querySelectorAll('[data-merge-only]').forEach(inp => {
+    inp.addEventListener('change', () => {
+      setPendingMergeOnlyNamed(inp.dataset.mergeOnly, inp.value);
+      const box = document.getElementById('merges-csv-box');
+      if (box) box.value = pendingMergesToCSV();
+    });
   });
   wireCsvExportButtons('copy-csv-btn', 'download-csv-btn', 'csv-box', 'changes.csv', pendingEditsToCSV);
   wireCsvExportButtons('copy-merges-csv-btn', 'download-merges-csv-btn', 'merges-csv-box', 'merges.csv', pendingMergesToCSV);
@@ -2098,12 +2161,37 @@ function renderDuplicates() {
         <input type="radio" name="keep-${esc(g.key)}" value="${b.id}" ${b===g.boats[0]?'checked':''}>
         <span><strong>${esc(b.boat_name||'—')}</strong> · ${esc(b.sail_no||'—')} · type: <strong>${esc(b.boat_type||'unknown')}</strong> · ${b.entries.length} entries · owner: ${esc(b.owner_name||'—')}</span>
       </label>`).join('');
+    // Every pair in the group, so a three-record group is checked properly
+    // rather than only against the first.
+    const clashes = [];
+    for (let i = 0; i < g.boats.length; i++)
+      for (let j = i+1; j < g.boats.length; j++)
+        nameClashSeasons(g.boats[i], g.boats[j]).forEach(c =>
+          clashes.push({ ...c, aSail: g.boats[i].sail_no, bSail: g.boats[j].sail_no }));
+    const shared = clashes.length ? sharedName(g.boats[0], g.boats[1]) : '';
+    const warning = clashes.length ? `
+      <div style="border-left:3px solid var(--series-one);background:var(--surface-2);padding:10px 12px;margin:10px 0;font-size:13px;">
+        <strong>These raced at the same time under different names.</strong>
+        A hull has one name in a season, so this is likely a collision — one record
+        holding entries from two boats — rather than a duplicate.
+        ${clashes.slice(0,6).map(c => `<div class="muted" style="margin-top:4px;">
+          ${c.from}${c.to>c.from?'&ndash;'+c.to:''}: ${esc(c.aSail)} as <strong>${esc(c.a)}</strong>,
+          ${esc(c.bSail)} as <strong>${esc(c.b)}</strong></div>`).join('')}
+        <div style="margin-top:8px;">Merge only the entries under one name and leave the rest where
+          they are — otherwise one boat's history is absorbed into the other.</div>
+      </div>` : '';
     return `
     <div class="card">
       <h2 style="margin-bottom:4px;">${g.boats.map(b=>esc(b.boat_name||b.sail_no)).join(' / ')}</h2>
       <p class="muted" style="font-size:13px;margin-top:0;">${esc(g.reason)}</p>
+      ${warning}
       <p style="font-size:13px;margin:10px 0 4px;">Pick which record to keep — the other(s) will be merged into it and removed, with all race history moved over:</p>
       ${boatOptions}
+      <label style="display:block;font-size:13px;margin:10px 0 4px;">Move only entries named
+        <input type="text" data-only-named="${esc(g.key)}" value="${esc(shared)}" placeholder="(all entries)"
+               style="font-family:monospace;font-size:12.5px;padding:3px 6px;margin-left:6px;width:220px;">
+        <span class="muted">— leave blank to move the whole record</span>
+      </label>
       <div class="btn-row">
         <button class="btn" type="button" data-merge-group="${esc(g.key)}">Merge into selected</button>
         <button class="btn secondary" type="button" data-dismiss-group="${esc(g.key)}">Not a duplicate — dismiss</button>
@@ -2128,7 +2216,10 @@ function attachDuplicatesHandlers() {
       const checked = Array.from(radios).find(r => r.checked);
       if (!checked) return;
       const keepId = parseInt(checked.value);
-      radios.forEach(r => { const id = parseInt(r.value); if (id !== keepId) addPendingMerge(keepId, id, 'From Duplicates page: ' + key); });
+      const onlyEl = document.querySelector(`[data-only-named="${CSS.escape(key)}"]`);
+      const onlyNamed = onlyEl ? onlyEl.value.trim() : '';
+      radios.forEach(r => { const id = parseInt(r.value); if (id !== keepId)
+        addPendingMerge(keepId, id, 'From Duplicates page: ' + key, onlyNamed); });
       navigate();
     });
   });
@@ -3227,7 +3318,12 @@ const COVERAGE_NOTES = [
    + 'Their View buttons on the club site do nothing — 2024 was retested and behaves the same '
    + 'as the older years, the race\'s own site links straight back to that page, and the Internet '
    + 'Archive holds no capture of any results page. About 2,300 entries that need the club directly.'],
-  [/^Cowes Week/i, 'auto', 'Scraped weekly. 2017 lost ~80 of 348 fetches to a DNS drop and is worth a re-run.'],
+  [/^Cowes Week/i, 'auto',
+   'Scraped weekly, and backfilled to 2007. 2015, 2018 and 2020 are blank because the site '
+   + 'publishes nothing for them — the season picker returns no races at all, so that gap is the '
+   + 'source’s and not ours (2020 was the cancelled season). 2017’s old DNS-drop gap is '
+   + 'closed: the 50 day/class combinations still listed as missing were re-fetched and have no '
+   + 'results published against them.'],
   [/^Royal Southern|^Taittinger|^Hamble|^Warsash/i, 'auto', 'Scraped weekly.'],
 ];
 // A source being blocked only matters if it is actually missing recent

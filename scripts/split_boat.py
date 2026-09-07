@@ -66,8 +66,28 @@ def main():
             continue
         src_id, src_name = got
 
-        if cur.execute("SELECT 1 FROM boats WHERE sail_no = ?", (new_sail,)).fetchone():
-            print("  %s already exists as its own boat, skipped" % new_sail)
+        # An earlier pass already made this record - or it was always there as
+        # a boat of its own. Either way the split is not re-done, but any
+        # entries that have landed back on the source since are re-moved: the
+        # source that mis-published the sail number is still publishing it, so
+        # the next scrape files INNUENDO onto GBR7775R again. Skipping outright
+        # made this ledger a one-shot, which is exactly what re-scraping undoes.
+        existing = cur.execute("SELECT id FROM boats WHERE sail_no = ?", (new_sail,)).fetchone()
+        if existing:
+            new_id = existing[0]
+            back = cur.execute(
+                "SELECT id FROM race_entries WHERE boat_id = ? AND boat_name_used IN (%s)"
+                % ",".join("?" * len(move_names)), [src_id] + sorted(move_names)).fetchall()
+            if not back:
+                print("  %s already split out; nothing has drifted back" % new_sail)
+                continue
+            print("  %s already split out; %d entr%s drifted back onto %s%s"
+                  % (new_sail, len(back), "y" if len(back) == 1 else "ies", src_sail,
+                     " (dry run)" if args.dry_run else ""))
+            if not args.dry_run:
+                cur.executemany("UPDATE race_entries SET boat_id = ? WHERE id = ?",
+                                [(new_id, b[0]) for b in back])
+                conn.commit()
             continue
 
         moving = cur.execute(

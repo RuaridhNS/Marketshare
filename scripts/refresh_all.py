@@ -11,7 +11,19 @@ dashboard keeps itself current.
 Every step is idempotent, which is what makes unattended running safe:
   - loaders use INSERT OR REPLACE on UNIQUE(race_id, boat_id)
   - dedupe_races.py collapses any duplicate race rows a re-run creates
+  - the correction ledgers in data/ report no change on a second pass
   - the export/build are pure functions of the database
+
+Two kinds of step run after the scrape, and PIPELINE holds both: those that
+re-DERIVE something from the entries (owners, boat types, naming history), and
+those that re-APPLY a decision a person made (merges, splits, class spellings,
+owner corrections). Both have to be here, because a scrape undoes both kinds:
+it re-imports the wrong owner off the results page, and it re-fragments the
+labels the decisions were made about.
+
+apply_sailscan_matches.py is deliberately NOT in the pipeline. Nothing in a
+refresh re-derives sailmaker history, so there is nothing to undo its work,
+and re-running it every week would only re-assert what is already there.
 
 Sources are declared in SOURCES below. Each entry says how to invoke a scraper
 for the current season; add a club or a regatta by adding a row, not by editing
@@ -99,32 +111,69 @@ def main():
             if not ok:
                 failures.append(name)
 
-    # A re-run mints fresh race rows for anything already loaded; collapse them
-    # before the export so counts never drift upward on repeat runs.
-    ok, _ = run("Deduplicate races", ["dedupe_races.py"], args.db, args.timeout)
-    if not ok:
-        failures.append("dedupe")
+    # Everything below either re-derives something from the entries, or
+    # re-applies a decision a person made that a fresh scrape would otherwise
+    # undo. The order is load-bearing; each comment says why that step sits
+    # where it does.
+    #
+    # Half of these were missing until 2026-09-07, and two of them
+    # (normalise_classes, apply_owner_corrections) have docstrings promising
+    # they are "re-applied on every run" - a guarantee that was only ever true
+    # if somebody remembered to type the command. A correction that is not in
+    # this list is a correction with a shelf life of one scrape.
+    PIPELINE = [
+        # Before anything that matches on a name. The scrape re-imports the
+        # same cp1252-mangled French owners every week, and a mangled
+        # boat_name_used will not match a MoveNames or OnlyNamed value.
+        ("Repair mojibake", ["repair_mojibake.py"], "mojibake"),
 
-    # Loaders write the owner onto the ENTRY; this promotes it to the boat
-    # record the dashboard actually reads. Skipping it left 2,729 boats looking
-    # ownerless while their own race history named the owner, so it belongs in
-    # every run rather than being remembered occasionally.
-    ok, _ = run("Backfill owners", ["backfill_owners.py"], args.db, args.timeout)
-    if not ok:
-        failures.append("owners")
+        # Regatta-level folds first: merging two records for one real event
+        # creates races that now exist twice, which the dedupe below collapses.
+        ("Merge regattas", ["merge_regattas.py", "--file", "data/regatta_merges.csv"], "regatta merges"),
 
-    # Scrapers write whatever spelling their source uses, so every run
-    # re-fragments the type list (J/109, J 109, J109 as three fleets). This has
-    # to run after the scrape or the canonical names last exactly one week.
-    ok, _ = run("Canonicalise boat types", ["normalise_boat_types.py"], args.db, args.timeout)
-    if not ok:
-        failures.append("boat types")
+        # Class labels decide race identity - races are keyed on (event, race
+        # name, class) - so canonicalising them can make two race rows
+        # identical. That is why this runs BEFORE the dedupe rather than after.
+        ("Canonicalise classes", ["normalise_classes.py"], "classes"),
 
-    # Naming history is derived from the names boats raced under, so it has to
-    # be rebuilt after each scrape like the owner history is.
-    ok, _ = run("Derive naming history", ["backfill_boat_names.py"], args.db, args.timeout)
-    if not ok:
-        failures.append("boat names")
+        # A re-run mints fresh race rows for anything already loaded; collapse
+        # them before the export so counts never drift upward on repeat runs.
+        ("Deduplicate races", ["dedupe_races.py"], "dedupe"),
+
+        # Boat-level merges, then the splits that undo the wrong ones. Both are
+        # ledgers of human decisions and both are idempotent: a second pass
+        # reports no change. Re-running is also what repairs a record left
+        # wearing the wrong boat's name, and what pulls back entries a
+        # re-scrape has re-filed onto the wrong hull.
+        ("Merge boats", ["merge_boats.py", "--file", "data/boat_merges.csv"], "boat merges"),
+        ("Split wrongly-merged boats", ["split_boat.py", "data/boat_splits.csv"], "boat splits"),
+
+        # Loaders write the owner onto the ENTRY; this promotes it to the boat
+        # record the dashboard actually reads. Skipping it left 2,729 boats
+        # looking ownerless while their own race history named the owner, so it
+        # belongs in every run rather than being remembered occasionally.
+        ("Backfill owners", ["backfill_owners.py"], "owners"),
+
+        # Strictly after the backfill above, which re-derives ownership from
+        # whoever the results page printed - the very thing these corrections
+        # exist to override. Run in the other order, every correction is undone
+        # by the step that follows it.
+        ("Apply owner corrections", ["apply_owner_corrections.py"], "owner corrections"),
+
+        # Scrapers write whatever spelling their source uses, so every run
+        # re-fragments the type list (J/109, J 109, J109 as three fleets). This
+        # has to run after the scrape or the canonical names last exactly one
+        # week.
+        ("Canonicalise boat types", ["normalise_boat_types.py"], "boat types"),
+
+        # Naming history is derived from the names boats raced under, so it has
+        # to be rebuilt after each scrape like the owner history is.
+        ("Derive naming history", ["backfill_boat_names.py"], "boat names"),
+    ]
+    for label, argv, tag in PIPELINE:
+        ok, _ = run(label, argv, args.db, args.timeout)
+        if not ok:
+            failures.append(tag)
 
     for step, argv in (("Export JSON", ["export_dashboard_data.py", "dashboard/data.json"]),
                        ("Build dashboard", ["build_dashboard.py"])):
