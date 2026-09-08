@@ -3318,14 +3318,19 @@ const COVERAGE_NOTES = [
    + 'Their View buttons on the club site do nothing — 2024 was retested and behaves the same '
    + 'as the older years, the race\'s own site links straight back to that page, and the Internet '
    + 'Archive holds no capture of any results page. About 2,300 entries that need the club directly.'],
-  [/^Cowes Week/i, 'partial',
+  [/^Cowes Week/i, 'auto',
    'Daily results scraped weekly, loaded 2010–2026 (2017’s old DNS-drop gap is closed: the 50 '
-   + 'combinations still listed as missing were re-fetched and publish no results). '
-   + '2007–2009, 2015 and 2018 publish overall series standings rather than per-race results, on '
-   + 'the page=points&lt;year&gt; view the daily page links to — about 240 class-seasons, being '
-   + 'loaded by scrape_cowes_points.py. Those rows carry full identity, not just a name: each one '
-   + 'links to a boat page with the sail number, type, TCC and skipper. 2020 is the cancelled '
-   + 'season and genuinely holds nothing.'],
+   + 'combinations still listed as missing were re-fetched and publish no results). The five '
+   + 'seasons with no daily results are loaded from the overall standings instead, by '
+   + 'scrape_cowes_points.py — but not equally, because the pages differ. 2018 publishes scoring '
+   + 'codes, so who sailed which race is known: 5,546 entries across 298 races. 2009 and 2015 '
+   + 'publish none, and the scores cannot stand in for them (calibrated against 2018, guessing '
+   + 'from the numbers gets 9.5% of cells wrong, because a boat that retired scores the same '
+   + 'penalty as one that never started), so each boat gets one entry per class instead — 808 '
+   + 'boats for 2009, more than any other Cowes season here, and 692 for 2015. 2007 and 2008 '
+   + 'publish no boat pages at all, so their rows are names with no sail number; those are held '
+   + 'in data/cowes_names_2007.csv and _2008.csv (2,283 rows) rather than loaded, because a name '
+   + 'alone cannot safely be attached to a boat already on file. 2020 was cancelled.'],
   [/^Royal Southern|^Taittinger|^Hamble|^Warsash/i, 'auto', 'Scraped weekly.'],
 ];
 // A source being blocked only matters if it is actually missing recent

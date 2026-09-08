@@ -9,6 +9,8 @@ Usage: python3 build_db.py <jog_fleet_combined.xlsx> <IRC_Solent_Report.xlsx> <o
 """
 import sys
 import re
+import csv
+import pathlib
 import sqlite3
 import datetime
 import openpyxl
@@ -161,11 +163,53 @@ def get_or_create_event(cur, regatta_id, season_year, notes=None, source_url=Non
 _RACE_SUFFIX = re.compile(r"\s*\((?:race|mini-?series|r)\s*\d+\)\s*$", re.I)
 
 
+_VERDICTS = None
+
+
+def _class_verdicts():
+    """The renames in data/class_verdicts.csv, variant -> kept spelling.
+
+    Read here rather than imported from normalise_classes for the same reason
+    _RACE_SUFFIX is duplicated: build_db is the bottom of the import graph.
+    Read once and cached; a missing or malformed file just means no renames.
+    """
+    global _VERDICTS
+    if _VERDICTS is None:
+        _VERDICTS = {}
+        path = pathlib.Path(__file__).resolve().parent.parent / "data" / "class_verdicts.csv"
+        try:
+            with open(path, newline="", encoding="utf-8-sig") as fh:
+                for row in csv.DictReader(fh):
+                    keep = (row.get("KeepAs") or "").strip()
+                    if not keep or keep.lower() in ("?", "leave", "leave apart"):
+                        continue
+                    for v in (row.get("Variants") or "").split("|"):
+                        v = v.strip()
+                        if v and v != keep:
+                            _VERDICTS[v.upper()] = keep
+        except (OSError, csv.Error):
+            pass
+    return _VERDICTS
+
+
 def canonical_class(label):
-    """The form a class label settles on once normalise_classes.py has run."""
+    """The form a class label settles on once normalise_classes.py has run.
+
+    Stripping the race-number suffix is not enough on its own. The verdicts
+    file also RENAMES labels - 2009's Cowes Week pages publish "Class 1 IRC"
+    where every other season writes "IRC Class 1" - and a scraper always sends
+    the site's own wording. Comparing without the renames, a re-run of the 2009
+    load found the stored class ("IRC Class 1") different from the one it was
+    asking for ("Class 1 IRC") and minted a second race with a second copy of
+    all 19 entries. That is the same duplication create_race exists to prevent,
+    arriving through the rename instead of through the suffix.
+    """
     if not label:
         return None
-    return _RACE_SUFFIX.sub("", str(label).strip()).strip() or None
+    base = _RACE_SUFFIX.sub("", str(label).strip()).strip()
+    if not base:
+        return None
+    return _class_verdicts().get(base.upper(), base)
 
 
 def create_race(cur, event_id, race_name, race_number=None, status=None, class_label=None,
