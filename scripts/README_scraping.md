@@ -1,26 +1,25 @@
 # Scraping workflow
 
-## Important environment constraint
+## Where this runs (corrected 2026-09-08)
 
-This project is built and run inside a Claude cloud sandbox. That sandbox's
-shell (`bash`/`python requests`/`curl`/etc.) has **no general internet
-access** — only package registries are reachable directly. The only way
-Claude can reach an arbitrary external website from here is the `WebFetch`
-tool. This means:
+**This section used to say the opposite and was left stale long after it
+stopped being true.** It described the project as living in a Claude cloud
+sandbox with no general internet access, where "a conventional standalone
+`requests`/`BeautifulSoup` scraper cannot run unattended" and everything had to
+go through `WebFetch` one page at a time. Anyone reading the top of this file
+would have concluded that the way the project actually works is impossible.
 
-- A conventional standalone `requests`/`BeautifulSoup` scraper **cannot run
-  unattended in this sandbox** — there's nothing to schedule it on that has
-  network access.
-- Any "automated scraping" in this environment has to go through Claude
-  itself calling `WebFetch` (or, on the user's own machine via the device
-  bridge, a normal Python scraper *can* run, since that machine has real
-  internet access).
-- Practically: a scheduled Claude task (see the project root's task list)
-  re-enters a session, calls `WebFetch` on each target results page with a
-  structured-extraction prompt, saves the output as a staging CSV, then runs
-  `load_rorc_csv.py` to upsert it into the database. Slower and more
-  "expensive" (LLM calls) per page than a real scraper, but it's what's
-  actually available from this sandbox today.
+It runs on the user's own Windows machine, which has ordinary internet access.
+Eight `requests`/`BeautifulSoup` scrapers run there directly, unattended, on a
+Task Scheduler job: `refresh_all.py` fetched Cowes Week, the Royal Southern,
+Warsash, Hamble and the Royal Solent on the morning of 2026-09-07, 39 minutes
+end to end, and rebuilt the dashboard afterwards. Historical backfills run the
+same way, a season at a time, by hand.
+
+`WebFetch` is not part of the pipeline. The one place a browser is still needed
+is a site that blocks this project's crawler but that the user can read while
+signed in - see the Round the Island section below, and
+`docs/browser_extraction_prompt.md`.
 
 ## Source scrapability audit (checked 2026-08-24)
 
@@ -29,18 +28,25 @@ tool. This means:
 | `rorc.org` (legacy static results, years **2007-2022**, e.g. `/raceresults/2021/ircoverall11.html`) | `Crawl-delay: 10`, no bot-specific restrictions | **Scrapable.** Plain HTML tables. |
 | `sailracehq.com` (current RORC results, **2023-present** — RORC migrated their live-results platform) | `Content-Signal: ai-train=no`; explicitly disallows `ClaudeBot` and other AI crawlers | **Not scraped.** Site has opted out of AI crawler access. |
 | `myjog.jog.org.uk` (JOG results, all years) | explicitly disallows `ClaudeBot` and other AI crawlers, cites EU copyright directive | **Not scraped.** Same reason. Continue manual export from this site, or ask JOG for an official data/API arrangement. |
-| Cowes Week (`cowesweek.co.uk`) | no robots.txt found (404) | Not yet built. No explicit opt-out, but needs its own page-structure reconnaissance before building a loader. |
-| RSYC, Warsash SC, ORC | not yet checked | Not yet built. Warsash results are partly PDF-based (see notes in the original IRC Solent Report — links to PDF summaries on warsashsc.org.uk). |
+| Cowes Week (`cowesweek.co.uk`) | no robots.txt found (404) | **Built and running.** `scrape_cowes_week.py` (daily results) and `scrape_cowes_points.py` (standings, for the five seasons with no daily results). 65,344 entries - the largest source here. |
+| Royal Southern (`scrape_royal_southern.py`) | no restrictions declared | **Built and running.** 3,916 entries. |
+| Warsash SC | no restrictions declared | **Built and running.** `scrape_warsash.py` plus `scrape_warsash_pdfs`/`load_warsash_pdfs.py` for the PDF-only summaries. 1,164 entries. |
+| Hamble / Royal Solent (HalSail) | no restrictions declared | **Built and running.** `scrape_hamble.py` (by club id) and `scrape_halsail_archive.py`. 1,135 entries. |
+| Round the Island (`racing.islandsc.org.uk`) | disallows `ClaudeBot` | **Not scraped.** Read from the user's own signed-in browser; 551 entries, reproducible from `data/rti_islandsc.csv`. See below. |
 
-**Bottom line:** real automation is only available for the RORC legacy
-archive (2007-2022) today. Current-season results on both of the platforms
-this data currently comes from (SailRaceHQ for RORC, MyJOG for JOG) have
-opted out of AI-crawler access at the platform level, so ongoing/current
-results still need to come in some other way — manual entry (fastest to
-keep going with what already works), or an official data-sharing
-arrangement with RORC/JOG (worth asking, given the existing rep
-relationship — sponsors/partners are often given API or CSV export access
-even when the public crawler policy says no).
+**Bottom line, as of 2026-09-08:** the claim that "real automation is only
+available for the RORC legacy archive" has not been true for a while. Six
+clubs and series are scraped unattended on a schedule, and the two blocked
+platforms are still blocked:
+
+- **JOG** (`myjog.jog.org.uk`) and **RORC 2023+** (`sailracehq.com`) disallow
+  this project's crawler at the platform level. Every run of `refresh_all.py`
+  prints both, so the gap stays visible rather than being mistaken for
+  completeness. RORC 2023-2025 is partly covered anyway, from season-points
+  workbooks exported by hand (3,429 entries).
+- Worth asking both for an official export or API arrangement, given the
+  existing rep relationship - partners are often given access even where the
+  public crawler policy says no.
 
 ## RORC legacy archive workflow (2007-2022)
 
