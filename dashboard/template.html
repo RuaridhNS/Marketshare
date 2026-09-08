@@ -3321,11 +3321,11 @@ const COVERAGE_NOTES = [
   [/^Cowes Week/i, 'partial',
    'Daily results scraped weekly, loaded 2010–2026 (2017’s old DNS-drop gap is closed: the 50 '
    + 'combinations still listed as missing were re-fetched and publish no results). '
-   + '2007–2009, 2015 and 2018 hold nothing yet, and are the gap worth closing: they publish '
-   + 'overall series standings rather than per-race results, on the page=points&lt;year&gt; view the '
-   + 'daily page links to, about 240 class-seasons in total. No sail numbers there, so those rows '
-   + 'have to resolve by boat name — see scripts/README_scraping.md. 2020 is the cancelled season '
-   + 'and genuinely holds nothing.'],
+   + '2007–2009, 2015 and 2018 publish overall series standings rather than per-race results, on '
+   + 'the page=points&lt;year&gt; view the daily page links to — about 240 class-seasons, being '
+   + 'loaded by scrape_cowes_points.py. Those rows carry full identity, not just a name: each one '
+   + 'links to a boat page with the sail number, type, TCC and skipper. 2020 is the cancelled '
+   + 'season and genuinely holds nothing.'],
   [/^Royal Southern|^Taittinger|^Hamble|^Warsash/i, 'auto', 'Scraped weekly.'],
 ];
 // A source being blocked only matters if it is actually missing recent

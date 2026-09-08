@@ -108,21 +108,42 @@ ids. Class-level series available per season:
     2007: 49    2008: 43    2009: 44    2015: 51    2018: 55
 
 That is roughly 240 class-seasons of boat-level data for five seasons that
-currently hold none, and for market share it is arguably the better shape:
-one row per boat per class, no per-race repetition to collapse afterwards.
+currently hold none. Loaded by `scrape_cowes_points.py`, one season at a time,
+via `scripts/cowes_points_backfill.sh`.
 
-Two things to get right when loading it:
+**Correction to the first version of this section:** it said these tables have
+no sail numbers and so would have to be resolved by boat name, which is the
+matching that produced every collision in `data/boat_merges.csv`. That was
+wrong, and it mattered - it would have made this the riskiest load in the
+project instead of one of the safest. Each standings row links to
+`page=boatdetails<year>&boatref=<n>`, and that page carries the **sail number**,
+design type, handicap/TCC, entered-by and skipper. Identity here is not
+inferred at all; it is better than the daily scrape's, which has no TCC or
+skipper. Only boats whose detail page is missing entirely (2018 refs 1333,
+1388, 1418, 1552 return the site chrome and nothing else) fall back to a name,
+and those are listed by name at the end of every run.
+
+Things to get right when loading it:
 
   - **Skip "Black Group Overall" and "White Group Overall".** They are
     re-cuts of the same boats across the class series, exactly like the
     Double Handed and Line Honours views on Round the Island. Loading them
     alongside the class series enters every boat twice and inflates share.
 
-  - **There are no sail numbers.** The table gives Pos, Boat Name and points
-    per day. 2015 and 2018 append the owner to the name cell
-    ("ANTILOPE (Willem Wester)", "FARGO Bertie Bicket"); 2007-2009 give the
-    name alone. Since boats are keyed on sail number, these rows have to
-    resolve by name - which is the same matching that produced the collisions
-    in `data/boat_merges.csv`. Resolve on name plus class plus season, treat
-    anything ambiguous as a new record rather than guessing at an existing
-    one, and expect to adjudicate a list afterwards.
+  - **A cell says whether the boat sailed, and the codes are not obvious.**
+    `DNC` (did not compete), `NER` and `NOD` are not entries; a blank code,
+    `DNF`, `RET` and `DSQ` are. `NER` means "not entered for that race", which
+    is settled rather than guessed: the boat detail page's "Days entered" field
+    is an eight-character week (`SSMTWTFS`), and the NER days are exactly the
+    days outside it - four boats checked, four exact matches. `NOD` is the one
+    judgement: same penalty as DNC but on days the boat WAS entered for, no key
+    published anywhere on the site, so it is treated as not-sailed and counted
+    in every run's summary so the size of the doubt stays visible.
+
+  - **Race naming maps the weekday to a day number**, giving
+    `"<class> - Day <n>"` exactly as the daily scraper writes for 2010-2026, so
+    a later daily load of these seasons merges instead of duplicating. The
+    header row cannot be used directly: 2008 lists two Saturdays (first and
+    last day of the week) and 2007's Class 0 IRC raced Fri, Wed, Thu in that
+    order. 2015 numbers its columns R1-R7 with no weekday, so those keep the
+    source's numbering as `"<class> - R<n>"`.
