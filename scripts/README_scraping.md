@@ -147,3 +147,44 @@ Things to get right when loading it:
     last day of the week) and 2007's Class 0 IRC raced Fri, Wed, Thu in that
     order. 2015 numbers its columns R1-R7 with no weekday, so those keep the
     source's numbering as `"<class> - R<n>"`.
+
+## Round the Island: browser-read, and now reproducible (2026-09-08)
+
+`racing.islandsc.org.uk` disallows this project's crawler, so the 551 Round the
+Island entries for 2025 and 2026 were read out of the user's own signed-in
+browser and loaded with `load_rti_islandsc.py`. **The CSV was never saved.**
+Every other source here can be rebuilt from a scraper, a tracked spreadsheet or
+a tracked decisions file; this one could not, so a rebuild from scratch would
+have silently lost the biggest fleet in the Solent.
+
+`export_rti_source.py` reconstructs that file from the database into
+`data/rti_islandsc.csv`, and the result is a real input rather than a report:
+
+```
+python3 scripts/export_rti_source.py db/marketshare.db
+python3 scripts/load_rti_islandsc.py db/marketshare.db data/rti_islandsc.csv
+```
+
+Two things to know about it.
+
+  - **A reload needs the correction ledgers afterwards.** Loading the file into
+    a copy of the database gave 552 entries against the original's 551. The
+    extra one is VENOMOUS, which Round the Island published under GBR7017R -
+    Tortuga Marine's Botin 56 BLACK PEARL - and the CSV keeps that because it
+    is what the source said. Re-running `merge_boats.py` removes it and
+    re-identifies GBR7017R, after which the copy matches the original exactly.
+    `refresh_all.py` already runs in that order, so a reload through the
+    pipeline is faithful; a reload on its own is not.
+
+  - **It is the loadable subset, not what the browser saw.** Only the IRC 0-3
+    rows were ever stored - the Double Handed, Clipper Yachts, Line Honours and
+    one-design views are re-cuts of those same boats and were discarded on
+    purpose, so they cannot come back out of the database. The four IRC
+    divisions partition the fleet exactly (2025: 28+83+71+84 = 266; 2026:
+    34+73+82+96 = 285, both equal to the site's own overall list), which is why
+    dropping the rest is right for entries and why this file is complete for
+    every purpose the database serves.
+
+The export is deliberately NOT part of `refresh_all.py`: it writes a source file
+*from* the database, so scheduling it would let a damaged database overwrite the
+only copy of its own source.
