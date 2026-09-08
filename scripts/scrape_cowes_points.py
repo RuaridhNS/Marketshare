@@ -54,12 +54,18 @@ overrides this.
 THE CODE VOCABULARY, for the seasons that publish it. Worked out from the data
 rather than assumed, the same way load_rorc_season_points.py had to:
 
-    (blank)  a finishing score          -> an entry
-    DNF RET  started, did not finish    -> an entry, status retired
-    DSQ      started, disqualified      -> an entry, status disqualified
-    DNC      did not compete            -> NOT an entry
-    NER      not entered for that race  -> NOT an entry
-    NOD      no declaration             -> NOT an entry (see below)
+    (blank)      a finishing score          -> an entry
+    AVG RDG      average points, redress    -> an entry, status finished
+    DNF RET DNS  started, no finish         -> an entry, status retired
+    DSQ OCS ...  started, penalised         -> an entry, status disqualified
+    DNC          did not compete            -> NOT an entry
+    NER          not entered for that race  -> NOT an entry
+    NOD          no declaration             -> NOT an entry (see below)
+
+Every code is tallied on every run and anything unrecognised is reported rather
+than quietly absorbed, which is how AVG was caught: it appeared 522 times in
+2018 - 9% of that season - and the first run dropped every one. See the
+STARTED_SCORED comment for the two independent checks that place it.
 
 NER is the most common code and it is settled, not guessed. Every boat detail
 page carries "Days entered" as an eight-character week (SSMTWTFS = Saturday
@@ -146,10 +152,37 @@ WEEK = ["Sat", "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
 NOT_A_RACE = re.compile(r"^(Pos|Boat\s*Name|Total|O/A|Best\d*)$", re.I)
 RACE_NUMBERED = re.compile(r"^R(\d+)$", re.I)
 GROUP_SERIES = re.compile(r"\bgroup\s+overall\b", re.I)
+# A class can publish the same racing twice under two names, and loading both
+# counts every boat twice. "Squib" lists seven days and "Squib National
+# Championship" lists R1-R5 which are five of those same days, value for value:
+# (B) ALICE scored 83, 54, 79, 79, 60 on Sun-Thu in the first and exactly
+# 83, 54, 79, 79, 60 as R1-R5 in the second, and ATOM and ATOMIC match too.
+# J/70 does it one level up - the "overall" day scores are averages of the
+# individual short-series races, which is why they come out fractional (26.7,
+# 24.5, 37.5) - so a J/70 loaded from both views gets 8 day entries plus 10
+# race entries for the same 10 races.
+#
+# The day-based view wins: it covers the whole week, and its "Day n" races line
+# up with what the daily scraper writes for every other season.
+RECUT_SUFFIX = re.compile(
+    r"\s+(short series|national championship|grand slam|championship)$", re.I)
+OVERALL_SUFFIX = re.compile(r"\s+overall$", re.I)
 
 # Worked out from the data - see the module docstring. Anything not listed is
 # treated as "did not sail" AND reported, so a code this script has never seen
-# cannot quietly become an entry or vanish without a mention.
+# cannot quietly become an entry or vanish without a mention. That reporting
+# paid for itself on the first full season: AVG turned up 522 times in 2018 and
+# was being dropped.
+#
+# AVG is average points, and it means the boat RACED. Two things say so. It
+# only ever falls on a day the boat was entered for (27 of 27 cross-checked
+# against "Days entered", against NER's 0 of 27), and its value is computed
+# from the boat's own other races rather than being the fleet+1 penalty a
+# non-starter gets: in the five-boat Farr 280 class, where that penalty would
+# be 6.0, TOUCAN scored 1.5 and 1.7, PANDEMONIUM 3.5 and 2.0, 4SALE 1.5, 2.7
+# and 3.5. Fractional, boat-specific, mid-fleet - a score, not a penalty. RDG
+# is redress given, which likewise only happens to a boat that sailed.
+STARTED_SCORED = {"AVG", "RDG"}
 STARTED_RETIRED = {"DNF", "RET", "RTD", "DNS"}
 STARTED_DISQ = {"DSQ", "BFD", "UFD", "OCS", "SCP", "NSC", "DGM"}
 DID_NOT_SAIL = {"DNC", "NER", "NOD"}
@@ -189,18 +222,53 @@ def fetch(params, attempts=4):
     raise last
 
 
+def base_class(name):
+    """The class a series belongs to, with any re-cut suffix removed."""
+    return OVERALL_SUFFIX.sub("", RECUT_SUFFIX.sub("", name or "")).strip()
+
+
 def discover_series(year):
-    """Every class series for a season, group-level re-cuts excluded."""
+    """Every class series for a season, with both kinds of re-cut excluded.
+
+    Returns (series, skipped) - skipped is reported rather than silently
+    dropped, since a class that stops publishing two views should show up as a
+    change in behaviour, not as a number that quietly moves.
+    """
     html = fetch({"section": "racing", "page": f"points{year}"})
-    out = []
+    found = []
     for sid, name in re.findall(r'<option[^>]*value="(\d+)"[^>]*>([^<]+)</option>', html):
         name = clean(name)
         if sid == "0" or not name:
             continue
+        found.append((sid, name))
+    skipped = []
+    # Whole-fleet re-cuts across every class: same trap, bigger.
+    keep = []
+    for sid, name in found:
         if GROUP_SERIES.search(name):
+            skipped.append((name, "re-cut of the class series across a whole group"))
+        else:
+            keep.append((sid, name))
+    # Then per-class: where a base class publishes more than one view, keep the
+    # day-based one (the bare name, or the "overall" variant).
+    by_base = {}
+    for sid, name in keep:
+        by_base.setdefault(base_class(name).lower(), []).append((sid, name))
+    out = []
+    for _, members in by_base.items():
+        if len(members) == 1:
+            out.append(members[0])
             continue
-        out.append((sid, name))
-    return out
+        preferred = ([m for m in members if not RECUT_SUFFIX.search(m[1])
+                      and not OVERALL_SUFFIX.search(m[1])]
+                     or [m for m in members if OVERALL_SUFFIX.search(m[1])]
+                     or members[:1])
+        out.append(preferred[0])
+        for m in members:
+            if m is not preferred[0]:
+                skipped.append((m[1], f"same racing as {preferred[0][1]!r}"))
+    out.sort(key=lambda m: found.index(m))
+    return out, skipped
 
 
 def biggest_table(html):
@@ -435,7 +503,9 @@ def main():
     args = p.parse_args()
 
     print(f"Discovering {args.year} series...", flush=True)
-    series = discover_series(args.year)
+    series, skipped = discover_series(args.year)
+    for name, why in skipped:
+        print(f"  skipping {name!r}: {why}", flush=True)
     if args.only_class:
         series = [s for s in series if args.only_class.lower() in s[1].lower()]
     if args.limit:
@@ -565,7 +635,8 @@ def main():
             for (hdr, value, code), num in zip(cells, nums):
                 if code:
                     codes[code] = codes.get(code, 0) + 1
-                if code and code not in STARTED_RETIRED and code not in STARTED_DISQ:
+                if code and code not in STARTED_SCORED and code not in STARTED_RETIRED \
+                        and code not in STARTED_DISQ:
                     if code not in DID_NOT_SAIL:
                         unknown[code] = unknown.get(code, 0) + 1
                     continue            # did not sail this race
