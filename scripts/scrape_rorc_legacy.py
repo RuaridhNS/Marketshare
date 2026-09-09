@@ -25,6 +25,7 @@ import sys
 import re
 import time
 import argparse
+import sqlite3
 import subprocess
 from urllib.parse import urljoin
 
@@ -50,6 +51,10 @@ COLUMN_ALIASES = {
     "comments": "Comments",
 }
 REQUIRED_FIELDS = {"SailNo", "Boat"}
+
+# "Entries: 447     Races Sailed: 12     Discard: 7" - the fleet summary an
+# overall-standings page prints where a race page prints its race name.
+SUMMARY_LINE = re.compile(r"^\s*Entries:\s*\d", re.I)
 
 
 def normalize_header_name(name):
@@ -97,6 +102,15 @@ def parse_race_page(url):
     series_title = texts[0] if len(texts) > 0 else ""
     race_name = texts[1] if len(texts) > 1 else ""
     date_line = texts[2] if len(texts) > 2 else ""
+
+    # An "overall standings" page (slug ending -os) has no race on it, so the
+    # line where a race page carries its name carries a fleet summary instead.
+    # Taking it verbatim produced 251 races in the database called things like
+    # "Entries: 447\xa0\xa0\xa0\xa0\xa0Races Sailed: 12" - 12,636 entries under
+    # names that are not names. The class is already parsed out of the title,
+    # so the page gets the one name that describes it.
+    if SUMMARY_LINE.match(race_name):
+        race_name = "Season Standings"
 
     year_m = re.match(r"^(\d{4})\s+(.*)$", series_title)
     rest = year_m.group(2) if year_m else series_title
@@ -196,16 +210,49 @@ def main():
     p.add_argument("--limit", type=int, default=None)
     p.add_argument("--delay", type=float, default=CRAWL_DELAY)
     p.add_argument("--dry-run", action="store_true")
+    p.add_argument("--resume", action="store_true",
+                   help="skip pages already fetched (by races.source_url, or by "
+                        "a CSV of the same name left in exports/)")
     args = p.parse_args()
 
     print(f"Discovering race URLs for {args.year}...")
     urls = discover_race_urls(args.year, args.slug_pattern)
-    if args.limit:
-        urls = urls[: args.limit]
-    print(f"Found {len(urls)} race page(s) to scrape.")
+    print(f"Found {len(urls)} race page(s) on the {args.year} index.")
 
     exports_dir = REPO_ROOT / "exports"
     exports_dir.mkdir(exist_ok=True)
+
+    if args.resume:
+        # Two records of what has already been fetched, because the older runs
+        # left only one of them. races.source_url is the durable answer going
+        # forward; for everything loaded before that was recorded, the CSV the
+        # scraper writes on its way into the database is the only trace, and
+        # those live in exports/ (gitignored, so they can vanish - which is why
+        # the URL is now stored too).
+        done = set()
+        try:
+            con = sqlite3.connect(args.db)
+            done |= {u for (u,) in con.execute(
+                "SELECT source_url FROM races WHERE IFNULL(source_url,'') <> ''")}
+            con.close()
+        except sqlite3.Error:
+            pass
+        before = len(urls)
+        kept = []
+        for u in urls:
+            slug = re.search(rf"/raceresults/{args.year}/([\w\-]+)\.html", u).group(1)
+            if u in done or (exports_dir / f"rorc_{args.year}_{slug}.csv").exists():
+                continue
+            kept.append(u)
+        urls = kept
+        print(f"  resuming: {before - len(urls)} already fetched, {len(urls)} to go")
+
+    # After the resume filter, so --limit means "fetch this many NEW pages"
+    # rather than "look at this many of the index", which with --resume could
+    # be a slice that is entirely already-fetched and so do nothing at all.
+    if args.limit:
+        urls = urls[: args.limit]
+        print(f"  limited to the first {len(urls)}")
 
     for i, url in enumerate(urls):
         if i > 0:

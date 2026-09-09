@@ -68,7 +68,14 @@ def main():
     conn = sqlite3.connect(args.db)
     cur = conn.cursor()
 
-    with open(args.csv_file) as f:
+    # UTF-8 explicitly, because that is what scrape_rorc_legacy.py writes.
+    # Without it Python used the platform default - cp1252 on this machine -
+    # and any byte outside that codepage killed the load: three 2011 races
+    # died on 0x8f mid-run, including Cowes-Dinard-St Malo with 44 boats. The
+    # scraper had already written the CSV by then, so --resume treated those
+    # races as done and would have skipped them for good. A CSV on disk means
+    # the page was FETCHED, not that it loaded.
+    with open(args.csv_file, encoding="utf-8", errors="replace") as f:
         lines = [l for l in f if not l.startswith("#")]
     reader = csv.DictReader(lines)
 
@@ -76,6 +83,17 @@ def main():
     event_id = get_or_create_event(cur, regatta_id, args.year, source_url=args.source_url)
     race_id = create_race(cur, event_id, args.race_name, status="confirmed",
                           class_label=args.class_label, race_date=args.race_date)
+    # The URL identifies the RACE, not the season. Passing it only to
+    # get_or_create_event left every race with an empty source_url and the
+    # event holding whichever page happened to be loaded last, so there was no
+    # way to ask which of the archive's pages had already been fetched: an
+    # audit of 2009-2022 found 177 pages on the season indexes with nothing in
+    # the database, and the only record of what HAD been fetched was the CSVs
+    # left in exports/, which are gitignored. COALESCE so a re-load never
+    # overwrites the URL a race was first seen at.
+    if args.source_url:
+        cur.execute("UPDATE races SET source_url = COALESCE(source_url, ?) WHERE id = ?",
+                    (args.source_url, race_id))
 
     n = 0
     for row in reader:

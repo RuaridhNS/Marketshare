@@ -30,6 +30,51 @@ def main():
     races = [dict(r) for r in cur.execute(
         "SELECT id, event_id, race_name, race_number, race_date, status, source_url FROM races")]
 
+    # A season-standings page is not a race. RORC's legacy archive publishes
+    # one per class per season alongside the individual race pages, listing
+    # every boat that competed with its total points - so its rows repeat boats
+    # already counted race by race. In 2022 the IRC Overall standings held 392
+    # boats and every single one of them also appears in that season's 16 race
+    # pages. Loaded as races they were 251 rows and 12,636 entries, 31% of all
+    # RORC entries, each boat counted once more per class-season.
+    #
+    # They are kept in the database, because the season points and overall
+    # positions on them exist nowhere else, and dropped from the export, which
+    # is what feeds every count and share figure. 2007-2009 are standings-only
+    # - the archive has no per-race pages for those seasons - so excluding
+    # them costs those three years their boat-level entries. That is the right
+    # trade: a count that is 31% double is worse than a gap that is visible on
+    # the Coverage page.
+    # Only where the per-race pages exist to duplicate. 2007-2009 have no race
+    # pages in the archive at all - the season index lists 8 to 10 links and
+    # every one is a standings page - so there the standings ARE the record,
+    # and dropping them would take 435 boats and three seasons of fleet out of
+    # the dashboard to fix a double-count that is not happening. Decided per
+    # (event, class), because the redundancy is per class: a class whose race
+    # pages 404ed keeps its standings even in a season where other classes
+    # have both.
+    standings = [r for r in races if r["race_name"] == "Season Standings"]
+    standings_race_ids = set()
+    if standings:
+        cls_by_race = {}
+        for rid, cl in cur.execute(
+                "SELECT race_id, class FROM race_entries GROUP BY race_id, class"):
+            cls_by_race.setdefault(rid, set()).add(cl)
+        covered = set()          # (event_id, class) that a real race already holds
+        for r in races:
+            if r["race_name"] == "Season Standings":
+                continue
+            for cl in cls_by_race.get(r["id"], ()):
+                covered.add((r["event_id"], cl))
+        for r in standings:
+            if all((r["event_id"], cl) in covered for cl in cls_by_race.get(r["id"], ())):
+                standings_race_ids.add(r["id"])
+    races = [r for r in races if r["id"] not in standings_race_ids]
+    if standings:
+        print(f"  season standings: {len(standings_race_ids)} of {len(standings)} excluded "
+              f"(their class already has real races in that event); "
+              f"{len(standings) - len(standings_race_ids)} kept as the only record")
+
     class_counts = [dict(r) for r in cur.execute(
         "SELECT event_id, class_label, entry_count, source FROM event_class_counts")]
 
@@ -57,6 +102,13 @@ def main():
                re.comments, re.tag, re.source
         FROM race_entries re
     """).fetchall()
+    # Their races were dropped above; drop their entries too, or every count
+    # keeps the duplication and the client is left holding entries whose
+    # race_id resolves to nothing.
+    if standings_race_ids:
+        before = len(entries_rows)
+        entries_rows = [e for e in entries_rows if e["race_id"] not in standings_race_ids]
+        print(f"  and {before - len(entries_rows)} entr(y/ies) on those races")
 
     # ---- IRC-only scope ----------------------------------------------------
     # This tool tracks the IRC fleet. Pure one-design boats (XOD, Squib,

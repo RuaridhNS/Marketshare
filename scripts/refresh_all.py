@@ -157,6 +157,14 @@ def main():
         # than one name are reported and left alone.
         ("Repair stale boat names", ["repair_boat_names.py"], "boat names stale"),
 
+        # After the regatta merges above, which is what brings an entry list and
+        # the results that replaced it into one place. An entry list is loaded
+        # on purpose for a race not yet sailed; once the results arrive it is a
+        # duplicate of them. JOG's 2026 Lonely Tower was 93 entered boats from
+        # the fleet spreadsheet and 100 from the club's results pages, 91 of
+        # them the same boats.
+        ("Drop superseded entry lists", ["drop_superseded_entries.py"], "superseded entries"),
+
         # Loaders write the owner onto the ENTRY; this promotes it to the boat
         # record the dashboard actually reads. Skipping it left 2,729 boats
         # looking ownerless while their own race history named the owner, so it
