@@ -144,6 +144,47 @@ def rederive_identity(cur, bid, sail, dry):
           f"{' (dry run)' if dry else ''}")
 
 
+def shares_nothing(cur, dst, src):
+    """True when the two records share neither a raced name nor an owner.
+
+    name_clash only refuses a pair that raced in the SAME season under
+    different names. Two different boats whose seasons happen not to overlap
+    sail straight past it, and the Duplicates page proposes exactly those: its
+    sail-number rule pairs anything differing by a trailing letter with a
+    matching type, which is thin evidence on its own.
+
+    Two got through that way. GBR5940 is Roger Bowden's King 40 NIFTY, raced in
+    2018; GBR5940R is Michael Bartholomew's King 40 TOKOLOSHE, 55 entries from
+    2009 to 2019 - and the merge would have folded TOKOLOSHE into NIFTY.
+    GBR1445 is Agne V Nilsson's Farr 45 FORTIS EXCEL; GBR1445R is Jonathan
+    Bamberger's SPITFIRE. Same type, one letter apart, no season in common, no
+    name in common, no owner in common.
+
+    A shared owner is what separates these from a legitimate sponsor rename:
+    GBR4601 and GBR4601L are both John Shepherd's FAIR DO'S VII, one of them
+    entered as THREADNEEDLE ASSET MANAGEMENT, and they share no name at all -
+    only the owner says they are one boat. So this refuses only when BOTH
+    signals are absent.
+    """
+    def names_and_owners(bid):
+        names, owners = set(), set()
+        for nm, ow in cur.execute(
+                "SELECT UPPER(IFNULL(boat_name_used,'')), UPPER(IFNULL(owner_name_used,'')) "
+                "FROM race_entries WHERE boat_id = ?", (bid,)):
+            if nm:
+                names.add(nm)
+            if ow:
+                owners.add(ow)
+        return names, owners
+    an, ao = names_and_owners(dst)
+    bn, bo = names_and_owners(src)
+    if not (an and bn):
+        return None            # one side has no named entry: nothing to judge on
+    if (an & bn) or (ao & bo):
+        return None
+    return (sorted(an)[:3], sorted(ao)[:2], sorted(bn)[:3], sorted(bo)[:2])
+
+
 def fold(cur, keep_sail, fold_sail, only_named, dry, force=False):
     k = cur.execute("SELECT id, boat_name FROM boats WHERE sail_no = ?", (keep_sail,)).fetchone()
     f = cur.execute("SELECT id, boat_name FROM boats WHERE sail_no = ?", (fold_sail,)).fetchone()
@@ -160,6 +201,16 @@ def fold(cur, keep_sail, fold_sail, only_named, dry, force=False):
         for yr, an, bn in clashes:
             print(f"      {yr}: {keep_sail} as {'/'.join(an)}, {fold_sail} as {'/'.join(bn)}")
         print("      Re-run with --force if you know they are the same hull.")
+        return 0
+
+    apart = shares_nothing(cur, dst, src) if not only_named and not force else None
+    if apart:
+        an, ao, bn, bo = apart
+        print(f"  REFUSED {fold_sail} {f[1]!r} -> {keep_sail} {k[1]!r}: they share no "
+              f"raced name and no owner, so nothing says they are one boat:")
+        print(f"      {keep_sail:12} raced as {'/'.join(an)}  owner(s) {'/'.join(ao) or '?'}")
+        print(f"      {fold_sail:12} raced as {'/'.join(bn)}  owner(s) {'/'.join(bo) or '?'}")
+        print("      Re-run with --force, or set OnlyNamed, if you know better.")
         return 0
 
     moved, dropped = move_entries(cur, src, dst, only_named, dry)
