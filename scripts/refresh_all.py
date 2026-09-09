@@ -148,6 +148,15 @@ def main():
         ("Merge boats", ["merge_boats.py", "--file", "data/boat_merges.csv"], "boat merges"),
         ("Split wrongly-merged boats", ["split_boat.py", "data/boat_splits.csv"], "boat splits"),
 
+        # Straight after those two, because both can leave a record wearing a
+        # name whose entry has just moved to another boat. merge_boats repairs
+        # the pairs in its own ledger; this catches every other case, including
+        # ones left by a merge made before that repair existed - GBR3750 was
+        # still called GLASGOW KISS while holding eight GOOD HYDEING entries,
+        # the real GLASGOW KISS being SGP3750. Records that raced under more
+        # than one name are reported and left alone.
+        ("Repair stale boat names", ["repair_boat_names.py"], "boat names stale"),
+
         # Loaders write the owner onto the ENTRY; this promotes it to the boat
         # record the dashboard actually reads. Skipping it left 2,729 boats
         # looking ownerless while their own race history named the owner, so it
