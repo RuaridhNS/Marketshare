@@ -25,10 +25,15 @@ each row would move before anything is written.
 Usage:
   python3 merge_boats.py <db.sqlite> [--file data/boat_merges.csv] [--dry-run]
 """
+import re
+import sys
 import csv
 import argparse
 import sqlite3
 import pathlib
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+from build_db import donate_entry_fields
 
 # tables that point at a boat, and the columns that make a row unique there
 CARRIED = [("race_entries", "boat_id", ["race_id"]),
@@ -49,19 +54,23 @@ def move_entries(cur, src, dst, only_named, dry):
         "SELECT id, race_id FROM race_entries WHERE boat_id = ?" +
         (" AND UPPER(boat_name_used) = UPPER(?)" if only_named else ""),
         (src, only_named) if only_named else (src,)).fetchall()
-    moved = dropped = 0
+    moved = dropped = rescued = 0
     for eid, race_id in rows:
-        clash = cur.execute("SELECT 1 FROM race_entries WHERE race_id = ? AND boat_id = ?",
+        clash = cur.execute("SELECT id FROM race_entries WHERE race_id = ? AND boat_id = ?",
                             (race_id, dst)).fetchone()
         if clash:
             if not dry:
+                # Same reason as dedupe_races: the two rows are one boat in one
+                # race and look interchangeable, but the one being dropped may
+                # be the only place a sailmaker or a lead rep was ever recorded.
+                rescued += donate_entry_fields(cur, eid, clash[0])
                 cur.execute("DELETE FROM race_entries WHERE id = ?", (eid,))
             dropped += 1
         else:
             if not dry:
                 cur.execute("UPDATE race_entries SET boat_id = ? WHERE id = ?", (dst, eid))
             moved += 1
-    return moved, dropped
+    return moved, dropped, rescued
 
 
 def name_clash(cur, dst, src):
@@ -166,6 +175,25 @@ def shares_nothing(cur, dst, src):
     only the owner says they are one boat. So this refuses only when BOTH
     signals are absent.
     """
+    # One exception, and it is the strongest identity there is: the two records
+    # carry the SAME sail number, one of them with an IRC endorsement suffix.
+    # A number is issued to a hull, so GBR1445 and GBR1445R are one boat -
+    # and a hull that has been sold and renamed shares neither a name nor an
+    # owner, which is the exact shape this function refuses on. That made it
+    # refuse GBR1445 'FORTIS EXCEL' (Agne V Nilsson, 2009) against GBR1445R
+    # 'SPITFIRE' (Jonathan Bamberger, 2015-16), both Farr 45s rated 1.21-1.23.
+    # The same pattern was confirmed one row earlier in this ledger: GBR5940
+    # 'NIFTY' (Roger Bowden) and GBR5940R 'TOKOLOSHE' (Michael Bartholomew) are
+    # one King 40, and that record now holds both names and both owners.
+    #
+    # So a shared base number overrides the rule. Where the numbers genuinely
+    # differ - two records paired on name alone - the refusal still stands.
+    base = lambda s: re.sub(r"[^A-Z0-9]", "", (s or "").upper()).rstrip("ABCDEFGHIJKLMNOPQRSTUVWXYZ")
+    k_sail = cur.execute("SELECT sail_no FROM boats WHERE id = ?", (dst,)).fetchone()
+    f_sail = cur.execute("SELECT sail_no FROM boats WHERE id = ?", (src,)).fetchone()
+    if k_sail and f_sail and base(k_sail[0]) and base(k_sail[0]) == base(f_sail[0]):
+        return None
+
     def names_and_owners(bid):
         names, owners = set(), set()
         for nm, ow in cur.execute(
@@ -213,10 +241,11 @@ def fold(cur, keep_sail, fold_sail, only_named, dry, force=False):
         print("      Re-run with --force, or set OnlyNamed, if you know better.")
         return 0
 
-    moved, dropped = move_entries(cur, src, dst, only_named, dry)
+    moved, dropped, rescued = move_entries(cur, src, dst, only_named, dry)
     note = f" (only entries named {only_named!r})" if only_named else ""
     print(f"  {fold_sail} {f[1]!r} -> {keep_sail} {k[1]!r}{note}: "
-          f"{moved} entr{'y' if moved == 1 else 'ies'} moved, {dropped} already present")
+          f"{moved} entr{'y' if moved == 1 else 'ies'} moved, {dropped} already present"
+          + (f", {rescued} curated field(s) carried over" if rescued else ""))
 
     if only_named:
         left = cur.execute("SELECT COUNT(*) FROM race_entries WHERE boat_id = ?", (src,)).fetchone()[0]

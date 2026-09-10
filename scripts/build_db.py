@@ -163,6 +163,40 @@ def get_or_create_event(cur, regatta_id, season_year, notes=None, source_url=Non
 _RACE_SUFFIX = re.compile(r"\s*\((?:race|mini-?series|r)\s*\d+\)\s*$", re.I)
 
 
+# Fields a hand-made source can carry that a scrape never does. When two rows
+# for the same boat in the same race collapse - dedupe_races merging a race
+# pair, or merge_boats folding one boat into another - these move to the
+# survivor instead of dying with the row that loses. Shared by both, because
+# both delete a duplicate entry and both used to do it blindly: 135 sailmaker
+# values went that way when the JOG fleet register's entry list was collapsed
+# into the sailed results for the same race.
+CURATED_ENTRY_FIELDS = ("sailmaker_id", "lead_rep", "contacted_by", "tag", "in_cs")
+
+
+def donate_entry_fields(cur, src_entry_id, dst_entry_id):
+    """Copy curated fields off a row about to be deleted onto the survivor,
+    filling only what the survivor has empty. Returns how many were rescued."""
+    if not src_entry_id or not dst_entry_id or src_entry_id == dst_entry_id:
+        return 0
+    cols = ", ".join(CURATED_ENTRY_FIELDS)
+    src = cur.execute(f"SELECT {cols} FROM race_entries WHERE id = ?", (src_entry_id,)).fetchone()
+    dst = cur.execute(f"SELECT {cols} FROM race_entries WHERE id = ?", (dst_entry_id,)).fetchone()
+    if not src or not dst:
+        return 0
+    sets, vals, n = [], [], 0
+    for i, col in enumerate(CURATED_ENTRY_FIELDS):
+        empty = dst[i] is None or (isinstance(dst[i], str) and not dst[i].strip())
+        has = src[i] is not None and not (isinstance(src[i], str) and not src[i].strip())
+        if empty and has:
+            sets.append(f"{col} = ?")
+            vals.append(src[i])
+            n += 1
+    if sets:
+        cur.execute(f"UPDATE race_entries SET {', '.join(sets)} WHERE id = ?",
+                    (*vals, dst_entry_id))
+    return n
+
+
 _VERDICTS = None
 
 
