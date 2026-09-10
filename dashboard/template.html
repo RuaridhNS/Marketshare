@@ -804,7 +804,9 @@ function sharedName(a, b) {
   return Array.from(names(a)).find(n => n && nb.has(n)) || '';
 }
 
-function findDuplicateGroups() {
+// Built once, filtered three ways: the working list, the parked list, and
+// the count on the nav badge.
+function allDuplicateGroups() {
   const byName = {};
   const byBase = {};
   DATA.boats.forEach(b => {
@@ -832,8 +834,39 @@ function findDuplicateGroups() {
     seen.add(ids);
     groups.push({ key: 'sailno:'+key, reason: `Sail numbers differ only by trailing letter(s) (${Array.from(distinctSailNos).join(' / ')}), same boat type ("${boats[0].boat_type}")`, boats });
   });
+  return groups;
+}
+
+function findDuplicateGroups() {
+  const dismissed = loadDismissedDupes(), parked = loadUnknownDupes();
+  return allDuplicateGroups().filter(g => !dismissed.includes(g.key)
+    && !parked.includes(g.key) && !g.boats.some(b => isPendingMergeAway(b.id)));
+}
+// The parked ones, for the "Unknown" section - same detection, so a pair that
+// stops being a candidate stops being listed here too.
+function findUnknownGroups() {
+  const parked = loadUnknownDupes();
+  if (!parked.length) return [];
   const dismissed = loadDismissedDupes();
-  return groups.filter(g => !dismissed.includes(g.key) && !g.boats.some(b => isPendingMergeAway(b.id)));
+  return allDuplicateGroups().filter(g => parked.includes(g.key)
+    && !dismissed.includes(g.key) && !g.boats.some(b => isPendingMergeAway(b.id)));
+}
+// Three verdicts, not two. "Merge" and "not a duplicate" are both decisions;
+// a lot of pairs are neither, and answering them needs someone who knows the
+// boats - GBR1445 FORTIS EXCEL against GBR1445R SPITFIRE sat unresolved for a
+// day because it needed the fact that a sail number belongs to a hull, not a
+// name. Without somewhere to put those, the only way to clear one off the list
+// was to call it "not a duplicate", which is a claim, and a wrong one.
+// Unknown parks it: out of the working list, still counted, still recoverable.
+const UNKNOWN_DUP_KEY = 'marketshare_unknown_dupes_v1';
+function loadUnknownDupes() { try { return JSON.parse(localStorage.getItem(UNKNOWN_DUP_KEY)||'[]'); } catch(e){ return []; } }
+function markDupeUnknown(key) {
+  const u = loadUnknownDupes();
+  if (!u.includes(key)) { u.push(key); localStorage.setItem(UNKNOWN_DUP_KEY, JSON.stringify(u)); }
+}
+function clearDupeUnknown(key) {
+  localStorage.setItem(UNKNOWN_DUP_KEY,
+    JSON.stringify(loadUnknownDupes().filter(k => k !== key)));
 }
 const DISMISSED_DUP_KEY = 'marketshare_dismissed_dupes_v1';
 function loadDismissedDupes() { try { return JSON.parse(localStorage.getItem(DISMISSED_DUP_KEY)||'[]'); } catch(e){ return []; } }
@@ -2195,16 +2228,38 @@ function renderDuplicates() {
       <div class="btn-row">
         <button class="btn" type="button" data-merge-group="${esc(g.key)}">Merge into selected</button>
         <button class="btn secondary" type="button" data-dismiss-group="${esc(g.key)}">Not a duplicate — dismiss</button>
+        <button class="btn secondary" type="button" data-unknown-group="${esc(g.key)}">Unknown — decide later</button>
       </div>
     </div>`;
   }).join('');
+
+  const parked = findUnknownGroups();
+  const parkedHtml = parked.length ? `
+    <div class="card">
+      <h2 style="margin-top:0;">Unknown — parked for a decision (${parked.length})</h2>
+      <p class="muted" style="font-size:12.5px;margin-top:0;">Neither merged nor dismissed. These are
+        the pairs where the answer needs someone who knows the boats: a sail number that differs only by
+        its IRC endorsement usually means one hull, but a hull sold and renamed shares no name and no
+        owner, which looks exactly like two different boats.</p>
+      <table>
+        <thead><tr><th>Pair</th><th>Why it was flagged</th><th></th></tr></thead>
+        <tbody>${parked.map(g => `<tr>
+          <td>${g.boats.map(b => `<a href="#/boat/${b.id}" data-route="#/boat/${b.id}">${esc(b.boat_name||b.sail_no)}</a>
+                <span class="muted">(${esc(b.sail_no||'—')}, ${b.entries.length})</span>`).join(' / ')}</td>
+          <td class="muted" style="font-size:12px;">${esc(g.reason)}</td>
+          <td><button class="btn secondary" type="button" data-unpark-group="${esc(g.key)}">Bring back</button></td>
+        </tr>`).join('')}</tbody>
+      </table>
+    </div>` : '';
 
   return `
     <h1>Possible duplicate boats</h1>
     <p class="subtitle">${groups.length} candidate group(s), found by matching identical boat names or sail numbers that
       differ only by a trailing IRC endorsement letter (e.g. GBR9091R vs GBR9091). Always a human call — dismiss
-      anything that isn't really a duplicate.</p>
-    ${groupHtml || `<div class="card muted">No candidates found right now.</div>`}
+      anything that isn't really a duplicate, or park it as unknown if you would rather not guess.${
+        parked.length ? ` <strong>${parked.length}</strong> parked below.` : ''}</p>
+    ${groupHtml || `<div class="card muted">No candidates left to decide.</div>`}
+    ${parkedHtml}
   `;
 }
 
@@ -2225,6 +2280,12 @@ function attachDuplicatesHandlers() {
   });
   document.querySelectorAll('[data-dismiss-group]').forEach(btn => {
     btn.addEventListener('click', () => { dismissDuplicateGroup(btn.dataset.dismissGroup); navigate(); });
+  });
+  document.querySelectorAll('[data-unknown-group]').forEach(btn => {
+    btn.addEventListener('click', () => { markDupeUnknown(btn.dataset.unknownGroup); navigate(); });
+  });
+  document.querySelectorAll('[data-unpark-group]').forEach(btn => {
+    btn.addEventListener('click', () => { clearDupeUnknown(btn.dataset.unparkGroup); navigate(); });
   });
 }
 

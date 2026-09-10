@@ -60,6 +60,15 @@ BLOCKED = [
             "AI-crawler list). Needs JOG to allow it, or a member-side export."),
     ("RORC 2023+", "rorc.org results moved to sailracehq.com, whose robots.txt "
                    "disallows ClaudeBot. Legacy archive covers 2007-2022 only."),
+    ("Royal Thames", "The 250th Anniversary Regatta's IRC results are on "
+                     "rtyc.nautical-cloud.com and racing.royalthames.com; both disallow "
+                     "ClaudeBot (same Cloudflare AI-crawler list as JOG). The non-IRC half "
+                     "IS fetchable - filedn.com/.../RTYC/250thResults.html, no robots.txt - "
+                     "but it is 12 one-design classes (RS Elite, Etchells, Dragon, SB20...) "
+                     "that the IRC scope excludes anyway. The Annual Regatta has no single "
+                     "source: royalthames.com/results scatters across KSail, YachtScoring "
+                     "and the Cape 31 class CMS, and the two YachtScoring events it links "
+                     "serve no result tables."),
 ]
 
 
