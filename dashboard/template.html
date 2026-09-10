@@ -3438,6 +3438,22 @@ function renderCoverage() {
       <p class="muted" style="font-size:12.5px;margin:0;">The table below is the detail, one row per regatta,
         grouped by series. The last column says specifically what each gap would take.</p>
     </div>
+    <div class="card">
+      <h2 style="margin-top:0;">How entries are counted</h2>
+      <p style="margin:0 0 8px;"><strong>A boat counts once per race.</strong> RORC scores a race once
+        per IRC division and again as “IRC Overall”; JOG scores its numbered classes and then again as
+        Double Handed, Generation JOG and the Women’s Sailing Series; ORC classes re-score the same boats
+        under a second rating system. Every one of those is the same boat in the same race.</p>
+      <p class="muted" style="font-size:12.5px;margin:0 0 8px;">Counting them all made the fleet look
+        about 15% larger than it is — of 39 RORC races carrying both an Overall table and class tables,
+        all 39 shared boats, and in the 2019 Fastnet every one of the 333 boats on Overall was already in
+        a class. On the JOG side the overlap is total: every Double Handed, Generation JOG and Women’s
+        boat is also in a numbered class.</p>
+      <p class="muted" style="font-size:12.5px;margin:0;">So each boat keeps its most specific division
+        for a race and the duplicates are dropped from the counts — 12,949 of them. Nothing is deleted:
+        the rows stay in the database, and no boat loses a race it sailed. Where an aggregate table is the
+        only record, as in the RORC races that publish nothing else, it is kept.</p>
+    </div>
     <p style="margin-top:-6px;">${chips}</p>
     ${cards}
   `;

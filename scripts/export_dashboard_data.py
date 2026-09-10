@@ -110,6 +110,90 @@ def main():
         entries_rows = [e for e in entries_rows if e["race_id"] not in standings_race_ids]
         print(f"  and {before - len(entries_rows)} entr(y/ies) on those races")
 
+    # ---- one boat, one race: drop the aggregate class rows -----------------
+    # RORC and JOG both score a race several times over. RORC publishes a race
+    # once per IRC division AND once as "IRC Overall"; JOG scores its numbered
+    # classes and then again as Double Handed, Generation JOG and the Women's
+    # Sailing Series. race_entries is UNIQUE(race_id, boat_id), so this is
+    # invisible at the row level - the duplication is across the class-specific
+    # race ROWS of one real race, keyed on (event, race_name).
+    #
+    # Measured before deciding. Of 39 RORC races holding both an Overall row
+    # and class rows, all 39 share boats, and the Overall set is usually a
+    # subset: the 2019 Fastnet has 333 boats on Overall and every one of them
+    # in a class row. On the JOG side the overlap is total - every Double
+    # Handed, Generation JOG and Women's boat in Cowes-Cherbourg 2026 and
+    # TeamO Cherbourg 2025 is also in a numbered class, 100% of them. That is
+    # 15,972 IRC Overall entries against 18,408 in real divisions, and 1,670
+    # JOG overlay entries against 3,022: about 15% of the database counted
+    # twice.
+    #
+    # An explicit list rather than a rule, because the obvious rule does not
+    # work. "How often does this class share boats with another" is symmetric -
+    # IRC 2 scores 56% only BECAUSE IRC Overall sits on top of it - so it
+    # cannot say which of a pair is the re-cut. "Fewer boats wins" is wrong
+    # too: Double Handed is smaller than Class 2 and is still the overlay.
+    #
+    # Kept where it is the only record: an aggregate row is dropped only for a
+    # boat that also appears under a real division in the same race, so a
+    # two-handed-only race, or the RORC races that publish nothing but an
+    # Overall, keep every entry they have.
+    AGGREGATE_CLASSES = {
+        "IRC Overall", "ORC Overall",          # whole-fleet aggregates
+        "ORC 1", "ORC 2", "ORC Two-Handed",    # the same boats under a second rating system
+        "IRC Two-Handed",                      # a category overlay on the divisions
+        "Double Handed", "Generation JOG", "Women's Sailing Series",
+        "One Design",
+    }
+    # A preference order, not a yes/no. A binary "is this an aggregate" test
+    # cannot choose between two aggregates - a boat in an ORC-only race sits in
+    # both "ORC 2" and "ORC Overall", neither of them a real IRC division - and
+    # it treats a NULL class as a division, so a boat with a blank row and an
+    # "IRC 3" row keeps both. Both cases left 667 boats still counted twice.
+    # Ranking them and keeping the best one per boat per race collapses all of
+    # it, and says plainly what the rule is: a boat counts once in a race, and
+    # the row that survives is the most specific one available.
+    WHOLE_FLEET = {"IRC Overall", "ORC Overall"}
+
+    def specificity(cls):
+        cls = cls or ""
+        if not cls:
+            return 3                      # no division recorded at all
+        if cls in WHOLE_FLEET:
+            return 2                      # the whole fleet in one table
+        if cls in AGGREGATE_CLASSES:
+            return 1                      # a category or a second rating system
+        return 0                          # a real division
+
+    race_key = {r["id"]: (r["event_id"], r["race_name"] or "") for r in races}
+    had_entries_before = {e["race_id"] for e in entries_rows}
+    best = {}
+    for i, e in enumerate(entries_rows):
+        if e["race_id"] not in race_key:
+            continue
+        k = (*race_key[e["race_id"]], e["boat_id"])
+        rank = specificity(e["class"])
+        if k not in best or rank < best[k][0]:
+            best[k] = (rank, i)
+    winners = {i for _, i in best.values()}
+    kept_entries, agg_dropped = [], 0
+    for i, e in enumerate(entries_rows):
+        if e["race_id"] in race_key and i not in winners:
+            agg_dropped += 1
+            continue
+        kept_entries.append(e)
+    entries_rows = kept_entries
+    if agg_dropped:
+        # Races left holding nothing go too, or the tree grows an "IRC Overall"
+        # branch with no boats under it.
+        still_used = {e["race_id"] for e in entries_rows}
+        emptied = had_entries_before - still_used
+        races = [r for r in races if r["id"] not in emptied]
+        print(f"  one boat one race: dropped {agg_dropped} duplicate entr(y/ies) where the "
+              f"same boat was scored again under an aggregate class (IRC/ORC Overall, "
+              f"Double Handed, Generation JOG...), keeping the most specific division; "
+              f"{len(emptied)} race row(s) left holding nothing")
+
     # ---- IRC-only scope ----------------------------------------------------
     # This tool tracks the IRC fleet. Pure one-design boats (XOD, Squib,
     # Sunbeam, SB20, most J/70s) are filtered out here rather than deleted, so
