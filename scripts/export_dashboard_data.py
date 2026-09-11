@@ -474,12 +474,31 @@ def main():
         d["current_sailmaker"] = current_sm
         boats.append(d)
 
-    # ---- market share: boat-level entries with a known sailmaker ----
+    # ---- market share by entries: racing done by boats whose sails we know ----
+    # This used to count race_entries.sailmaker_id, which is set by a couple of
+    # hand-made loaders and by nothing else - so it measured "entries whose
+    # loader happened to record a sailmaker", not "entries sailed by a boat we
+    # know the sails of". 345 entries against the 12,619 that the 225 known
+    # boats actually sailed, and one collapsed duplicate row could move it by a
+    # third, which is what happened when the JOG register was folded into its
+    # results.
+    #
+    # Counted off the boat instead, which is where a sailmaker is actually
+    # recorded. Weighting by entries is the point of having this chart beside
+    # the per-boat one: a boat that sails twenty races is twenty races' worth of
+    # sails in the fleet, and a boat that sails one is not.
+    #
+    # Uses the boat's CURRENT sailmaker for every season it raced. That is exact
+    # for all but 14 boats - the only ones in the database with more than one
+    # maker on record - and of 282 sailmaker rows just 62 carry a start date, so
+    # attributing by season would be guesswork dressed as precision for the sake
+    # of those 14.
     from collections import Counter, defaultdict
+    entries_per_boat = Counter(e["boat_id"] for e in entries_rows)
     sm_counts = Counter()
-    for e in entries_rows:
-        if e["sailmaker_id"]:
-            sm_counts[sm_by_id[e["sailmaker_id"]]["name"]] += 1
+    for b in boats:
+        if b["current_sailmaker"]:
+            sm_counts[b["current_sailmaker"]] += entries_per_boat.get(b["id"], 0)
     market_share = [{"sailmaker": k, "entries": v} for k, v in sorted(sm_counts.items(), key=lambda x: -x[1])]
 
     # distinct-boat market share (a boat counted once, using its "current" sailmaker)

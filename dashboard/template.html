@@ -4481,16 +4481,26 @@ function attachMarketAnalysisHandlers() {
 }
 
 function renderMarketShare() {
-  // "By race entry" is recomputed from raw entries (rather than the
-  // server-precomputed all-time DATA.market_share_entries) so it can be
-  // scoped to the same last-5-season active window as everything else here.
+  // "By race entry" is recomputed here rather than taken from the
+  // precomputed DATA.market_share_entries, so it can be scoped to the same
+  // last-5-season active window as everything else on this page.
+  //
+  // It counts the BOAT's sailmaker, not the entry's. e.sailmaker_name is set
+  // by two hand-made loaders and by no scraper, so counting it measured which
+  // loader wrote a row rather than whose sails were on the water - 345 entries
+  // where the 225 boats we know actually sailed 12,619. It was fragile as well
+  // as wrong: collapsing one duplicated entry row moved it by a third.
   const byBucketEntries = {};
-  DATA.boats.forEach(b => b.entries.forEach(e => {
-    const year = entrySeasonYear(e);
-    if (year == null || year < ACTIVE_CUTOFF_YEAR || !e.sailmaker_name) return;
-    const bucket = bucketOf(e.sailmaker_name);
-    byBucketEntries[bucket] = (byBucketEntries[bucket]||0) + 1;
-  }));
+  DATA.boats.forEach(b => {
+    const maker = liveSailmaker(b);
+    if (!maker) return;
+    const bucket = bucketOf(maker);
+    b.entries.forEach(e => {
+      const year = entrySeasonYear(e);
+      if (year == null || year < ACTIVE_CUTOFF_YEAR) return;
+      byBucketEntries[bucket] = (byBucketEntries[bucket]||0) + 1;
+    });
+  });
   const byBucketBoats = boatBucketCounts();
   const itemsEntries = BUCKET_ORDER.filter(b=>byBucketEntries[b]).map(b=>({sailmaker:b, entries:byBucketEntries[b]}));
   const itemsBoats = BUCKET_ORDER.filter(b=>byBucketBoats[b]).map(b=>({sailmaker:b, entries:byBucketBoats[b]}));
@@ -4509,6 +4519,10 @@ function renderMarketShare() {
       <div class="card">
         <h2>By race entry, last 5 seasons (a boat can appear more than once)</h2>
         ${svgBarChart(itemsEntries, {colorFn: it => BUCKET_COLOR[it.sailmaker]})}
+        <p class="muted" style="font-size:12px;margin:10px 0 0;">Races sailed by boats whose
+          sailmaker we know, weighted by how much each one races — a boat doing twenty races is
+          twenty races’ worth of sails in the fleet. It is not “entries that record a sailmaker”:
+          results almost never do.</p>
       </div>
     </div>
     <div class="card" style="padding:0;overflow:auto;">
