@@ -3239,6 +3239,7 @@ function renderCalendar() {
   };
 
   const withBoats = rows.filter(r => r.boats.length).length;
+  const allDated = all.filter(r => r.start).length;
   return `
     <h1>Calendar</h1>
     <p class="subtitle">Every event we hold, newest first. Market share is shown on each one we have
@@ -3268,8 +3269,9 @@ function renderCalendar() {
         <p class="muted" style="font-size:12.5px;margin:0 0 12px;">
           <strong>${rows.length}</strong> event${rows.length === 1 ? '' : 's'} shown,
           <strong>${withBoats}</strong> with boats behind them.
-          Only 84 events carry a date, so undated ones sit at the end of their season with a dash —
-          dates arrive with results.</p>
+          ${allDated} of ${all.length} carry a date, so undated ones sit at the end of their season
+          with a dash. A date comes from the club's fixture list, not from the results — which is why
+          a future season can be on here before a single race has sailed.</p>
         ${timeline}
       </div>
     </div>

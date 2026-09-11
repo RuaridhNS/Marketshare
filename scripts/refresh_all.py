@@ -201,6 +201,11 @@ def main():
         # event start/end span from the races underneath, which is what puts a
         # regatta on the calendar at all.
         ("Normalise dates", ["normalise_dates.py"], "dates"),
+        # After normalise_dates, never before: a published fixture date is
+        # better evidence than a span derived from whichever races happened
+        # to carry one, so the ledger has to be the last word.
+        ("Apply published fixture dates",
+         ["apply_event_dates.py", "--file", "data/event_dates.csv"], "event dates"),
     ]
     for label, argv, tag in PIPELINE:
         ok, _ = run(label, argv, args.db, args.timeout)

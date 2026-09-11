@@ -115,3 +115,49 @@ python3 scripts/load_pasted_results.py db/marketshare.db pasted.csv --category J
 > nothing was lost:
 >
 > `# rows=<N> classes=<list> races=<list> notreached=<list or none>`
+
+---
+
+# Capturing a fixture list (dates, before any results exist)
+
+A different job from transcribing results, and worth its own recipe: a calendar
+page gives an event a date months before a single boat crosses a line, and a
+dated future event is what makes the timeline useful in October. The output goes
+to `data/event_dates.csv`, which `scripts/apply_event_dates.py` re-applies on
+every refresh and which **creates an event that does not exist yet** — so a
+fixture list alone is enough to build next season.
+
+The case that needs this today is **JOG 2027**. JOG released the full 2027
+calendar on 16 July 2026, but the programme itself is at
+`myjog.jog.org.uk/programme` — the blocked host — while the announcement on
+`jog.org.uk` carries no dates. So the calendar has to come through your browser.
+
+Open the programme page and paste:
+
+> You are transcribing a sailing fixture list from the page open in this browser.
+>
+> **Output nothing but a CSV** — no commentary, no markdown fence. Header exactly:
+>
+> `regatta,season,start_date,end_date,source,note`
+>
+> - `regatta` — the event name as the page prints it, prefixed `JOG ` if the page
+>   omits it (`JOG Cowes-Cherbourg`). One row per event.
+> - `season` — four digits.
+> - `start_date`, `end_date` — `YYYY-MM-DD`. For a one-day race put the same date
+>   in both, or leave `end_date` blank.
+> - `source` — the page URL, same on every row.
+> - `note` — anything qualifying it (`double-handed only`, `with RORC`), else blank.
+>
+> Transcribe only dates the page states. If a row shows a month but no day, skip
+> it and list it after the CSV. Do not infer a date from last year's calendar.
+
+Then check the names land before trusting them — the loader refuses a regatta
+name it does not recognise rather than guessing, and says which:
+
+```bash
+python3 scripts/apply_event_dates.py db/marketshare.db --file jog2027.csv --dry-run
+```
+
+Rows it names as unknown are either a new regatta (add it) or a spelling drift
+from the one already in `regattas.name` (fix the CSV). When it runs clean, append
+the rows to `data/event_dates.csv` so the next refresh keeps them.

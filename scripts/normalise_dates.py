@@ -61,6 +61,24 @@ def to_iso(raw):
     return None
 
 
+# Some sources put the date in the race NAME and nowhere else - Warsash writes
+# "The Henri-Lloyd Warsash Spring Championships 2026 - R1 - IRC 1 Champs - April
+# 18". That is a published date, not a guess, so it is read rather than left on
+# the floor. The year comes from the event's season, because the name gives only
+# a month and a day.
+NAME_TAIL = re.compile(r"-\s*([A-Za-z]{3,9})\.?\s+(\d{1,2})(?:st|nd|rd|th)?\s*$")
+
+
+def date_from_name(race_name, season_year):
+    m = NAME_TAIL.search(race_name or "")
+    if not m or not season_year:
+        return None
+    mon, day = m.group(1).lower(), int(m.group(2))
+    if mon not in MONTHS or not 1 <= day <= 31:
+        return None
+    return f"{season_year}-{MONTHS[mon]:02d}-{day:02d}"
+
+
 def main():
     p = argparse.ArgumentParser()
     p.add_argument("db")
@@ -87,6 +105,18 @@ def main():
     print(f"race dates: {changed} rewritten to ISO, {unparsed} not recognised")
     for b in bad:
         print(f"    unrecognised: {b!r}")
+
+    mined = 0
+    for rid, nm, yr in cur.execute("""
+            SELECT r.id, r.race_name, e.season_year FROM races r
+            JOIN events e ON e.id = r.event_id
+            WHERE IFNULL(r.race_date,'') = ''""").fetchall():
+        iso = date_from_name(nm, yr)
+        if iso:
+            mined += 1
+            if not args.dry_run:
+                cur.execute("UPDATE races SET race_date = ? WHERE id = ?", (iso, rid))
+    print(f"            {mined} more read out of the race name itself")
 
     # Event span from its own races. COALESCE so an event whose races lose
     # their dates later keeps what it had rather than being blanked.
