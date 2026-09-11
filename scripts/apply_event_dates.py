@@ -94,8 +94,8 @@ def main():
             cur.execute("UPDATE events SET start_date = ?, end_date = ? WHERE id = ?",
                         (start, end, ev[0]))
 
-    print(f"event dates: {set_} set from the ledger, {created} future event(s) created, "
-          f"{same} already correct")
+    print(f"event dates: {set_} set from the ledger, {created} event(s) created for a "
+          f"fixture we hold no races for, {same} already correct")
     if unknown:
         # A typo here is silent damage - it would look like the date just did
         # not apply - so it is named rather than skipped quietly.
