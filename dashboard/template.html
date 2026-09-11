@@ -377,12 +377,30 @@ tr.enrich-miss > td:first-child { box-shadow: inset 3px 0 0 var(--series-doyle);
   border: 2px solid var(--page); }
 .cal-item.cal-undated::before { background: var(--baseline); }
 .cal-item:hover { background: var(--surface-2); }
-.cal-date { display: flex; flex-direction: column; align-items: flex-end;
-  margin-left: -30px; padding-left: 8px; line-height: 1.15; }
-.cal-date b { font-size: 14px; font-variant-numeric: tabular-nums; }
-.cal-date small { font-size: 10.5px; color: var(--text-muted); text-transform: uppercase;
-  letter-spacing: .04em; }
-.cal-date-none { color: var(--text-muted); font-size: 14px; }
+/* Month heading: the thing you scan for. Sticks under the year so you always
+   know which month the rows on screen belong to. */
+.cal-month { margin-bottom: 4px; }
+.cal-month-head {
+  display: flex; align-items: baseline; gap: 10px; margin: 0 0 4px;
+  padding: 8px 12px 8px 30px; position: sticky; top: 38px; z-index: 1;
+  background: var(--page); border-bottom: 1px solid var(--gridline);
+}
+.cal-month-name { font-size: 17px; font-weight: 700; letter-spacing: -0.01em; }
+.cal-month-year { font-size: 13px; font-weight: 600; color: var(--text-muted);
+  font-variant-numeric: tabular-nums; }
+.cal-month-count { margin-left: auto; font-size: 11.5px; color: var(--text-muted);
+  font-weight: 500; }
+.cal-month-undated .cal-month-name { color: var(--text-muted); font-weight: 600; }
+
+/* Day chip: weekday small above, day number large. */
+.cal-date { display: flex; flex-direction: column; align-items: center;
+  margin-left: -30px; padding-left: 4px; line-height: 1.05; }
+.cal-date b { font-size: 21px; font-weight: 700; font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em; }
+.cal-date small { font-size: 10px; color: var(--text-muted); text-transform: uppercase;
+  letter-spacing: .06em; font-weight: 600; }
+.cal-date .cal-date-to { text-transform: none; letter-spacing: 0; font-weight: 500; }
+.cal-date-none { color: var(--text-muted); font-size: 18px; }
 .cal-body { min-width: 0; }
 .cal-name { font-weight: 600; font-size: 13.5px; text-decoration: none; }
 .cal-name:hover { color: var(--series-north); }
@@ -3129,13 +3147,21 @@ function renderCalendar() {
   const years = Object.keys(byYear).map(Number).sort((a, b) => b - a);
 
   const MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const DOW = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  // The month is the heading the row sits under, so the chip carries the DAY -
+  // big, and with its weekday, because racing is a weekend business and "Sat
+  // 11" says more at a glance than "11". An event spanning days shows the span;
+  // one spanning months keeps its own start month, which the first version got
+  // wrong by printing the END month against the START day.
   const dayChip = r => {
     if (!r.start) return `<span class="cal-date cal-date-none" title="No date published for this event">—</span>`;
     const [y, m, d] = r.start.split('-').map(Number);
-    const [ey, em, ed] = (r.end || r.start).split('-').map(Number);
-    const span = (r.end && r.end !== r.start)
-      ? (em === m ? `${d}–${ed}` : `${d} ${MON[m-1]} – ${ed}`) : `${d}`;
-    return `<span class="cal-date"><b>${span}</b><small>${MON[(em||m)-1]}</small></span>`;
+    const end = r.end && r.end !== r.start ? r.end.split('-').map(Number) : null;
+    const dow = DOW[new Date(Date.UTC(y, m - 1, d)).getUTCDay()];
+    if (!end) return `<span class="cal-date"><small>${dow}</small><b>${d}</b></span>`;
+    const sameMonth = end[1] === m;
+    return `<span class="cal-date"><small>${dow}</small><b>${d}</b>` +
+      `<small class="cal-date-to">to ${end[2]}${sameMonth ? '' : ' ' + MON[end[1] - 1]}</small></span>`;
   };
 
   const card = r => {
@@ -3161,19 +3187,47 @@ function renderCalendar() {
     </div>`;
   };
 
+  // Grouped by MONTH inside each season, which is what was missing. Sorting by
+  // date was already right, but with four events in five carrying no date at
+  // all they piled up at the bottom of a long flat list and the whole thing
+  // read as unordered. Month headings give the run of days something to hang
+  // off, and the undated ones get a heading of their own saying what they are
+  // instead of looking like the sort had given up.
+  //
+  // Newest first throughout - year, then month, then day - so the season being
+  // planned for is at the top rather than 2007.
+  const MONTH_FULL = ['January','February','March','April','May','June',
+                      'July','August','September','October','November','December'];
   const timeline = years.map(y => {
-    const list = byYear[y].slice().sort((a, b) => {
-      if (a.start && b.start) return b.start.localeCompare(a.start);
-      if (a.start) return -1;
-      if (b.start) return 1;
-      return b.boats.length - a.boats.length;
-    });
-    const dated = list.filter(r => r.start).length;
+    const list = byYear[y];
+    const dated = list.filter(r => r.start);
+    const undated = list.filter(r => !r.start).sort((a, b) => b.boats.length - a.boats.length);
+    const byMonth = {};
+    dated.forEach(r => (byMonth[Number(r.start.slice(5, 7))] ||= []).push(r));
+    const months = Object.keys(byMonth).map(Number).sort((a, b) => b - a);
+
+    const monthBlocks = months.map(m => {
+      const rows = byMonth[m].slice().sort((a, b) => b.start.localeCompare(a.start));
+      return `<div class="cal-month">
+        <h3 class="cal-month-head"><span class="cal-month-name">${MONTH_FULL[m - 1]}</span>
+          <span class="cal-month-year">${y}</span>
+          <span class="cal-month-count">${rows.length} event${rows.length === 1 ? '' : 's'}</span></h3>
+        ${rows.map(card).join('')}
+      </div>`;
+    }).join('');
+
+    const undatedBlock = undated.length ? `<div class="cal-month cal-month-undated">
+        <h3 class="cal-month-head"><span class="cal-month-name">Date not published</span>
+          <span class="cal-month-year">${y}</span>
+          <span class="cal-month-count">${undated.length} event${undated.length === 1 ? '' : 's'}</span></h3>
+        ${undated.map(card).join('')}
+      </div>` : '';
+
     return `<section class="cal-year">
       <h2 class="cal-year-head">${y}
         <span class="muted">${list.length} event${list.length === 1 ? '' : 's'}${
-          dated ? `, ${dated} dated` : ', none dated'}</span></h2>
-      ${list.map(card).join('')}
+          dated.length ? `, ${dated.length} dated` : ', none dated'}</span></h2>
+      ${monthBlocks}${undatedBlock}
     </section>`;
   }).join('') || `<div class="card muted">Nothing matches those filters.</div>`;
 
