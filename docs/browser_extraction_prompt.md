@@ -4,9 +4,45 @@ Paste this into Claude in Chrome with a results page open. It produces a CSV
 that `scripts/load_pasted_results.py` reads directly — self-describing, so one
 paste can cover many races and classes.
 
-Use it for **JOG** and any **RORC** page not covered by the season-points
-workbooks. Nothing here bypasses a site's access controls: it transcribes a page
-already open in your own browser, under your own login.
+Use it for **JOG**, the **Royal Thames**, and any **RORC** page not covered by
+the season-points workbooks. Nothing here bypasses a site's access controls: it
+transcribes a page already open in your own browser, under your own login.
+
+## The three blocked sources are one problem
+
+All three disallow `ClaudeBot` in robots.txt — the Cloudflare managed
+AI-crawler list — so none can be scraped, and all three come in this way:
+
+| Source | Where the results are |
+|---|---|
+| JOG, all years | `myjog.jog.org.uk`, and several races on Nautical Cloud |
+| RORC 2023+ | `sailracehq.com` (the 2007–2022 legacy archive IS scraped) |
+| Royal Thames | `rtyc.nautical-cloud.com` and `racing.royalthames.com` |
+
+**JOG and the Royal Thames share a scoring platform.** Several JOG races here
+are already named for it — JOG Nautical Cloud Channel Race, JOG Nautical Cloud
+St Peter Port — so it is the platform blocking the crawler, not either club, and
+one recipe covers both. The 6,348 JOG entries already loaded came this way.
+
+For the Royal Thames use these regatta names, so rows land as one regatta rather
+than several spellings:
+
+- `Royal Thames 250th Anniversary Regatta` (2025)
+- `Royal Thames Annual Regatta`
+
+The 250th's **non-IRC** classes are a separate, unrestricted static file —
+`filedn.com/.../RTYC/250thResults.html`, twelve one-design fleets — fetchable
+normally, though the IRC scope filters them out anyway.
+
+## Overlay classes are safe to transcribe
+
+Capture every table the page shows, including `IRC Overall`, `Double Handed`,
+`Generation JOG` and the ORC divisions, even though those re-score boats that
+also appear in a numbered class. The export keeps one row per boat per race,
+preferring the most specific division, so a boat scored three times over is
+counted once. Transcribing both is better than choosing: if only the overlay
+table is captured those boats still count, because a duplicate is dropped only
+when a real division also holds that boat.
 
 Load the result with:
 
