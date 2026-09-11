@@ -351,6 +351,51 @@ tr.sales-saved > td:first-child { box-shadow: inset 3px 0 0 var(--series-quantum
 tr.enrich-miss > td { background: var(--surface-2); }
 tr.enrich-miss > td:first-child { box-shadow: inset 3px 0 0 var(--series-doyle); }
 
+/* ---- calendar: a filter rail and a scrollable timeline ---- */
+.cal-layout { display: grid; grid-template-columns: 232px minmax(0, 1fr); gap: 20px;
+  align-items: start; }
+@media (max-width: 860px) { .cal-layout { grid-template-columns: 1fr; } }
+/* The rail stays put while the timeline scrolls - the whole point of filters is
+   changing one and watching the list move, which is impossible if the control
+   has scrolled off. */
+.cal-filters { position: sticky; top: 20px; }
+.cal-filters .field { margin-bottom: 10px; }
+.cal-scroll { min-width: 0; }
+
+.cal-year { margin-bottom: 26px; }
+.cal-year-head { font-size: 15px; margin: 0 0 10px; display: flex; gap: 10px;
+  align-items: baseline; position: sticky; top: 0; z-index: 2;
+  background: var(--page); padding: 6px 0; }
+.cal-year-head .muted { font-size: 12px; font-weight: 500; }
+
+/* The spine: a line down the left with each event hanging off it. */
+.cal-item { display: grid; grid-template-columns: 62px minmax(0,1fr) auto;
+  gap: 14px; align-items: start; padding: 10px 12px 10px 0;
+  border-left: 2px solid var(--gridline); margin-left: 30px; position: relative; }
+.cal-item::before { content: ""; position: absolute; left: -5px; top: 18px;
+  width: 8px; height: 8px; border-radius: 50%; background: var(--series-north);
+  border: 2px solid var(--page); }
+.cal-item.cal-undated::before { background: var(--baseline); }
+.cal-item:hover { background: var(--surface-2); }
+.cal-date { display: flex; flex-direction: column; align-items: flex-end;
+  margin-left: -30px; padding-left: 8px; line-height: 1.15; }
+.cal-date b { font-size: 14px; font-variant-numeric: tabular-nums; }
+.cal-date small { font-size: 10.5px; color: var(--text-muted); text-transform: uppercase;
+  letter-spacing: .04em; }
+.cal-date-none { color: var(--text-muted); font-size: 14px; }
+.cal-body { min-width: 0; }
+.cal-name { font-weight: 600; font-size: 13.5px; text-decoration: none; }
+.cal-name:hover { color: var(--series-north); }
+.cal-meta { display: flex; gap: 12px; flex-wrap: wrap; font-size: 11.5px;
+  color: var(--text-muted); margin-top: 2px; }
+.cal-classes { display: block; font-size: 11px; color: var(--text-muted);
+  margin-top: 3px; overflow-wrap: anywhere; }
+.cal-share { text-align: right; padding-top: 2px; }
+@media (max-width: 640px) {
+  .cal-item { grid-template-columns: 52px minmax(0,1fr); }
+  .cal-share { grid-column: 2; text-align: left; }
+}
+
 /* market share at every level of the regatta tree */
 .share-wrap { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
 .share-bar { display: inline-flex; width: 54px; height: 7px; border-radius: 4px;
@@ -1023,7 +1068,7 @@ function navigate() {
     else if (route === 'market-analysis') main.innerHTML = renderMarketAnalysis();
     else if (route === 'market-share') main.innerHTML = renderMarketShare();
     else if (route === 'sales') main.innerHTML = renderSales();
-    else if (route === 'calendar') { main.innerHTML = renderCalendar(); }
+    else if (route === 'calendar') { main.innerHTML = renderCalendar(); attachCalendarHandlers(); }
     else if (route === 'enrich') {
       // A regatta clicked on the calendar arrives as query params and is what
       // the generated load_entry_list.py command names.
@@ -2375,6 +2420,45 @@ function regattaSummary(r) {
   };
 }
 
+// Share of a set of boats, and the small bar that renders it. Module scope
+// because the regatta tree and the calendar both need it and a second copy
+// would drift - the numbers have to agree wherever they appear.
+const shareOf = (ids) => {
+  let north = 0, other = 0, unknown = 0;
+  ids.forEach(id => {
+    const b = boatsById[id];
+    if (!b) return;
+    const bucket = bucketOf(liveSailmaker(b));
+    if (bucket === 'North Sails') north++;
+    else if (bucket === 'Unknown' || bucket === 'Partial') unknown++;
+    else other++;
+  });
+  return { north, other, unknown, known: north + other, total: north + other + unknown };
+};
+const shareMeta = (ids) => {
+  const s = shareOf(ids);
+  if (!s.total) return '';
+  if (!s.known) {
+    return '<span class="share-wrap" title="No sailmaker known for any of these ' +
+      s.total + ' boats."><span class="share-bar">' +
+      '<i class="sb-unknown" style="width:100%"></i></span>' +
+      '<span class="share-text share-none">no sailmaker known</span></span>';
+  }
+  const pct = Math.round(100 * s.north / s.known);
+  const w = n => (100 * n / s.total).toFixed(1) + '%';
+  return '<span class="share-wrap" title="' + s.north + ' North, ' + s.other +
+    ' competitor, ' + s.unknown + ' unknown, of ' + s.total + ' boats. The percentage is ' +
+    'North\u2019s share of the ' + s.known + ' we know.">' +
+    '<span class="share-bar">' +
+    '<i class="sb-north" style="width:' + w(s.north) + '"></i>' +
+    '<i class="sb-other" style="width:' + w(s.other) + '"></i>' +
+    '<i class="sb-unknown" style="width:' + w(s.unknown) + '"></i></span>' +
+    '<span class="share-text">' + pct + '% of ' + s.known + ' known' +
+    (s.unknown ? '<span class="share-unknown">, ' + s.unknown + ' unknown</span>' : '') +
+    '</span></span>';
+};
+
+
 function renderRegattasList() {
   // Club > Year > Event > Class > boat. The class layer lives on the entries -
   // it used to be baked into regatta NAMES, which made one event look like
@@ -2506,40 +2590,6 @@ function renderRegattasList() {
   // opposite things: one is how we are doing, the other is how much of the
   // fleet we cannot yet see. Coverage is 6% of the fleet, so a share quoted
   // without the unknown count next to it would be worse than no number.
-  const shareOf = (ids) => {
-    let north = 0, other = 0, unknown = 0;
-    ids.forEach(id => {
-      const b = boatsById[id];
-      if (!b) return;
-      const bucket = bucketOf(liveSailmaker(b));
-      if (bucket === 'North Sails') north++;
-      else if (bucket === 'Unknown' || bucket === 'Partial') unknown++;
-      else other++;
-    });
-    return { north, other, unknown, known: north + other, total: north + other + unknown };
-  };
-  const shareMeta = (ids) => {
-    const s = shareOf(ids);
-    if (!s.total) return '';
-    if (!s.known) {
-      return '<span class="share-wrap" title="No sailmaker known for any of these ' +
-        s.total + ' boats."><span class="share-bar">' +
-        '<i class="sb-unknown" style="width:100%"></i></span>' +
-        '<span class="share-text share-none">no sailmaker known</span></span>';
-    }
-    const pct = Math.round(100 * s.north / s.known);
-    const w = n => (100 * n / s.total).toFixed(1) + '%';
-    return '<span class="share-wrap" title="' + s.north + ' North, ' + s.other +
-      ' competitor, ' + s.unknown + ' unknown, of ' + s.total + ' boats. The percentage is ' +
-      'North\u2019s share of the ' + s.known + ' we know.">' +
-      '<span class="share-bar">' +
-      '<i class="sb-north" style="width:' + w(s.north) + '"></i>' +
-      '<i class="sb-other" style="width:' + w(s.other) + '"></i>' +
-      '<i class="sb-unknown" style="width:' + w(s.unknown) + '"></i></span>' +
-      '<span class="share-text">' + pct + '% of ' + s.known + ' known' +
-      (s.unknown ? '<span class="share-unknown">, ' + s.unknown + ' unknown</span>' : '') +
-      '</span></span>';
-  };
 
   // Boat rows are built on demand. Rendering every entry up front is ~54,000
   // rows of HTML, which is what made the old Sales page unusable.
@@ -3004,67 +3054,189 @@ function calendarRows() {
   }).filter(Boolean);
 }
 
+// Filter state for the timeline. Module scope so it survives a re-render:
+// navigate() rebuilds the page on every change, and a filter that reset itself
+// each time you used it would be worse than no filter.
+const CAL = { club: '', category: '', cls: '', season: '', onlyShare: false };
+
+// One row per EVENT, not per regatta: a timeline is a sequence of things that
+// happened on days, and a regatta is the series they belong to.
+function calendarEvents() {
+  const racesByEvent = {};
+  DATA.races.forEach(r => (racesByEvent[r.event_id] ||= []).push(r));
+  const entriesByRace = {};
+  DATA.boats.forEach(b => (b.entries || []).forEach(e =>
+    (entriesByRace[e.race_id] ||= []).push(b.id)));
+  const regById = {};
+  DATA.regattas.forEach(r => regById[r.id] = r);
+
+  return DATA.events.map(ev => {
+    const rg = regById[ev.regatta_id];
+    if (!rg) return null;
+    const races = racesByEvent[ev.id] || [];
+    const boats = new Set();
+    const classes = new Set();
+    races.forEach(r => {
+      (entriesByRace[r.id] || []).forEach(id => boats.add(id));
+      if (r.class_label) classes.add(r.class_label);
+    });
+    // Class comes off the entries, which is where it is actually recorded -
+    // races.class_label is only set by some loaders.
+    races.forEach(r => (entriesByRace[r.id] || []).forEach(id => {
+      const b = boatsById[id];
+      if (!b) return;
+      (b.entries || []).forEach(e => { if (e.race_id === r.id && e.class) classes.add(e.class); });
+    }));
+    const scheduled = races.some(r => r.status === 'scheduled' || r.status === 'entered');
+    return {
+      ev, rg, club: seriesOf(rg), races: races.length,
+      boats: [...boats], classes: [...classes].sort(),
+      scheduled,
+      start: ev.start_date || '', end: ev.end_date || ev.start_date || '',
+    };
+  }).filter(Boolean).filter(x => x.races || x.start);
+}
+
+function calendarFacets(rows) {
+  const clubs = {}, cats = {}, classes = {}, seasons = {};
+  rows.forEach(r => {
+    clubs[r.club] = (clubs[r.club] || 0) + 1;
+    if (r.rg.category) cats[r.rg.category] = (cats[r.rg.category] || 0) + 1;
+    seasons[r.ev.season_year] = (seasons[r.ev.season_year] || 0) + 1;
+    r.classes.forEach(c => classes[c] = (classes[c] || 0) + 1);
+  });
+  return { clubs, cats, classes, seasons };
+}
+
+function calendarFiltered(rows) {
+  return rows.filter(r =>
+    (!CAL.club || r.club === CAL.club) &&
+    (!CAL.category || r.rg.category === CAL.category) &&
+    (!CAL.season || String(r.ev.season_year) === CAL.season) &&
+    (!CAL.cls || r.classes.includes(CAL.cls)) &&
+    (!CAL.onlyShare || r.boats.length));
+}
+
 function renderCalendar() {
-  const rows = calendarRows();
-  const dated = rows.filter(r => r.window).sort((a, b) => a.sortKey.localeCompare(b.sortKey));
-  const undated = rows.filter(r => !r.window)
-    .sort((a, b) => b.last - a.last || b.fleet - a.fleet);
-  const active = r => r.last >= new Date().getFullYear() - 1;
+  const all = calendarEvents();
+  const facets = calendarFacets(all);
+  const rows = calendarFiltered(all);
 
-  const fmt = md => {
-    if (!md) return '';
-    const [m, d] = md.split('-').map(Number);
-    return `${d} ${MONTH_NAMES[m - 1].slice(0, 3)}`;
+  // Newest first: the season you are planning for is the one you want at the
+  // top, and 2007 is history you scroll to.
+  const byYear = {};
+  rows.forEach(r => (byYear[r.ev.season_year] ||= []).push(r));
+  const years = Object.keys(byYear).map(Number).sort((a, b) => b - a);
+
+  const MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const dayChip = r => {
+    if (!r.start) return `<span class="cal-date cal-date-none" title="No date published for this event">—</span>`;
+    const [y, m, d] = r.start.split('-').map(Number);
+    const [ey, em, ed] = (r.end || r.start).split('-').map(Number);
+    const span = (r.end && r.end !== r.start)
+      ? (em === m ? `${d}–${ed}` : `${d} ${MON[m-1]} – ${ed}`) : `${d}`;
+    return `<span class="cal-date"><b>${span}</b><small>${MON[(em||m)-1]}</small></span>`;
   };
-  const row = r => `<tr class="clickable" data-route="#/regatta/${r.rg.id}">
-      <td><strong>${esc(r.rg.name)}</strong>
-        <span class="muted" style="font-size:12px;">${esc(r.rg.category || '')}</span></td>
-      <td>${r.window
-        ? `${fmt(r.window.from)}${r.window.to !== r.window.from ? ' – ' + fmt(r.window.to) : ''}
-           <span class="muted" style="font-size:11.5px;">(${r.window.n} dated)</span>`
-        : '<span class="muted">no dated edition</span>'}</td>
-      <td class="num">${r.last}</td>
-      <td class="num">${r.recent}/10</td>
-      <td class="num">${r.fleet || '<span class="muted">—</span>'}</td>
-      <td>${r.entryList
-        ? `<span class="pill" style="background:var(--series-quantum);color:#fff;">${r.entryList} entered</span>`
-        : `<a class="tree-open" href="#/enrich?regatta=${encodeURIComponent(r.rg.name)}&year=${r.nextSeason}"
-             data-route="#/enrich?regatta=${encodeURIComponent(r.rg.name)}&year=${r.nextSeason}">Apply entry list →</a>`}</td>
-    </tr>`;
 
-  const table = (list, caption) => !list.length ? '' : `
-    <div class="card" style="padding:0;overflow:auto;">
-      <h2 style="padding:18px 20px 0;">${caption}</h2>
-      <table>
-        <thead><tr><th>Regatta</th><th>Usually runs</th><th>Last held</th>
-          <th>Seasons (of 10)</th><th>Fleet last time</th><th>Next edition</th></tr></thead>
-        <tbody>${list.map(row).join('')}</tbody>
-      </table>
+  const card = r => {
+    const share = r.boats.length ? shareMeta(r.boats) : '';
+    const cls = r.classes.length
+      ? `<span class="cal-classes">${r.classes.slice(0, 6).map(esc).join(' · ')}${
+           r.classes.length > 6 ? ` <span class="muted">+${r.classes.length - 6}</span>` : ''}</span>`
+      : '';
+    return `<div class="cal-item${r.start ? '' : ' cal-undated'}">
+      ${dayChip(r)}
+      <div class="cal-body">
+        <a class="cal-name" href="#/regatta/${r.rg.id}?year=${r.ev.season_year}"
+           data-route="#/regatta/${r.rg.id}?year=${r.ev.season_year}">${esc(r.rg.name)}</a>
+        ${r.scheduled ? '<span class="pill" style="background:var(--series-quantum);color:#fff;">entry list</span>' : ''}
+        <div class="cal-meta">
+          <span>${esc(r.club)}</span>
+          <span>${r.races} race${r.races === 1 ? '' : 's'}</span>
+          <span>${r.boats.length ? r.boats.length + ' boats' : '<span class="muted">no boats held</span>'}</span>
+        </div>
+        ${cls}
+      </div>
+      <div class="cal-share">${share || '<span class="muted" style="font-size:11.5px;">—</span>'}</div>
     </div>`;
+  };
 
-  const withList = rows.filter(r => r.entryList).length;
+  const timeline = years.map(y => {
+    const list = byYear[y].slice().sort((a, b) => {
+      if (a.start && b.start) return b.start.localeCompare(a.start);
+      if (a.start) return -1;
+      if (b.start) return 1;
+      return b.boats.length - a.boats.length;
+    });
+    const dated = list.filter(r => r.start).length;
+    return `<section class="cal-year">
+      <h2 class="cal-year-head">${y}
+        <span class="muted">${list.length} event${list.length === 1 ? '' : 's'}${
+          dated ? `, ${dated} dated` : ', none dated'}</span></h2>
+      ${list.map(card).join('')}
+    </section>`;
+  }).join('') || `<div class="card muted">Nothing matches those filters.</div>`;
+
+  const opts = (obj, cur, sortNum) => {
+    let keys = Object.keys(obj);
+    keys.sort(sortNum ? (a, b) => Number(b) - Number(a)
+                      : (a, b) => obj[b] - obj[a] || a.localeCompare(b));
+    return keys.map(k => `<option value="${esc(k)}"${k === cur ? ' selected' : ''}>${esc(k)} (${obj[k]})</option>`).join('');
+  };
+
+  const withBoats = rows.filter(r => r.boats.length).length;
   return `
     <h1>Calendar</h1>
-    <p class="subtitle">The regattas to be getting entry lists for, ordered by when in the year they
-      run. Click one to open it, or apply an entry list to its next edition.</p>
-    <div class="stat-row">
-      <div class="stat-tile"><div class="v">${rows.filter(active).length}</div><div class="l">Active regattas</div></div>
-      <div class="stat-tile"><div class="v">${dated.length}</div><div class="l">With known dates</div></div>
-      <div class="stat-tile"><div class="v">${withList}</div><div class="l">Entry list applied</div></div>
+    <p class="subtitle">Every event we hold, newest first. Market share is shown on each one we have
+      boats for — North's share of the boats whose sailmaker we know, with the unknowns beside it.</p>
+    <div class="cal-layout">
+      <aside class="cal-filters">
+        <div class="card" style="margin:0;">
+          <h2 style="margin-top:0;font-size:14px;">Filter</h2>
+          <div class="field"><label class="field-label" for="cal-club">Club / series</label>
+            <select id="cal-club"><option value="">All clubs</option>${opts(facets.clubs, CAL.club)}</select></div>
+          <div class="field"><label class="field-label" for="cal-cat">Organiser</label>
+            <select id="cal-cat"><option value="">All organisers</option>${opts(facets.cats, CAL.category)}</select></div>
+          <div class="field"><label class="field-label" for="cal-class">Class</label>
+            <select id="cal-class"><option value="">All classes</option>${opts(facets.classes, CAL.cls)}</select></div>
+          <div class="field"><label class="field-label" for="cal-season">Season</label>
+            <select id="cal-season"><option value="">All seasons</option>${opts(facets.seasons, CAL.season, true)}</select></div>
+          <label class="chip" style="width:100%;justify-content:flex-start;">
+            <input type="checkbox" id="cal-only-share"${CAL.onlyShare ? ' checked' : ''}>
+            Only events we hold boats for</label>
+          <div class="btn-row"><button class="btn secondary" type="button" id="cal-reset">Reset</button></div>
+          <p class="muted" style="font-size:11.5px;margin:12px 0 0;">There is no country filter because
+            there is no country data: all 182 regattas are recorded as Solent, and no venue is stored.
+            Organiser is the nearest real dimension.</p>
+        </div>
+      </aside>
+      <div class="cal-scroll">
+        <p class="muted" style="font-size:12.5px;margin:0 0 12px;">
+          <strong>${rows.length}</strong> event${rows.length === 1 ? '' : 's'} shown,
+          <strong>${withBoats}</strong> with boats behind them.
+          Only 84 events carry a date, so undated ones sit at the end of their season with a dash —
+          dates arrive with results.</p>
+        ${timeline}
+      </div>
     </div>
-    <div class="card">
-      <h2 style="margin-top:0;">What this can and cannot tell you</h2>
-      <p class="muted" style="font-size:12.5px;margin:0;">Only 505 of 7,062 races carry a date, and the
-        latest is 28 Aug 2026 — so there is no future-dated race in the database and nothing here is a
-        prediction. “Usually runs” is the span of the editions we <em>do</em> have dates for; a regatta
-        with none says so rather than being placed in a plausible month. Dates arrive with results, so
-        this fills in as the season is scraped.</p>
-    </div>
-    ${table(dated.filter(active), 'By time of year')}
-    ${table(dated.filter(r => !active(r)), 'Dated, but not run recently')}
-    ${table(undated.filter(active), 'Active, no dated edition yet')}
-    ${table(undated.filter(r => !active(r)), 'Historic')}
   `;
+}
+
+function attachCalendarHandlers() {
+  const bind = (id, key) => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener('change', () => { CAL[key] = el.value; navigate(); });
+  };
+  bind('cal-club', 'club');
+  bind('cal-cat', 'category');
+  bind('cal-class', 'cls');
+  bind('cal-season', 'season');
+  const only = document.getElementById('cal-only-share');
+  if (only) only.addEventListener('change', () => { CAL.onlyShare = only.checked; navigate(); });
+  const reset = document.getElementById('cal-reset');
+  if (reset) reset.addEventListener('click', () => {
+    CAL.club = CAL.category = CAL.cls = CAL.season = ''; CAL.onlyShare = false; navigate();
+  });
 }
 
 const ENRICH = { rows: null, headers: [], sheets: [], sheet: null, name: '', stats: null,
