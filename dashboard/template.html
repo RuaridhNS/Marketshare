@@ -380,6 +380,7 @@ tr.enrich-miss > td:first-child { box-shadow: inset 3px 0 0 var(--series-doyle);
     <a class="nav-item" href="#/market-analysis" data-route="#/market-analysis">Market analysis</a>
     <a class="nav-item" href="#/market-share" data-route="#/market-share">Market share</a>
     <a class="nav-item" href="#/sales" data-route="#/sales">Sales opportunities</a>
+    <a class="nav-item" href="#/calendar" data-route="#/calendar">Calendar</a>
     <a class="nav-item" href="#/enrich" data-route="#/enrich">Entry list</a>
     <a class="nav-item" href="#/duplicates" data-route="#/duplicates">Duplicates<span class="nav-badge" id="duplicates-badge" style="display:none;"></span></a>
     <a class="nav-item" href="#/quality" data-route="#/quality">Data quality</a>
@@ -1022,7 +1023,13 @@ function navigate() {
     else if (route === 'market-analysis') main.innerHTML = renderMarketAnalysis();
     else if (route === 'market-share') main.innerHTML = renderMarketShare();
     else if (route === 'sales') main.innerHTML = renderSales();
-    else if (route === 'enrich') { main.innerHTML = renderEnrich(); attachEnrichHandlers(); }
+    else if (route === 'calendar') { main.innerHTML = renderCalendar(); }
+    else if (route === 'enrich') {
+      // A regatta clicked on the calendar arrives as query params and is what
+      // the generated load_entry_list.py command names.
+      const rq = query.get('regatta');
+      if (rq) ENRICH.target = { regatta: rq, year: query.get('year') || '' };
+      main.innerHTML = renderEnrich(); attachEnrichHandlers(); }
     else if (route === 'coverage') main.innerHTML = renderCoverage();
     else if (route === 'quality') main.innerHTML = renderQuality();
     else if (route === 'compare') main.innerHTML = renderCompare((query.get('r')||'').split(',').filter(Boolean));
@@ -2929,7 +2936,139 @@ function attachAnalysisHandlers() {
 // overwritten - where the sheet and the database disagree, both are kept and
 // the disagreement is reported, because that is a fact worth seeing rather
 // than a conflict to resolve silently.
-const ENRICH = { rows: null, headers: [], sheets: [], sheet: null, name: '', stats: null };
+// ---------- page: calendar ----------
+// What this can and cannot know, because it decides the whole shape of the
+// page. Only 505 of 7,062 races carry a date, and the latest of them is
+// 2026-08-28 - so there is not one future-dated race in the database, and a
+// literal "what's on next month" calendar would be an empty page. What IS
+// known is which regattas recur, when in the year they have run before, and
+// whether an entry list has been applied to the next edition yet. That is the
+// thing worth acting on: the regattas to be getting entry lists for.
+//
+// So this is a preparation list ordered by time of year, not a month grid. It
+// never guesses a date it does not have: a regatta with no dated edition says
+// so rather than being placed in a plausible-looking month.
+const MONTH_NAMES = ['January','February','March','April','May','June',
+                     'July','August','September','October','November','December'];
+
+function calendarRows() {
+  const evByReg = {};
+  DATA.events.forEach(e => (evByReg[e.regatta_id] ||= []).push(e));
+  const entriesByRace = {};
+  DATA.boats.forEach(b => (b.entries || []).forEach(e => {
+    (entriesByRace[e.race_id] ||= []).push(b);
+  }));
+  const racesByEvent = {};
+  DATA.races.forEach(r => (racesByEvent[r.event_id] ||= []).push(r));
+
+  const thisYear = new Date().getFullYear();
+  return DATA.regattas.map(rg => {
+    const evs = (evByReg[rg.id] || []).slice().sort((a, b) => a.season_year - b.season_year);
+    if (!evs.length) return null;
+    const seasons = evs.map(e => e.season_year);
+    const last = Math.max(...seasons);
+    const recent = seasons.filter(y => y > thisYear - 10).length;
+    const dated = evs.filter(e => e.start_date);
+    // Typical window across every dated edition, as month/day - the point is
+    // "early August", not a specific year's dates.
+    let window = null;
+    if (dated.length) {
+      const md = dated.map(e => e.start_date.slice(5));
+      md.sort();
+      const mdEnd = dated.map(e => (e.end_date || e.start_date).slice(5)).sort();
+      window = { from: md[0], to: mdEnd[mdEnd.length - 1], n: dated.length };
+    }
+    const lastEv = evs.find(e => e.season_year === last);
+    const lastRaces = racesByEvent[lastEv.id] || [];
+    const fleet = new Set();
+    lastRaces.forEach(r => (entriesByRace[r.id] || []).forEach(b => fleet.add(b.id)));
+    // An entry list already applied shows up as a scheduled race with entries
+    // and no result - that is exactly what load_entry_list.py writes. The
+    // edition it belongs to IS the next one, even when that is the current
+    // season: RORC Cherbourg has 19 boats entered for 2026 and has not been
+    // sailed, so looking for 2027 would report it as having no list.
+    const awaiting = evs.filter(e => e.season_year >= thisYear
+      && (racesByEvent[e.id] || []).some(r => r.status === 'scheduled' || r.status === 'entered'));
+    const scheduledBoats = new Set();
+    awaiting.forEach(e => (racesByEvent[e.id] || [])
+      .filter(r => r.status === 'scheduled' || r.status === 'entered')
+      .forEach(r => (entriesByRace[r.id] || []).forEach(b => scheduledBoats.add(b.id))));
+    const nextSeason = awaiting.length ? Math.min(...awaiting.map(e => e.season_year))
+                                       : (last >= thisYear ? last + 1 : thisYear);
+    return {
+      rg, last, recent, seasons: seasons.length, window,
+      fleet: fleet.size, nextSeason,
+      entryList: scheduledBoats.size,
+      sortKey: window ? window.from : 'zz',
+    };
+  }).filter(Boolean);
+}
+
+function renderCalendar() {
+  const rows = calendarRows();
+  const dated = rows.filter(r => r.window).sort((a, b) => a.sortKey.localeCompare(b.sortKey));
+  const undated = rows.filter(r => !r.window)
+    .sort((a, b) => b.last - a.last || b.fleet - a.fleet);
+  const active = r => r.last >= new Date().getFullYear() - 1;
+
+  const fmt = md => {
+    if (!md) return '';
+    const [m, d] = md.split('-').map(Number);
+    return `${d} ${MONTH_NAMES[m - 1].slice(0, 3)}`;
+  };
+  const row = r => `<tr class="clickable" data-route="#/regatta/${r.rg.id}">
+      <td><strong>${esc(r.rg.name)}</strong>
+        <span class="muted" style="font-size:12px;">${esc(r.rg.category || '')}</span></td>
+      <td>${r.window
+        ? `${fmt(r.window.from)}${r.window.to !== r.window.from ? ' – ' + fmt(r.window.to) : ''}
+           <span class="muted" style="font-size:11.5px;">(${r.window.n} dated)</span>`
+        : '<span class="muted">no dated edition</span>'}</td>
+      <td class="num">${r.last}</td>
+      <td class="num">${r.recent}/10</td>
+      <td class="num">${r.fleet || '<span class="muted">—</span>'}</td>
+      <td>${r.entryList
+        ? `<span class="pill" style="background:var(--series-quantum);color:#fff;">${r.entryList} entered</span>`
+        : `<a class="tree-open" href="#/enrich?regatta=${encodeURIComponent(r.rg.name)}&year=${r.nextSeason}"
+             data-route="#/enrich?regatta=${encodeURIComponent(r.rg.name)}&year=${r.nextSeason}">Apply entry list →</a>`}</td>
+    </tr>`;
+
+  const table = (list, caption) => !list.length ? '' : `
+    <div class="card" style="padding:0;overflow:auto;">
+      <h2 style="padding:18px 20px 0;">${caption}</h2>
+      <table>
+        <thead><tr><th>Regatta</th><th>Usually runs</th><th>Last held</th>
+          <th>Seasons (of 10)</th><th>Fleet last time</th><th>Next edition</th></tr></thead>
+        <tbody>${list.map(row).join('')}</tbody>
+      </table>
+    </div>`;
+
+  const withList = rows.filter(r => r.entryList).length;
+  return `
+    <h1>Calendar</h1>
+    <p class="subtitle">The regattas to be getting entry lists for, ordered by when in the year they
+      run. Click one to open it, or apply an entry list to its next edition.</p>
+    <div class="stat-row">
+      <div class="stat-tile"><div class="v">${rows.filter(active).length}</div><div class="l">Active regattas</div></div>
+      <div class="stat-tile"><div class="v">${dated.length}</div><div class="l">With known dates</div></div>
+      <div class="stat-tile"><div class="v">${withList}</div><div class="l">Entry list applied</div></div>
+    </div>
+    <div class="card">
+      <h2 style="margin-top:0;">What this can and cannot tell you</h2>
+      <p class="muted" style="font-size:12.5px;margin:0;">Only 505 of 7,062 races carry a date, and the
+        latest is 28 Aug 2026 — so there is no future-dated race in the database and nothing here is a
+        prediction. “Usually runs” is the span of the editions we <em>do</em> have dates for; a regatta
+        with none says so rather than being placed in a plausible month. Dates arrive with results, so
+        this fills in as the season is scraped.</p>
+    </div>
+    ${table(dated.filter(active), 'By time of year')}
+    ${table(dated.filter(r => !active(r)), 'Dated, but not run recently')}
+    ${table(undated.filter(active), 'Active, no dated edition yet')}
+    ${table(undated.filter(r => !active(r)), 'Historic')}
+  `;
+}
+
+const ENRICH = { rows: null, headers: [], sheets: [], sheet: null, name: '', stats: null,
+                 target: null };
 
 const XLSX_CDN = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
 let _xlsxPromise = null;
@@ -3129,7 +3268,27 @@ function enrichToCSV() {
 
 function renderEnrich() {
   const st = ENRICH.stats;
-  const drop = `
+  // Applying a list to a regatta is a database write, and this page is a
+  // static file - so what it produces is the exact command that does it,
+  // naming the regatta and season picked on the calendar. Same shape as
+  // Pending changes: the browser decides, a script applies.
+  const t = ENRICH.target;
+  const targetCard = t ? `
+    <div class="card" style="border-left:4px solid var(--series-north);">
+      <h2 style="margin-top:0;">Applying to ${esc(t.regatta)}${t.year ? ' ' + esc(t.year) : ''}</h2>
+      <p class="muted" style="font-size:13px;margin:0 0 10px;">Drop the organiser's entry list below.
+        It is matched against Marketshare here in the browser, so you can see who is entered and what
+        they are flying before anything is written. To load it into the database as a scheduled race —
+        entries with no result, filled in when the results arrive — run:</p>
+      <textarea class="csv-box" readonly rows="3" style="min-height:0;">python3 scripts/load_entry_list.py db/marketshare.db "&lt;the file you dropped&gt;" \\
+  --regatta "${esc(t.regatta)}"${t.year ? ` --year ${esc(t.year)}` : ''} --dry-run</textarea>
+      <p class="muted" style="font-size:12px;margin:8px 0 0;">Drop <code>--dry-run</code> to write it.
+        The sheet's own Sailmaker column is reported, not imported, unless you add
+        <code>--import-sailmakers</code> — it sometimes disagrees with what we hold, and silently
+        overwriting a maker moves the market-share numbers.
+        <a href="#/calendar" data-route="#/calendar">Back to the calendar</a></p>
+    </div>` : '';
+  const drop = targetCard + `
     <div class="card">
       <h2 style="margin-top:0;">Fill an entry list from Marketshare</h2>
       <p class="muted" style="font-size:13px;margin-top:0;">

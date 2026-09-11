@@ -195,6 +195,12 @@ def main():
         # Naming history is derived from the names boats raced under, so it has
         # to be rebuilt after each scrape like the owner history is.
         ("Derive naming history", ["backfill_boat_names.py"], "boat names"),
+
+        # Every scraper writes dates in whatever its source used, so this has
+        # the same shelf life as the class labels: one run. It also derives the
+        # event start/end span from the races underneath, which is what puts a
+        # regatta on the calendar at all.
+        ("Normalise dates", ["normalise_dates.py"], "dates"),
     ]
     for label, argv, tag in PIPELINE:
         ok, _ = run(label, argv, args.db, args.timeout)
