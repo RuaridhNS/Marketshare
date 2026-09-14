@@ -60,14 +60,21 @@ def main():
         for rid, cl in cur.execute(
                 "SELECT race_id, class FROM race_entries GROUP BY race_id, class"):
             cls_by_race.setdefault(rid, set()).add(cl)
-        covered = set()          # (event_id, class) that a real race already holds
+        # Keyed on the SEASON, not the event. The standings used to sit in the
+        # same event as the races that duplicate them, back when a whole RORC
+        # season was one regatta; promote_rorc_races.py gave every race its own
+        # regatta and the standings theirs, so an event key would now never
+        # match and every one of these rows would come back into the counts.
+        year_of = {e["id"]: e["season_year"] for e in events}
+        covered = set()          # (season_year, class) that a real race already holds
         for r in races:
             if r["race_name"] == "Season Standings":
                 continue
             for cl in cls_by_race.get(r["id"], ()):
-                covered.add((r["event_id"], cl))
+                covered.add((year_of.get(r["event_id"]), cl))
         for r in standings:
-            if all((r["event_id"], cl) in covered for cl in cls_by_race.get(r["id"], ())):
+            yr = year_of.get(r["event_id"])
+            if all((yr, cl) in covered for cl in cls_by_race.get(r["id"], ())):
                 standings_race_ids.add(r["id"])
     races = [r for r in races if r["id"] not in standings_race_ids]
     if standings:
@@ -539,6 +546,20 @@ def main():
         # denominator behind every market-share figure in the dashboard
         "n_entries_with_sailmaker": sum(1 for e in entries_rows if e["sailmaker_id"]),
     }
+
+    # Dead branches: an event the export emptied, holding neither a race nor a
+    # reported entry count, is a row in the regatta tree that opens onto
+    # nothing. Removed here rather than in the database, because the database
+    # is right - it is this export that drops the duplicate standings.
+    keep_ev = {r["event_id"] for r in races} | {c["event_id"] for c in class_counts}
+    dead_ev = [e for e in events if e["id"] not in keep_ev]
+    events = [e for e in events if e["id"] in keep_ev]
+    keep_rg = {e["regatta_id"] for e in events}
+    dead_rg = [r for r in regattas if r["id"] not in keep_rg]
+    regattas = [r for r in regattas if r["id"] in keep_rg]
+    if dead_ev or dead_rg:
+        print(f"empty branches: dropped {len(dead_ev)} event(s) and {len(dead_rg)} regatta(s) "
+              f"holding neither a race nor a reported count")
 
     data = {
         "generated_at": datetime.datetime.now().isoformat(),

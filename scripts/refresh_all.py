@@ -138,6 +138,11 @@ def main():
 
         # Regatta-level folds first: merging two records for one real event
         # creates races that now exist twice, which the dedupe below collapses.
+        # Before the merges: this creates the regattas the sponsor-variant folds
+        # below then act on, and it is what stops every RORC race in the tree
+        # showing three seasons when the database holds fifteen.
+        ("Promote RORC races out of season buckets",
+         ["promote_rorc_races.py", "--file", "data/rorc_race_regattas.csv"], "rorc promote"),
         ("Merge regattas", ["merge_regattas.py", "--file", "data/regatta_merges.csv"], "regatta merges"),
 
         # Class labels decide race identity - races are keyed on (event, race
