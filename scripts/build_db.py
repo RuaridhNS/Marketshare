@@ -22,6 +22,11 @@ SAILMAKERS = [
     ("North Sails", 1), ("Doyle", 0), ("Ullman", 0), ("Quantum", 0),
     ("Sanders", 0), ("Partial", 0), ("Unknown", 0), ("Other", 0),
     ("GP", 0), ("UK", 0),
+    # French lofts. Seeded even where no boat carries one yet, so they are
+    # pickable the first time a rep meets one on the dock rather than after
+    # the next refresh.
+    ("Incidence", 0), ("All Purpose", 0), ("Delta Voiles", 0),
+    ("Technique Voile", 0),
 ]
 # Normalize raw sailmaker text -> canonical name in SAILMAKERS
 SAILMAKER_ALIASES = {
@@ -37,6 +42,14 @@ SAILMAKER_ALIASES = {
     "elvstrom": "Elvstrom", "elvstroem": "Elvstrom", "elvstrøm": "Elvstrom",
     "relling": "Relling", "ullman sails": "Ullman", "doyle sails": "Doyle",
     "quantum sails": "Quantum", "sanders sails": "Sanders",
+    # French lofts, long-hand and accented forms folded onto one name each
+    "incidence": "Incidence", "incidence sails": "Incidence",
+    "incidences": "Incidence", "voilerie incidence": "Incidence",
+    "all purpose": "All Purpose", "all purpose sails": "All Purpose",
+    "allpurpose": "All Purpose", "ap sails": "All Purpose",
+    "delta voiles": "Delta Voiles", "delta": "Delta Voiles",
+    "technique voile": "Technique Voile", "techniquevoile": "Technique Voile",
+    "technique voiles": "Technique Voile",
 }
 
 

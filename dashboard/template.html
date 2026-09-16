@@ -338,6 +338,9 @@ tr.sales-saved > td:first-child { box-shadow: inset 3px 0 0 var(--series-quantum
 .sm-select:hover { border-color: currentColor; }
 .sm-select:focus { outline: 2px solid var(--series-north); outline-offset: 1px; }
 .sm-select option { font-weight: 400; color: var(--text-primary); background: var(--surface-1); }
+.sm-cell { white-space: nowrap; }
+.sm-recorded { display: block; font-size: 10.5px; color: var(--text-muted);
+  margin-top: 2px; }
 
 /* a blank branch says why it is blank */
 .tree-why { display: block; margin-top: 4px; font-size: 12px;
@@ -2807,7 +2810,7 @@ function renderAnalysis() {
     attend.map(g => `<tr class="clickable" data-route="#/boat/${g.b.id}">
       <td><strong>${esc(g.b.boat_name || '—')}</strong> <span class="muted">${esc(g.b.sail_no || '')}</span></td>
       <td>${esc(g.b.boat_type || '')}</td>
-      <td><span class="pill" style="${pillStyle(liveSailmaker(g.b))}">${esc(liveSailmaker(g.b) || 'Unknown')}</span></td>
+      <td class="sm-cell">${smSelect(g.b, 'sailmaker')}</td>
       <td class="num">${g.n}</td>
       <td><span style="display:inline-block;height:8px;border-radius:2px;background:var(--series-north);width:${Math.max(3, g.n / maxN * 100)}%"></span></td>
     </tr>`).join('') + '</tbody></table>';
@@ -2823,7 +2826,7 @@ function renderAnalysis() {
     succ.map(g => `<tr class="clickable" data-route="#/boat/${g.b.id}">
       <td><strong>${esc(g.b.boat_name || '—')}</strong> <span class="muted">${esc(g.b.sail_no || '')}</span></td>
       <td>${esc(g.b.boat_type || '')}</td>
-      <td><span class="pill" style="${pillStyle(liveSailmaker(g.b))}">${esc(liveSailmaker(g.b) || 'Unknown')}</span></td>
+      <td class="sm-cell">${smSelect(g.b, 'sailmaker')}</td>
       <td class="num">${g.scored}</td><td class="num">${g.podium}</td>
       <td class="num">${Math.round(g.rate * 100)}%</td>
       <td class="num">${g.avg.toFixed(1)}</td></tr>`).join('') + '</tbody></table>'
@@ -2870,7 +2873,7 @@ function renderAnalysis() {
       <td class="muted">${esc(o.from.owner_name || '—')}</td>
       <td>${esc(o.to.owner_name || '—')}</td>
       <td class="num">${o.yr}</td>
-      <td><span class="pill" style="${pillStyle(liveSailmaker(o.b))}">${esc(liveSailmaker(o.b) || 'Unknown')}</span></td>
+      <td class="sm-cell">${smSelect(o.b, 'sailmaker')}</td>
     </tr>`).join('') + '</tbody></table>'
     : '<p class="muted" style="padding:0 20px 16px;">No ownership changes recorded in this window.</p>';
 
@@ -4347,7 +4350,7 @@ function renderRegattaProfile(id, year, cls) {
       <td>${esc(g.boat.boat_type||'')}</td>
       <td>${esc(Array.from(g.classes).join(', '))}</td>
       <td>${esc(g.boat.owner_name||'')}</td>
-      <td><span class="pill" style="${pillStyle(g.sailmaker)}">${esc(g.sailmaker||'Unknown')}</span></td>
+      <td class="sm-cell">${smSelect(g.boat, 'sailmaker')}</td>
       <td class="num">${g.races}</td>
       <td>${g.best!=null ? (g.best===1?'1st':g.best===2?'2nd':g.best===3?'3rd':g.best+'th') : '—'}</td>
     </tr>`).join('');
@@ -4505,7 +4508,7 @@ function renderRacePage(raceId) {
       <td>${esc(e.class||'')}</td>
       <td class="num">${e.tcc!=null ? e.tcc : (e.boat.tcc||'')}</td>
       <td>${esc(e.owner_name_used||e.boat.owner_name||'')}</td>
-      <td>${e.sailmaker_name ? `<span class="pill" style="${pillStyle(e.sailmaker_name)}">${esc(e.sailmaker_name)}</span>` : ''}</td>
+      <td class="sm-cell">${smSelect(e.boat, 'sailmaker')}${e.sailmaker_name && e.sailmaker_name !== liveSailmaker(e.boat) ? `<small class="sm-recorded" title="recorded on this result">${esc(e.sailmaker_name)}</small>` : ''}</td>
       <td>${esc(e.corrected_time||e.status||'')}</td>
       <td class="num">${e.points!=null ? e.points : ''}</td>
     </tr>`).join('');
@@ -4598,7 +4601,7 @@ function renderMarketAnalysis() {
       <td>${esc(b.sail_no || '')}</td>
       <td>${esc(b.boat_type || '')}</td>
       <td>${esc(b.owner_name || '')}</td>
-      <td><span class="pill" style="${pillStyle(liveSailmaker(b))}">${esc(liveSailmaker(b) || 'Unknown')}</span></td>
+      <td class="sm-cell">${smSelect(b, 'sailmaker')}</td>
       <td class="num">${b.entries.length}</td>
     </tr>`).join('');
 
