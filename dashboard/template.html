@@ -3539,6 +3539,35 @@ function renderEnrich() {
         <p class="muted" style="font-size:12px;margin:10px 0 0;" id="enrich-status">No file loaded.</p>
       </div>
     </div>`;
+  // A file dropped without a regatta picked on the calendar used to stop here:
+  // the sheet was enriched in the browser and the page never said how to get it
+  // into the database. It now builds that command from what you type.
+  const newEventCard = (st && !t) ? `
+    <div class="card" style="border-left:4px solid var(--series-quantum);">
+      <h2 style="margin-top:0;">Put this event in the database</h2>
+      <p class="muted" style="font-size:13px;margin:0 0 12px;">
+        This file is not tied to a regatta on the calendar, so name it here and the
+        command to load it is written for you. Run it from the project directory.</p>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;">
+        <div class="field"><label class="field-label" for="ne-regatta">Regatta name</label>
+          <input type="text" id="ne-regatta" value="${esc(ENRICH.name ? ENRICH.name.replace(/\.(csv|xlsx|xls)$/i,'').replace(/marketshares?/ig,'').replace(/[\(\[]\s*\d{4}\s*[\)\]]/g,'').replace(/\s+/g,' ').trim() : '')}"></div>
+        <div class="field"><label class="field-label" for="ne-year">Year</label>
+          <input type="number" id="ne-year" value="${(ENRICH.name||'').match(/20\d\d/) ? (ENRICH.name||'').match(/20\d\d/)[0] : new Date().getFullYear()}"></div>
+        <div class="field"><label class="field-label" for="ne-segment">Segment</label>
+          <select id="ne-segment">${['','Grand Prix','Premier Race','Race','One-Design','Classic','Cruise','Premier Cruise']
+            .map(s => `<option value="${esc(s)}">${s ? esc(s) : '(none)'}</option>`).join('')}</select></div>
+        <div class="field"><label class="field-label" for="ne-country">Country code</label>
+          <input type="text" id="ne-country" placeholder="FRA, USA, GBR…"></div>
+      </div>
+      <textarea class="csv-box" id="ne-cmd" readonly rows="3" style="min-height:0;"></textarea>
+      <p class="muted" style="font-size:12px;margin:8px 0 0;">
+        Runs as a dry run first and writes nothing — drop <code>--dry-run</code> to commit.
+        It takes a database backup, matches every boat against the ones we already hold,
+        and will not let the sheet silently overwrite a sailmaker we already have.
+        Rebuild the dashboard afterwards and this event appears under
+        <a href="#/segments" data-route="#/segments">Segments</a>.</p>
+    </div>` : '';
+
   if (!st) return `<h1>Entry list</h1>${drop}`;
 
   const sheetPick = ENRICH.sheets.length > 1
@@ -3572,6 +3601,7 @@ function renderEnrich() {
   return `
     <h1>Entry list</h1>
     ${drop}
+    ${newEventCard}
     <div class="card">
       <div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap;margin-bottom:10px;">
         <strong>${esc(ENRICH.name)}</strong>${sheetPick}
@@ -3632,7 +3662,34 @@ function useSheet(matrix, sheetName) {
   ENRICH.rows = enrichRows(ENRICH.headers, body);
 }
 
+// Keeps the "put this event in the database" command in step with the four
+// fields above it. Shell-quotes anything the user types, since a regatta name
+// with an apostrophe in it is normal ("Queen's Cup") and would otherwise
+// produce a command that breaks when pasted.
+function attachNewEventHandlers() {
+  const box = document.getElementById('ne-cmd');
+  if (!box) return;
+  const ids = ['ne-regatta', 'ne-year', 'ne-segment', 'ne-country'];
+  const q = v => `"${String(v).replace(/(["\\$`])/g, '\\$1')}"`;
+  const build = () => {
+    const [reg, yr, seg, ctry] = ids.map(i => (document.getElementById(i).value || '').trim());
+    const file = ENRICH.name || '<the file you dropped>';
+    let cmd = `python scripts/load_marketshare_csv.py db/marketshare.db ${q(file)} \\\n`
+            + `  --regatta ${q(reg || 'Name this regatta')} --year ${yr || new Date().getFullYear()}`;
+    if (seg)  cmd += ` \\\n  --segment ${q(seg)}`;
+    if (ctry) cmd += ` --country ${q(ctry.toUpperCase())}`;
+    cmd += ' --dry-run';
+    box.value = cmd;
+  };
+  ids.forEach(i => {
+    const el = document.getElementById(i);
+    if (el) { el.addEventListener('input', build); el.addEventListener('change', build); }
+  });
+  build();
+}
+
 function attachEnrichHandlers() {
+  attachNewEventHandlers();
   const zone = document.getElementById('drop-zone');
   const input = document.getElementById('enrich-file');
   const pick = document.getElementById('enrich-pick');
