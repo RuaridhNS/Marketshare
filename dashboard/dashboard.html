@@ -3499,6 +3499,21 @@ function enrichToCSV() {
   return lines.join('\n');
 }
 
+// "RNSA Regatta [Sep 5-7].xlsx" -> "RNSA Regatta". Everything in brackets goes:
+// these filenames carry a date range, a year, or both, and none of it belongs
+// in a regatta name.
+function regattaGuess() {
+  return (ENRICH.name || '')
+    .replace(/\.(csv|xlsx|xls)$/i, '')
+    .replace(/\[[^\]]*\]/g, ' ')
+    .replace(/\([^)]*\)/g, ' ')
+    .replace(/\bmarketshares?\b/ig, ' ')
+    .replace(/\b20\d\d\b/g, ' ')
+    .replace(/[_\-–—]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 function renderEnrich() {
   const st = ENRICH.stats;
   // Applying a list to a regatta is a database write, and this page is a
@@ -3524,19 +3539,23 @@ function renderEnrich() {
   const drop = targetCard + `
     <div class="card">
       <h2 style="margin-top:0;">Fill an entry list from Marketshare</h2>
-      <p class="muted" style="font-size:13px;margin-top:0;">
+      ${st ? '' : `<p class="muted" style="font-size:13px;margin-top:0;">
         Drop an event entry list in — the spreadsheet with Sail Number, Yacht Name and a
         mostly-empty Sailmaker column. Every boat already in Marketshare is filled in, and the
         ones we do not hold are listed so the gap is visible. <strong>Blanks only:</strong> what
         your team has typed is never overwritten. Where the sheet and the database disagree,
         both are kept and the disagreement is reported.
         Nothing leaves your browser — the file is read on this page.
-      </p>
-      <div id="drop-zone" class="drop-zone">
+      </p>`}
+      <div id="drop-zone" class="drop-zone"${st ? ' style="padding:12px;"' : ''}>
         <input type="file" id="enrich-file" accept=".xlsx,.xls,.csv" style="display:none;">
-        <p style="margin:0 0 8px;"><strong>Drop a .xlsx or .csv here</strong></p>
-        <button class="btn" id="enrich-pick" type="button">Choose a file</button>
-        <p class="muted" style="font-size:12px;margin:10px 0 0;" id="enrich-status">No file loaded.</p>
+        <p style="margin:0 0 8px;"><strong>${st ? 'Drop another file to replace this one'
+          : 'Drop a .xlsx or .csv here'}</strong></p>
+        <button class="btn${st ? ' secondary' : ''}" id="enrich-pick" type="button">Choose a file</button>
+        <p class="muted" style="font-size:12px;margin:10px 0 0;" id="enrich-status">${
+          st ? `<strong style="color:var(--series-quantum);">Loaded ${esc(ENRICH.name)}</strong>
+                — ${st.total} boats, ${st.matched} matched. Next step below.`
+             : 'No file loaded.'}</p>
       </div>
     </div>`;
   // A file dropped without a regatta picked on the calendar used to stop here:
@@ -3550,7 +3569,7 @@ function renderEnrich() {
         command to load it is written for you. Run it from the project directory.</p>
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;">
         <div class="field"><label class="field-label" for="ne-regatta">Regatta name</label>
-          <input type="text" id="ne-regatta" value="${esc(ENRICH.name ? ENRICH.name.replace(/\.(csv|xlsx|xls)$/i,'').replace(/marketshares?/ig,'').replace(/[\(\[]\s*\d{4}\s*[\)\]]/g,'').replace(/\s+/g,' ').trim() : '')}"></div>
+          <input type="text" id="ne-regatta" value="${esc(regattaGuess())}"></div>
         <div class="field"><label class="field-label" for="ne-year">Year</label>
           <input type="number" id="ne-year" value="${(ENRICH.name||'').match(/20\d\d/) ? (ENRICH.name||'').match(/20\d\d/)[0] : new Date().getFullYear()}"></div>
         <div class="field"><label class="field-label" for="ne-segment">Segment</label>
