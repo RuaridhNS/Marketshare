@@ -9,11 +9,11 @@ Bristol Channel,2023,Portishead,Shanghai Cup,9,9,9,yes,Sailwave; only the passag
 Bristol Channel,2024,Portishead,Shanghai Cup,13,13,13,yes,Sailwave overall standings
 Bristol Channel,2025,Portishead,Shanghai Cup,11,11,11,yes,Sailwave overall standings
 Bristol Channel,2026,Portishead,Shanghai Cup,16,16,16,yes,"Sailwave overall standings. The published entry list carries 17, so this is finishers"
-Scottish,2022,Tarbert,Jura Scottish Series,,,,yes,not published - the club archive skips 2020 to 2022
-Scottish,2023,Tarbert,Jura Scottish Series,25,25,,yes,"club results PDF; Class 1 5 / Class 2 (RC35) 15 / Class 3 5. Counted by distinct sail number, so an all-digit sail number is missed - a floor"
-Scottish,2024,Tarbert,Jura Scottish Series,20,20,,yes,club results PDF; RC35 9 / IRC Fleet 2 11. Same counting caveat as 2023
-Scottish,2025,Tarbert,Jura Scottish Series,27,27,84,yes,club results PDF (HalSail export); IRC 1 10 / IRC 2 11 / IRC Coastal 6
-Scottish,2026,Tarbert,Jura Scottish Series,24,24,82,yes,HalSail live event 5118; IRC 1 14 / IRC Coastal 10
+Scottish,2022,North Clyde Regatta,North Clyde Regatta,,,,NO,"the Scottish Series itself was CANCELLED in 2022 - for want of volunteers rather than entries, per Afloat - and the Scottish IRC Championship moved to the North Clyde Regatta on 10 September. Results not captured. Scotland is therefore not a fixed-venue region after all"
+Scottish,2023,Tarbert,Jura Scottish Series,25,25,,mostly,"club results PDF; Class 1 5 / Class 2 (RC35) 15 / Class 3 5. Counted by distinct sail number, so an all-digit sail number is missed - a floor"
+Scottish,2024,Tarbert,Jura Scottish Series,20,20,,mostly,club results PDF; RC35 9 / IRC Fleet 2 11. Same counting caveat as 2023
+Scottish,2025,Tarbert,Jura Scottish Series,27,27,84,mostly,club results PDF (HalSail export); IRC 1 10 / IRC 2 11 / IRC Coastal 6
+Scottish,2026,Tarbert,Jura Scottish Series,24,24,82,mostly,HalSail live event 5118; IRC 1 14 / IRC Coastal 10
 Channel Islands,2022,Jersey,Jersey Regatta,,,,yes,"results were on HalSail, but HalSail purges old series from the live site and Jersey's own site only ever linked the live URL. The Wayback Machine captured the results INDEX for 2021-24 (event 3485/4673/4985, naming the classes) but never the results tables, and the live series ids now return an empty page. Recoverable only from the Royal Channel Islands YC or HalSail"
 Channel Islands,2023,Jersey,Jersey Regatta,,,,yes,"results were on HalSail, but HalSail purges old series from the live site and Jersey's own site only ever linked the live URL. The Wayback Machine captured the results INDEX for 2021-24 (event 3485/4673/4985, naming the classes) but never the results tables, and the live series ids now return an empty page. Recoverable only from the Royal Channel Islands YC or HalSail"
 Channel Islands,2024,Jersey,Jersey Regatta,,,,yes,"results were on HalSail, but HalSail purges old series from the live site and Jersey's own site only ever linked the live URL. The Wayback Machine captured the results INDEX for 2021-24 (event 3485/4673/4985, naming the classes) but never the results tables, and the live series ids now return an empty page. Recoverable only from the Royal Channel Islands YC or HalSail"
@@ -33,12 +33,12 @@ Northern Ireland,2022,,,,,,new,championship did not exist - first listed by RORC
 Northern Ireland,2023,,,,,,new,championship did not exist - first listed by RORC in 2025
 Northern Ireland,2024,,,,,,new,championship did not exist - first listed by RORC in 2025
 Northern Ireland,2025,Bangor,Royal Ulster Yacht Club,22,22,42,NO,Sailwave; IRC 1 9 / IRC 2 7 / Coastal-IRC 6 plus 20 in the matching YTC classes
-Northern Ireland,2026,Carrickfergus,Carrickfergus Sailing Club,,,,NO,no entry or results list published at time of research
+Northern Ireland,2026,Carrickfergus,Carrickfergus Sailing Club,14,14,30,NO,"Sailwave; IRC 1 Class 8 / IRC 2 Class 6 plus YTC 16. Down from 22 at Bangor the year before, after the championship moved venue"
 North West,2022,,,,,,new,championship did not exist - new for 2026
 North West,2023,,,,,,new,championship did not exist - new for 2026
 North West,2024,,,,,,new,championship did not exist - new for 2026
 North West,2025,,,,,,new,championship did not exist - new for 2026
-North West,2026,Liverpool,Liverpool Yacht Club,,,,new,no entry or results list published at time of research
+North West,2026,Liverpool,Liverpool Yacht Club,11,11,15,new,"Sailwave, racing.lyc.org.uk; IRC1 6 / IRC2 5 plus YTC 4. First edition of the championship"
 Southern,2022,Poole,International Paint Poole Regatta,19,19,44,NO,"Sailwave; the championship WAS the regatta's IRC fleet that year - IRC Southern Area Championship Class 1 (10) and Class 2 (9). Comparable with 2026's 58, not with 2026's 6"
 Southern,2023,Weymouth,Weymouth Sailing Club,,,,NO,moved to Weymouth Sailing Club this year. WSC scores on HalSail (club 64); the 2023 dataset is archived and needs its dsKey to reach
 Southern,2024,,,,,,NO,not listed as a Southern Championship - Poole hosted the IRC NATIONAL Championship instead (48 IRC boats)
