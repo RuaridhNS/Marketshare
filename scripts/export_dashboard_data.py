@@ -22,7 +22,50 @@ def main():
     owners = [dict(r) for r in cur.execute("SELECT id, name, is_charter_operator FROM owners")]
     owner_by_id = {o["id"]: o for o in owners}
 
-    regattas = [dict(r) for r in cur.execute("SELECT id, name, category, region FROM regattas ORDER BY name")]
+    regattas = [dict(r) for r in cur.execute(
+        "SELECT id, name, category, region, segment, country FROM regattas ORDER BY name")]
+
+    # --- Segments -------------------------------------------------------------
+    # Computed straight off the database, BEFORE the IRC filter further down.
+    # That filter exists to keep the Solent views honest, but One-Design,
+    # Classic and Premier Cruise boats are not IRC-rated by nature, so running
+    # them through it would erase the very fleets this view is for.
+    segment_events = [dict(r) for r in cur.execute("""
+        SELECT r.segment, r.name AS regatta, r.id AS regatta_id, r.region,
+               e.season_year AS year,
+               COUNT(DISTINCT re.boat_id)  AS boats,
+               SUM(CASE WHEN s.name = 'North Sails' THEN 1 ELSE 0 END) AS north,
+               SUM(CASE WHEN re.sailmaker_id IS NOT NULL
+                          AND s.name NOT IN ('Unknown','Other','Partial')
+                        THEN 1 ELSE 0 END) AS known
+          FROM regattas r
+          JOIN events e       ON e.regatta_id = r.id
+          JOIN races ra       ON ra.event_id  = e.id
+          JOIN race_entries re ON re.race_id  = ra.id
+          LEFT JOIN sailmakers s ON s.id = re.sailmaker_id
+         WHERE r.segment IS NOT NULL
+         GROUP BY r.segment, r.id, e.season_year
+         HAVING boats > 0
+         ORDER BY r.segment, boats DESC""")]
+
+    segment_totals = [dict(r) for r in cur.execute("""
+        SELECT r.segment,
+               COUNT(DISTINCT r.id)        AS regattas,
+               COUNT(DISTINCT e.id)        AS events,
+               COUNT(DISTINCT re.boat_id)  AS boats,
+               COUNT(*)                    AS entries,
+               SUM(CASE WHEN s.name = 'North Sails' THEN 1 ELSE 0 END) AS north,
+               SUM(CASE WHEN re.sailmaker_id IS NOT NULL
+                          AND s.name NOT IN ('Unknown','Other','Partial')
+                        THEN 1 ELSE 0 END) AS known
+          FROM regattas r
+          JOIN events e       ON e.regatta_id = r.id
+          JOIN races ra       ON ra.event_id  = e.id
+          JOIN race_entries re ON re.race_id  = ra.id
+          LEFT JOIN sailmakers s ON s.id = re.sailmaker_id
+         WHERE r.segment IS NOT NULL
+         GROUP BY r.segment
+         ORDER BY boats DESC""")]
 
     events = [dict(r) for r in cur.execute(
         "SELECT id, regatta_id, season_year, start_date, end_date, source_url, notes FROM events")]
@@ -572,6 +615,8 @@ def main():
         "market_share_entries": market_share,
         "market_share_boats": market_share_boats,
         "entry_trends": trend_rows,
+        "segment_totals": segment_totals,
+        "segment_events": segment_events,
         "class_counts": class_counts,
         # Crew, for the Analysis tab. Only the boats that survived the IRC
         # filter, so the panel cannot show people sailing boats the rest of the

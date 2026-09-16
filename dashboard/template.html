@@ -441,6 +441,7 @@ tr.enrich-miss > td:first-child { box-shadow: inset 3px 0 0 var(--series-doyle);
     <a class="nav-item" href="#/boats" data-route="#/boats">Boats</a>
     <a class="nav-item" href="#/regattas" data-route="#/regattas">Regattas</a>
     <a class="nav-item" href="#/compare" data-route="#/compare">Compare</a>
+    <a class="nav-item" href="#/segments" data-route="#/segments">Segments</a>
     <a class="nav-item" href="#/coverage" data-route="#/coverage">Coverage</a>
     <a class="nav-item" href="#/analysis" data-route="#/analysis">Analysis</a>
     <a class="nav-item" href="#/market-analysis" data-route="#/market-analysis">Market analysis</a>
@@ -1096,6 +1097,7 @@ function navigate() {
       const rq = query.get('regatta');
       if (rq) ENRICH.target = { regatta: rq, year: query.get('year') || '' };
       main.innerHTML = renderEnrich(); attachEnrichHandlers(); }
+    else if (route === 'segments') main.innerHTML = renderSegments();
     else if (route === 'coverage') main.innerHTML = renderCoverage();
     else if (route === 'quality') main.innerHTML = renderQuality();
     else if (route === 'compare') main.innerHTML = renderCompare((query.get('r')||'').split(',').filter(Boolean));
@@ -3822,6 +3824,94 @@ const COVERAGE_BADGE = {
   partial: ['Part loaded', 'var(--series-quantum)', '#fff'],
   historical: ['Historical', 'var(--series-unknown)', 'var(--series-unknown-text)'],
 };
+
+// Segments. Built from segment_totals/segment_events, which the exporter
+// computes BEFORE the IRC filter - One-Design, Classic and Premier Cruise
+// boats are not IRC-rated, so the filter would erase the fleets this view
+// exists to show.
+const SEGMENT_ORDER = ['Grand Prix','Premier Race','Race','One-Design',
+                       'Classic','Cruise','Premier Cruise'];
+const SEGMENT_NOTE = {
+  'Grand Prix':     'Professional circuits and pro-campaign offshore.',
+  'Premier Race':   'The marquee handicap and offshore events.',
+  'Race':           'Club, regional and series handicap racing.',
+  'One-Design':     'One-design class racing, keelboat and dinghy.',
+  'Classic':        'Classic, vintage and metre-rule yachts.',
+  'Cruise':         'Cruising rallies.',
+  'Premier Cruise': 'Superyacht regattas and blue-water rallies.'
+};
+
+function renderSegments() {
+  const totals = (DATA.segment_totals || []);
+  const evs    = (DATA.segment_events || []);
+  if (!totals.length) return `<h1>Segments</h1><div class="card"><p class="muted">
+    No segmented events yet. Run the Marketshare workbook import.</p></div>`;
+
+  const byName = {}; totals.forEach(t => byName[t.segment] = t);
+  const ordered = SEGMENT_ORDER.filter(s => byName[s]);
+  const maxBoats = Math.max(...totals.map(t => t.boats));
+
+  const cards = ordered.map(name => {
+    const t = byName[name];
+    const share = t.known ? (100 * t.north / t.known) : null;
+    return `<div class="card" style="padding:16px 18px;">
+      <div style="font-size:13px;font-weight:600;letter-spacing:.04em;
+                  text-transform:uppercase;color:var(--text-secondary);">${esc(name)}</div>
+      <div style="font-size:30px;font-weight:700;line-height:1.1;margin:6px 0 2px;">
+        ${t.boats.toLocaleString()}</div>
+      <div class="muted" style="font-size:12px;">boats &middot; ${t.regattas} regattas
+        &middot; ${t.events} events</div>
+      <div style="height:6px;background:var(--gridline);margin:10px 0 8px;">
+        <div style="height:100%;width:${(100*t.boats/maxBoats).toFixed(1)}%;
+                    background:var(--series-north);"></div></div>
+      <div style="font-size:12px;">${share === null ? '<span class="muted">no sailmaker recorded</span>'
+        : `North <b>${share.toFixed(0)}%</b> <span class="muted">of ${t.known.toLocaleString()}
+           boats with a sailmaker recorded</span>`}</div>
+      <div class="muted" style="font-size:11.5px;margin-top:7px;">${esc(SEGMENT_NOTE[name]||'')}</div>
+    </div>`;
+  }).join('');
+
+  const groups = ordered.map(name => {
+    const rows = evs.filter(e => e.segment === name)
+      .sort((a,b) => b.boats - a.boats || (b.year||0)-(a.year||0))
+      .slice(0, 25)
+      .map(e => {
+        const share = e.known ? `${(100*e.north/e.known).toFixed(0)}%` : '—';
+        return `<tr class="clickable" data-route="#/regatta/${e.regatta_id}">
+          <td>${esc(e.regatta)}</td>
+          <td>${e.year || '—'}</td>
+          <td style="text-align:right;">${e.boats.toLocaleString()}</td>
+          <td style="text-align:right;">${share}</td>
+          <td class="muted" style="font-size:12px;">${esc(e.region || '')}</td>
+        </tr>`;
+      }).join('');
+    const n = evs.filter(e => e.segment === name).length;
+    return `<div class="card" style="padding:0;overflow:auto;">
+      <h2 style="padding:18px 20px 0;">${esc(name)}
+        <span class="muted" style="font-weight:400;font-size:13px;">
+          ${n > 25 ? `top 25 of ${n} event-years` : `${n} event-year${n===1?'':'s'}`}</span></h2>
+      <table>
+        <thead><tr><th>Regatta</th><th>Year</th><th style="text-align:right;">Boats</th>
+          <th style="text-align:right;">North</th><th>Region</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table></div>`;
+  }).join('');
+
+  return `<h1>Segments</h1>
+  <p class="muted" style="max-width:76ch;margin:-6px 0 18px;">
+    Every event carrying a segment, including the non-Solent events imported from
+    the Marketshare workbooks. Counts here bypass the IRC filter used elsewhere,
+    because one-design, classic and superyacht boats are not IRC-rated.</p>
+  <div class="card" style="border-left:3px solid var(--series-north);margin-bottom:18px;">
+    <p style="margin:0;font-size:13.5px;">
+      <b>Read the North percentages with care.</b> They are the share of boats whose
+      sailmaker someone recorded, not of the fleet. Sailmaker is filled in on roughly
+      three boats in ten, and it gets filled in most often when the answer is North,
+      so these figures are a ceiling rather than a measurement.</p></div>
+  <div class="grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(215px,1fr));
+       gap:14px;margin-bottom:22px;">${cards}</div>
+  ${groups}`;
+}
 
 function renderCoverage() {
   const rows = DATA.regattas.map(r => {
