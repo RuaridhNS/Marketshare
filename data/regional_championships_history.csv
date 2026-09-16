@@ -1,35 +1,54 @@
-Region,Championship,HostEvent,Year,IRCBoats,TotalFleet,Basis
-National,IRC National Championship,Dartmouth Regatta Sailing Week,2022,43,,"HalSail class results, per-class ""N boats in the class"" footer. NOTE: this row is the Dartmouth regatta, which is a South West event. The National title travels - Poole 2024, Cowes 2025, Dartmouth 2026 - so only 2026 is the National"
-National,IRC National Championship,Dartmouth Regatta Sailing Week,2023,61,,HalSail class results
-National,IRC National Championship,Dartmouth Regatta Sailing Week,2024,62,,HalSail class results
-National,IRC National Championship,Dartmouth Regatta Sailing Week,2025,51,,"HalSail class results. Dartmouth hosted the IRC South West Championship this year, not the National"
-National,IRC National Championship,Dartmouth Regatta Sailing Week,2026,61,,"HalSail live event 5337; IRC0 9 / IRC1 12 / IRC2 12 / IRC3 13 / IRC4 15. Matches the published ""61 boats racing under IRC"". The National was held here this year"
-Southern,IRC Southern Championship,International Paint Poole Regatta,2022,19,44,"Sailwave; IRC Southern Area Championship Class 1 10 plus Class 2 9. The other 25 are VPRS. This is Poole's own championship with no visiting title attached - the honest base figure"
-Southern,IRC Southern Championship,International Paint Poole Regatta,2024,48,75,"Sailwave; Poole hosted the IRC NATIONAL Championship this year - classes 0-4 at 3/9/17/7/12. Not comparable with 2022"
-Southern,IRC Southern Championship,International Paint Poole Regatta,2026,58,85,"Sailwave; Poole hosted the IRC EUROPEAN Championship this year, which brought 52 of the 58. The Southern Championship's own class is 6 boats. Not comparable with 2022"
-Southern,IRC Southern Championship,International Paint Poole Regatta,2023,,,the regatta is biennial - no edition in odd years
-Southern,IRC Southern Championship,International Paint Poole Regatta,2025,,,the regatta is biennial - no edition in odd years
-East Coast,IRC East Coast Championship,Ramsgate Week,2022,13,,archive.halsail.com dsKey 3089; IRC Overall series
-East Coast,IRC East Coast Championship,Ramsgate Week,2023,13,,archive.halsail.com dsKey 3172; Round the Goodwins IRC Overall
-East Coast,IRC East Coast Championship,Ramsgate Week,2024,,,"the club's previous-results page points 2024 at the live site, which now shows 2026; no archived dataset found"
-East Coast,IRC East Coast Championship,Ramsgate Week,2025,12,,archive.halsail.com dsKey 3371; IRC Ramsgate Week Overall
-East Coast,IRC East Coast Championship,Ramsgate Week,2026,14,34,"HalSail IRC Overall series 92677. The 34-boat combined entry list is NOT the IRC fleet: Ramsgate runs IRC classes 1-2 alongside YTC classes 4-8 and a Class 7 local handicap"
-Scottish,IRC Scottish Championship,Jura Scottish Series,2022,,,not published - the club archive skips 2020 to 2022
-Scottish,IRC Scottish Championship,Jura Scottish Series,2023,25,,"club results PDF; Class 1 5 / Class 2 (RC35) 15 / Class 3 5. Counted by distinct sail number, so a boat with an all-digit number is missed - treat as a floor"
-Scottish,IRC Scottish Championship,Jura Scottish Series,2024,20,,club results PDF; RC35 9 / IRC Fleet 2 11. Same counting caveat as 2023
-Scottish,IRC Scottish Championship,Jura Scottish Series,2025,27,84,club results PDF (HalSail export); IRC 1 10 / IRC 2 11 / IRC Coastal 6
-Scottish,IRC Scottish Championship,Jura Scottish Series,2026,24,82,HalSail live event 5118; IRC 1 14 / IRC Coastal 10
-Welsh,IRC Welsh National Championship,Cardigan Bay Celtic Regatta,2022,10,10,Sailwave; only a combined overall was published
-Welsh,IRC Welsh National Championship,Cardigan Bay Celtic Regatta,2023,17,17,Sailwave; Class 1 9 / Class 2 8
-Welsh,IRC Welsh National Championship,Cardigan Bay Celtic Regatta,2024,19,19,Sailwave; Class 1 10 / Class 2 9
-Welsh,IRC Welsh National Championship,Cardigan Bay Celtic Regatta,2025,17,22,Sailwave; Class 1 8 / Class 2 9 plus YTC 5
-Welsh,IRC Welsh National Championship,Cardigan Bay Celtic Regatta,2026,16,19,Sailwave; IRC 1 9 / IRC 2 7 plus YTC 3
-Bristol Channel,IRC Bristol Channel Championship,Shanghai Cup,2022,6,6,Sailwave; only the passage race standings published
-Bristol Channel,IRC Bristol Channel Championship,Shanghai Cup,2023,9,9,Sailwave; only the passage race standings published
-Bristol Channel,IRC Bristol Channel Championship,Shanghai Cup,2024,13,13,Sailwave overall standings
-Bristol Channel,IRC Bristol Channel Championship,Shanghai Cup,2025,11,11,Sailwave overall standings
-Bristol Channel,IRC Bristol Channel Championship,Shanghai Cup,2026,16,16,"Sailwave overall standings. The published entry list carries 17, so the results figure is finishers"
-Channel Islands,IRC Channel Island Championship,Jersey Regatta,2026,8,59,"HalSail event 5511. The Notice of Race awards the championship to ""Classes 1, 2 & Q"": classes 0+1 carry 4 boats (X332, Melges 24, J/109, A35) and class 2/Q another 4 (Farr 727 Quarter Tonners). The other 51 are NOT IRC - class 3 races RYA YTC, class 4 a Jersey Dayboat Handicap, classes 5-7 Hobie catamarans, 8-9 dinghies on Portsmouth Yardstick. Earlier years publish race reports but no results"
-South West,IRC South West Championship,Royal Torbay Regatta,2026,4,15,"Sailwave; the page states ""Entries: 4"" for the IRC YACHT fleet, plus 11 in the RYA YTC cruiser class. Earlier years use a different results path and are not yet captured"
-Northern Ireland,IRC Northern Ireland Championship,Carrickfergus Sailing Club,2026,,,no entry or results list published at time of research
-North West,IRC North West Championship,Liverpool Yacht Club,2026,,,new championship for 2026; no entry or results list published at time of research
+Region,Year,Venue,HostEvent,IRCBoats,TotalFleet,VenueStable,Basis
+Welsh,2022,Pwllheli,Cardigan Bay Celtic Regatta,10,10,yes,Sailwave; only a combined overall was published
+Welsh,2023,Pwllheli,Cardigan Bay Celtic Regatta,17,17,yes,Sailwave; Class 1 9 / Class 2 8
+Welsh,2024,Pwllheli,Cardigan Bay Celtic Regatta,19,19,yes,Sailwave; Class 1 10 / Class 2 9
+Welsh,2025,Pwllheli,Cardigan Bay Celtic Regatta,17,22,yes,Sailwave; Class 1 8 / Class 2 9 plus YTC 5
+Welsh,2026,Pwllheli,Cardigan Bay Celtic Regatta,16,19,yes,Sailwave; IRC 1 9 / IRC 2 7 plus YTC 3
+Bristol Channel,2022,Portishead,Shanghai Cup,6,6,yes,Sailwave; only the passage race standings published
+Bristol Channel,2023,Portishead,Shanghai Cup,9,9,yes,Sailwave; only the passage race standings published
+Bristol Channel,2024,Portishead,Shanghai Cup,13,13,yes,Sailwave overall standings
+Bristol Channel,2025,Portishead,Shanghai Cup,11,11,yes,Sailwave overall standings
+Bristol Channel,2026,Portishead,Shanghai Cup,16,16,yes,"Sailwave overall standings. The published entry list carries 17, so this is finishers"
+Scottish,2022,Tarbert,Jura Scottish Series,,,yes,not published - the club archive skips 2020 to 2022
+Scottish,2023,Tarbert,Jura Scottish Series,25,,yes,"club results PDF; Class 1 5 / Class 2 (RC35) 15 / Class 3 5. Counted by distinct sail number, so an all-digit sail number is missed - a floor"
+Scottish,2024,Tarbert,Jura Scottish Series,20,,yes,club results PDF; RC35 9 / IRC Fleet 2 11. Same counting caveat as 2023
+Scottish,2025,Tarbert,Jura Scottish Series,27,84,yes,club results PDF (HalSail export); IRC 1 10 / IRC 2 11 / IRC Coastal 6
+Scottish,2026,Tarbert,Jura Scottish Series,24,82,yes,HalSail live event 5118; IRC 1 14 / IRC Coastal 10
+Channel Islands,2022,Jersey,Jersey Regatta,,,yes,results not published online - race report only
+Channel Islands,2023,Jersey,Jersey Regatta,,,yes,results not published online - race report only
+Channel Islands,2024,Jersey,Jersey Regatta,,,yes,results not published online - race report only
+Channel Islands,2025,Jersey,Jersey Regatta,,,yes,results not published online - race report only
+Channel Islands,2026,Jersey,Jersey Regatta,8,59,yes,"HalSail event 5511. The NoR awards the title to ""Classes 1, 2 & Q"": classes 0+1 carry 4 (X332, Melges 24, J/109, A35) and class 2/Q another 4 (Farr 727s). The other 51 are RYA YTC, a Jersey Dayboat Handicap, Hobie catamarans and Portsmouth Yardstick dinghies"
+East Coast,2022,Ramsgate,Ramsgate Week,13,,mostly,archive.halsail.com dsKey 3089; IRC Overall series
+East Coast,2023,Ramsgate,Ramsgate Week,13,,mostly,archive.halsail.com dsKey 3172; Round the Goodwins IRC Overall
+East Coast,2024,West Mersea,Mersea Week,,,mostly,"the championship moved to Mersea Week this one year; results not captured"
+East Coast,2025,Ramsgate,Ramsgate Week,12,,mostly,archive.halsail.com dsKey 3371; IRC Ramsgate Week Overall
+East Coast,2026,Ramsgate,Ramsgate Week,14,34,mostly,"HalSail IRC Overall series 92677. The 34-boat entry list is NOT the IRC fleet - Ramsgate runs IRC classes 1-2 alongside YTC classes 4-8 and a Class 7 local handicap"
+South West,2022,Plymouth,Plymouth Yacht Regatta,,,NO,site unreachable at time of research
+South West,2023,Falmouth,Falmouth Sailing Week,,,NO,results not found on the event site
+South West,2024,Plymouth,"Royal Western Yacht Club",12,,NO,"archive.halsail.com dsKey 3293, class ""IRC SW Champs"". A standalone championship class"
+South West,2025,Dartmouth,Dartmouth Regatta Sailing Week,51,,NO,"HalSail; the championship was embedded in Dartmouth Regatta Week, so this is that regatta's whole IRC fleet"
+South West,2026,Torbay,Royal Torbay Regatta,4,15,NO,"Sailwave; the page states ""Entries: 4"" for the IRC YACHT fleet plus 11 RYA YTC cruisers"
+Northern Ireland,2022,,,,,new,championship did not exist - first listed by RORC in 2025
+Northern Ireland,2023,,,,,new,championship did not exist - first listed by RORC in 2025
+Northern Ireland,2024,,,,,new,championship did not exist - first listed by RORC in 2025
+Northern Ireland,2025,Bangor,Royal Ulster Yacht Club,22,42,NO,Sailwave; IRC 1 9 / IRC 2 7 / Coastal-IRC 6 plus 20 in the matching YTC classes
+Northern Ireland,2026,Carrickfergus,Carrickfergus Sailing Club,,,NO,no entry or results list published at time of research
+North West,2022,,,,,new,championship did not exist - new for 2026
+North West,2023,,,,,new,championship did not exist - new for 2026
+North West,2024,,,,,new,championship did not exist - new for 2026
+North West,2025,,,,,new,championship did not exist - new for 2026
+North West,2026,Liverpool,Liverpool Yacht Club,,,new,no entry or results list published at time of research
+Southern,2022,Poole,International Paint Poole Regatta,19,44,NO,Sailwave; IRC Southern Area Championship Class 1 10 plus Class 2 9. Poole's own title with no visiting championship attached - the honest base figure
+Southern,2023,Weymouth,Weymouth Sailing Club,,,NO,the championship moved to Weymouth this year; results not captured
+Southern,2024,,,,,NO,"not listed as a Southern Championship - Poole hosted the IRC NATIONAL Championship instead (48 IRC boats)"
+Southern,2025,,,,,NO,no Southern Championship listed by RORC this year
+Southern,2026,Poole,International Paint Poole Regatta,58,85,NO,"Sailwave; Poole hosted the IRC EUROPEAN Championship, which brought 52 of the 58. The Southern Championship's own class is 6 boats"
+National,2024,Poole,International Paint Poole Regatta,48,75,NO,Sailwave; classes 0-4 at 3/9/17/7/12
+National,2025,Cowes,RTYC 250th Anniversary Regatta,,,NO,held in the Solent - covered by the main Marketshare database rather than this file
+National,2026,Dartmouth,Dartmouth Regatta Sailing Week,61,,NO,"HalSail live event 5337; IRC0 9 / IRC1 12 / IRC2 12 / IRC3 13 / IRC4 15. Matches the published ""61 boats racing under IRC"""
+Dartmouth regatta,2022,Dartmouth,Dartmouth Regatta Sailing Week,43,,n/a,"the regatta itself, whichever championship it carried. HalSail class results"
+Dartmouth regatta,2023,Dartmouth,Dartmouth Regatta Sailing Week,61,,n/a,HalSail class results
+Dartmouth regatta,2024,Dartmouth,Dartmouth Regatta Sailing Week,62,,n/a,HalSail class results
+Dartmouth regatta,2025,Dartmouth,Dartmouth Regatta Sailing Week,51,,n/a,HalSail class results; hosted the IRC South West Championship
+Dartmouth regatta,2026,Dartmouth,Dartmouth Regatta Sailing Week,61,,n/a,HalSail live event 5337; hosted the IRC National Championship
