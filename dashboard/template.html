@@ -1696,12 +1696,14 @@ function renderBoatProfile(id) {
   const overlapping = nameHist.some(h => h.confidence === 'overlapping');
   const nameTimeline = nameHist.length <= 1 ? '' : `
     <div class="card">
-      <h2>Previously known as</h2>
+      <h2>Name history</h2>
       ${overlapping ? `<p class="muted" style="font-size:12px;margin-top:0;">
         <strong>These periods overlap</strong>, and a boat cannot carry two names at once — this record
         probably holds more than one boat, merged because they share a sail number. Worth splitting.</p>`
-        : `<p class="muted" style="font-size:12px;margin-top:0;">Names this boat has raced under, newest first,
-           taken from the entry lists themselves.</p>`}
+        : `<p class="muted" style="font-size:12px;margin-top:0;">A boat has one official name: the one it
+           last raced under, marked <strong>official</strong> below. The rest are what it raced under
+           before, newest first, taken from the entry lists themselves. A temporary name carried while
+           out on charter does not replace the official one.</p>`}
       <ol style="list-style:none;padding:0;margin:0;border-left:2px solid var(--border);">
         ${nameHist.map((h, i) => {
           const cur = i === 0;
@@ -1711,7 +1713,7 @@ function renderBoatProfile(id) {
             <span style="position:absolute;left:-7px;top:4px;width:12px;height:12px;border-radius:50%;
                   background:${cur ? dot : 'var(--surface-1)'};border:2px solid ${dot};"></span>
             <div><strong>${esc(h.name)}</strong>
-              ${cur ? '<span class="pill" style="background:var(--series-north);color:#fff;margin-left:6px;">current</span>' : ''}
+              ${cur ? '<span class="pill" style="background:var(--series-north);color:#fff;margin-left:6px;">official</span>' : ''}
               ${h.confidence === 'overlapping' ? '<span class="pill" style="background:var(--series-doyle);color:#292524;margin-left:6px;">overlaps</span>' : ''}</div>
             <div class="muted" style="font-size:12px;">${h.first_season || '?'}${h.last_season && h.last_season !== h.first_season ? '–' + h.last_season : ''}
               ${vs.length ? ' · also entered as ' + vs.map(esc).join(', ') : ''}</div>
