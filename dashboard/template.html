@@ -456,6 +456,11 @@ tr.enrich-miss > td:first-child { box-shadow: inset 3px 0 0 var(--series-doyle);
 .globe-side { display: flex; flex-direction: column; gap: 16px; }
 .globe-row { cursor: pointer; }
 .globe-row:hover td { background: var(--gridline); }
+.globe-zoom { display: flex; align-items: center; gap: 8px; margin-top: 10px;
+  justify-content: center; flex-wrap: wrap; font-size: 12px; }
+.globe-zoom .btn { padding: 4px 11px; font-size: 13px; line-height: 1.1; }
+#globe-zoom-label { font-variant-numeric: tabular-nums; min-width: 34px;
+  text-align: center; font-weight: 600; }
 @media (max-width: 720px) { .share-text { display: none; } }
 </style>
 </head>
@@ -3935,7 +3940,7 @@ const COVERAGE_BADGE = {
 // An orthographic projection drawn on a canvas. No library: three.js plus a
 // globe wrapper is about a megabyte for what is, geometrically, eight lines of
 // trigonometry, and the page is already 2.9MB.
-const GLOBE = { lon: -20, lat: 25, r: 0, drag: null, hover: null,
+const GLOBE = { lon: -20, lat: 25, r: 0, zoom: 1, drag: null, hover: null,
                 mode: 'density', segs: null, y0: null, y1: null, spin: false };
 
 const GLOBE_HEAT = ['#FEE9A8', '#FBC96B', '#F19A3C', '#DE6A28', '#BE3B20', '#8C1D14'];
@@ -3989,13 +3994,19 @@ function drawGlobe() {
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.clearRect(0, 0, size, size);
 
-  const cx = size / 2, cy = size / 2, R = size / 2 - 6;
-  GLOBE.r = R;
+  const cx = size / 2, cy = size / 2, baseR = size / 2 - 6;
+  const R = baseR * (GLOBE.zoom || 1);
+  GLOBE.r = R; GLOBE.baseR = baseR;
   const css = getComputedStyle(document.documentElement);
   const col = n => css.getPropertyValue(n).trim() || '#888';
   const rad = Math.PI / 180;
   const l0 = GLOBE.lon * rad, p0 = GLOBE.lat * rad;
   const sinp0 = Math.sin(p0), cosp0 = Math.cos(p0);
+
+  // Zooming grows the sphere past the frame, so everything is drawn inside a
+  // fixed circular porthole and the rim is stroked afterwards, outside the clip.
+  ctx.save();
+  ctx.beginPath(); ctx.arc(cx, cy, baseR, 0, Math.PI * 2); ctx.clip();
 
   // ocean
   ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2);
@@ -4049,25 +4060,27 @@ function drawGlobe() {
     ctx.stroke();
   }
 
-  // rim
-  ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2);
-  ctx.strokeStyle = col('--globe-coast'); ctx.lineWidth = 1; ctx.stroke();
-
   // venues, smallest first so a big fleet never hides a small one
   const vs = globeVenues();
   const max = vs.length ? vs[0].b : 1;
+  const zoomScale = Math.min(2.2, Math.sqrt(GLOBE.zoom || 1));
   GLOBE.points = [];
   vs.slice().reverse().forEach(v => {
     const q = project(v.lon, v.lat);
     if (!q.vis) return;
     const t = max > 1 ? Math.log(1 + v.b) / Math.log(1 + max) : 1;
-    const rr = (3.5 + 17 * t) * (size / 560);
+    const rr = (3.5 + 17 * t) * (size / 560) * zoomScale;
     GLOBE.points.push({ v, x: q.x, y: q.y, r: rr });
     ctx.beginPath(); ctx.arc(q.x, q.y, rr, 0, Math.PI * 2);
     ctx.fillStyle = globeColour(v, max);
     ctx.globalAlpha = 0.78; ctx.fill(); ctx.globalAlpha = 1;
     ctx.strokeStyle = col('--globe-ring'); ctx.lineWidth = 1; ctx.stroke();
   });
+
+  ctx.restore();
+  // rim, outside the clip so the porthole keeps a clean edge at any zoom
+  ctx.beginPath(); ctx.arc(cx, cy, baseR, 0, Math.PI * 2);
+  ctx.strokeStyle = col('--globe-coast'); ctx.lineWidth = 1; ctx.stroke();
 
   const h = GLOBE.hover;
   if (h) {
@@ -4136,6 +4149,15 @@ function renderGlobe() {
         ${legend}
         <span class="muted">${GLOBE.mode === 'density' ? 'more' : '100%'}</span>
       </div>
+      <div class="globe-zoom">
+        <button class="btn secondary" id="globe-zoom-out" type="button"
+                aria-label="Zoom out">&minus;</button>
+        <span id="globe-zoom-label">${(GLOBE.zoom || 1).toFixed(1)}&times;</span>
+        <button class="btn secondary" id="globe-zoom-in" type="button"
+                aria-label="Zoom in">+</button>
+        <button class="btn secondary" id="globe-reset" type="button">Reset</button>
+        <span class="muted">scroll or pinch to zoom &middot; drag to spin</span>
+      </div>
     </div>
     <div class="globe-side">
       <div class="card" style="padding:14px 16px;">
@@ -4193,9 +4215,14 @@ function attachGlobeHandlers() {
   const move = e => {
     const p = at(e);
     if (GLOBE.drag) {
+      // Grab-and-drag: the point under the cursor follows the cursor. Raising
+      // the centre longitude sweeps features LEFT, so dragging right has to
+      // lower it; same for latitude. Both were the wrong way round.
+      // k shrinks with GLOBE.r, which already carries the zoom, so the drag
+      // slows down as you zoom in rather than flinging you across the ocean.
       const k = 180 / Math.max(GLOBE.r, 1);
-      GLOBE.lon = GLOBE.drag.lon + (p.x - GLOBE.drag.x) * k * 0.6;
-      GLOBE.lat = Math.max(-89, Math.min(89, GLOBE.drag.lat - (p.y - GLOBE.drag.y) * k * 0.6));
+      GLOBE.lon = GLOBE.drag.lon - (p.x - GLOBE.drag.x) * k * 0.6;
+      GLOBE.lat = Math.max(-89, Math.min(89, GLOBE.drag.lat + (p.y - GLOBE.drag.y) * k * 0.6));
       if (e.cancelable) e.preventDefault();
       redraw();
       return;
@@ -4211,6 +4238,46 @@ function attachGlobeHandlers() {
   cv.addEventListener('touchmove', move, { passive: false });
   cv.addEventListener('touchend', end);
   cv.style.cursor = 'grab';
+
+  const ZMIN = 1, ZMAX = 14;
+  const setZoom = z => {
+    GLOBE.zoom = Math.max(ZMIN, Math.min(ZMAX, z));
+    const lbl = document.getElementById('globe-zoom-label');
+    if (lbl) lbl.textContent = GLOBE.zoom.toFixed(1) + '×';
+    redraw();
+  };
+  cv.addEventListener('wheel', e => {
+    e.preventDefault();
+    setZoom((GLOBE.zoom || 1) * (e.deltaY < 0 ? 1.18 : 1 / 1.18));
+  }, { passive: false });
+  // pinch, for a trackpad or a phone
+  let pinch = null;
+  cv.addEventListener('touchstart', e => {
+    if (e.touches.length === 2) {
+      pinch = { d: Math.hypot(e.touches[0].clientX - e.touches[1].clientX,
+                              e.touches[0].clientY - e.touches[1].clientY),
+                z: GLOBE.zoom || 1 };
+      GLOBE.drag = null;
+    }
+  }, { passive: true });
+  cv.addEventListener('touchmove', e => {
+    if (pinch && e.touches.length === 2) {
+      const d = Math.hypot(e.touches[0].clientX - e.touches[1].clientX,
+                           e.touches[0].clientY - e.touches[1].clientY);
+      setZoom(pinch.z * (d / (pinch.d || 1)));
+      if (e.cancelable) e.preventDefault();
+    }
+  }, { passive: false });
+  cv.addEventListener('touchend', e => { if (e.touches.length < 2) pinch = null; });
+
+  const zi = document.getElementById('globe-zoom-in');
+  const zo = document.getElementById('globe-zoom-out');
+  const zr = document.getElementById('globe-reset');
+  if (zi) zi.addEventListener('click', () => setZoom((GLOBE.zoom || 1) * 1.5));
+  if (zo) zo.addEventListener('click', () => setZoom((GLOBE.zoom || 1) / 1.5));
+  if (zr) zr.addEventListener('click', () => {
+    GLOBE.lon = -20; GLOBE.lat = 25; setZoom(1);
+  });
 
   // navigate(), not redraw(): the venue table and the counts beside the globe
   // are rendered HTML, so repainting the canvas alone left them showing every
