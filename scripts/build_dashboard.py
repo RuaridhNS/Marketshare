@@ -9,6 +9,7 @@ it ~15-18x; the page decompresses it client-side with the browser's native
 DecompressionStream, so no external library is needed."""
 import re
 import os
+import sys
 import shutil
 import tempfile
 import subprocess
@@ -76,7 +77,7 @@ def check_js(template):
             os.unlink(tmp)
 
 
-def main():
+def main(split=False):
     with open(DATA, encoding="utf-8") as f:
         data_str = f.read()
     # validate it's real JSON before embedding
@@ -93,6 +94,21 @@ def main():
 
     check_js(template)
 
+    if split:
+        # Hosted build: page and data as separate files, so a refresh replaces
+        # only the data. The page is then ~1MB of markup that browsers and CDNs
+        # cache, and a nightly update pushes 2MB instead of republishing 3MB.
+        dist = DASHBOARD_DIR.parent / "dist"
+        dist.mkdir(exist_ok=True)
+        page = template.replace("/*__DATA_JSON_B64GZ__*/", "")
+        (dist / "index.html").write_text(page, encoding="utf-8")
+        (dist / "data.json.gz").write_bytes(compressed)
+        print(f"Wrote {dist / 'index.html'} ({len(page):,} bytes) and "
+              f"{dist / 'data.json.gz'} ({len(compressed):,} bytes)")
+        print("Serve both from the same folder over http(s) - the page fetches "
+              "the data file at load.")
+        return
+
     out = template.replace("/*__DATA_JSON_B64GZ__*/", b64_str)
     with open(OUT, "w", encoding="utf-8") as f:
         f.write(out)
@@ -101,4 +117,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    main("--split" in sys.argv)

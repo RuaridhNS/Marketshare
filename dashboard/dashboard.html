@@ -503,10 +503,39 @@ tr.enrich-miss > td:first-child { box-shadow: inset 3px 0 0 var(--series-doyle);
 // (raw JSON at this scale is tens of MB of highly repetitive text; gzip shrinks
 // it ~15-18x). Decompressed with the browser's native DecompressionStream so no
 // external library needs to be inlined.
-const b64 = document.getElementById('data-json').textContent;
-const gz = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
-const ds = new Response(new Blob([gz]).stream().pipeThrough(new DecompressionStream('gzip')));
-const DATA = JSON.parse(await ds.text());
+// Two shapes of build. The single-file build leaves the payload inline and
+// works from a memory stick with no server. The split build (--split) leaves
+// that tag empty and fetches data.json.gz from alongside the page instead, so
+// a refresh only has to replace a 2MB data file rather than republish a 3MB
+// page - which is what makes scheduled, live updates practical on a host.
+const inflate = async bytes => {
+  const ds = new Response(new Blob([bytes]).stream()
+                          .pipeThrough(new DecompressionStream('gzip')));
+  return JSON.parse(await ds.text());
+};
+const b64 = document.getElementById('data-json').textContent.trim();
+let DATA;
+if (b64) {
+  DATA = await inflate(Uint8Array.from(atob(b64), c => c.charCodeAt(0)));
+} else {
+  const main0 = document.getElementById('main');
+  try {
+    // cache-bust so a refreshed data file is picked up rather than the copy
+    // the browser cached this morning
+    const res = await fetch('data.json.gz?t=' + Date.now());
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    DATA = await inflate(new Uint8Array(await res.arrayBuffer()));
+  } catch (err) {
+    // esc() is defined further down this script, so build the node by hand
+    main0.innerHTML = '<div class="card"><h2>Could not load the data file</h2>' +
+      '<p class="muted">This build expects <code>data.json.gz</code> next to the page, ' +
+      'served over http(s). Opening the file straight off disk will not work &mdash; ' +
+      'use the single-file build for that.</p><p class="muted" id="data-err"></p></div>';
+    const errEl = document.getElementById('data-err');
+    if (errEl) errEl.textContent = String(err);
+    return;
+  }
+}
 
 // ---------- sailmaker bucketing / colors ----------
 const BUCKET_ORDER = ['North Sails','Doyle','Quantum','One','Sanders','Elvstrom','Other','Partial','Unknown'];

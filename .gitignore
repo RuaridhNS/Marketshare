@@ -24,3 +24,4 @@ exports/jog_*.csv
 
 # Scheduled-refresh run logs (rotated, last 30 kept)
 logs/
+dist/
