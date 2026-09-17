@@ -2,6 +2,7 @@
 """Export the SQLite database to a single JSON file consumed by the
 self-contained dashboard.html. Run this after any DB update, then run
 build_dashboard.py to bake the fresh JSON into the HTML file."""
+import os
 import re
 import sys
 import json
@@ -47,6 +48,44 @@ def main():
          GROUP BY r.segment, r.id, e.season_year
          HAVING boats > 0
          ORDER BY r.segment, boats DESC""")]
+
+    # --- Globe ----------------------------------------------------------------
+    # One row per venue / segment / season. Also before the IRC filter, for the
+    # same reason as the segment totals: half these fleets are not IRC-rated.
+    globe_rows = [dict(r) for r in cur.execute("""
+        SELECT r.venue AS v, r.country AS c, r.lat, r.lon,
+               COALESCE(r.segment,'Unsegmented') AS seg, e.season_year AS y,
+               COUNT(DISTINCT re.boat_id) AS b,
+               SUM(CASE WHEN s.name = 'North Sails' THEN 1 ELSE 0 END) AS n,
+               SUM(CASE WHEN re.sailmaker_id IS NOT NULL
+                          AND s.name NOT IN ('Unknown','Other','Partial')
+                        THEN 1 ELSE 0 END) AS k
+          FROM regattas r
+          JOIN events e        ON e.regatta_id = r.id
+          JOIN races ra        ON ra.event_id  = e.id
+          JOIN race_entries re ON re.race_id   = ra.id
+          LEFT JOIN sailmakers s ON s.id = re.sailmaker_id
+         WHERE r.lat IS NOT NULL AND e.season_year IS NOT NULL
+         GROUP BY r.venue, seg, e.season_year
+         HAVING b > 0""")]
+    unplaced = cur.execute("""
+        SELECT COUNT(DISTINCT r.id), COUNT(DISTINCT re.boat_id)
+          FROM regattas r
+          JOIN events e        ON e.regatta_id = r.id
+          JOIN races ra        ON ra.event_id  = e.id
+          JOIN race_entries re ON re.race_id   = ra.id
+         WHERE r.lat IS NULL""").fetchone()
+    land_path = os.path.join(os.path.dirname(os.path.dirname(
+        os.path.abspath(db_path))), "data", "land_110m.json")
+    try:
+        with open(land_path, encoding="utf-8") as f:
+            land = json.load(f)
+    except OSError:
+        land = []
+        print("  no data/land_110m.json - run scripts/fetch_land.py; globe will "
+              "draw without coastlines")
+    globe = {"rows": globe_rows, "land": land,
+             "unplaced_regattas": unplaced[0], "unplaced_boats": unplaced[1]}
 
     segment_totals = [dict(r) for r in cur.execute("""
         SELECT r.segment,
@@ -617,6 +656,7 @@ def main():
         "entry_trends": trend_rows,
         "segment_totals": segment_totals,
         "segment_events": segment_events,
+        "globe": globe,
         "class_counts": class_counts,
         # Crew, for the Analysis tab. Only the boats that survived the IRC
         # filter, so the panel cannot show people sailing boats the rest of the

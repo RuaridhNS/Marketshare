@@ -1,0 +1,144 @@
+Pattern,Venue,Country,Lat,Lon
+# Matched case-insensitively against the regatta name, FIRST MATCH WINS, so the
+# most specific patterns come first. Edit freely: this is the only place the
+# globe gets its coordinates from. Lat/Lon are the racing area, not the town hall.
+cowes dinard|dinard st malo|cowes-dinard,Saint-Malo,FRA,48.649,-2.026
+cowes-st malo|rorc cowes-st malo,Saint-Malo,FRA,48.649,-2.026
+cowes week|round the island|taittinger|vice admiral|rorc easter|race the wight,Solent,GBR,50.740,-1.310
+cowes|solent|royal southern|hamble|warsash|lymington|yarmouth|\bxod\b|half ton|one ton|stug perry|telegraph,Solent,GBR,50.740,-1.310
+fastnet,Fastnet Rock,IRL,51.385,-9.600
+myth of malham|eddystone,Eddystone,GBR,50.183,-4.258
+cervantes|de guingand|morgan cup|rorc channel race|castle rock|rorc spring|season points|rorc 2h|two-handed|2h championships,Solent,GBR,50.740,-1.310
+cherbourg|lonely tower,Cherbourg,FRA,49.640,-1.616
+st vaast|saint vaast,Saint-Vaast-la-Hougue,FRA,49.590,-1.266
+deauville,Deauville,FRA,49.360,0.075
+st peter port|guernsey,Saint Peter Port,GGY,49.455,-2.536
+alderney,Alderney,GGY,49.717,-2.200
+jersey,Saint Helier,JEY,49.183,-2.111
+la trinite,La Trinite-sur-Mer,FRA,47.586,-3.030
+drheam|la trinite-cherbourg,La Trinite-sur-Mer,FRA,47.586,-3.030
+normandy channel|caen,Caen,FRA,49.280,-0.370
+spi ouest,La Trinite-sur-Mer,FRA,47.586,-3.030
+transat caf|le havre,Le Havre,FRA,49.490,0.107
+figaro|les sables|vendee|ultim|odyss,Les Sables-d'Olonne,FRA,46.497,-1.783
+tour voile|lorient,Lorient,FRA,47.748,-3.370
+course des caps|brest,Brest,FRA,48.390,-4.486
+saint-tropez|st tropez,Saint-Tropez,FRA,43.269,6.640
+voiles d'antibes|antibes,Antibes,FRA,43.581,7.126
+regates royales|cannes,Cannes,FRA,43.551,7.018
+giraglia,Saint-Tropez,FRA,43.269,6.640
+primo cup|monaco|monte carlo,Monaco,MCO,43.735,7.421
+palermo,Palermo,ITA,38.120,13.360
+middle sea|malta|valletta,Valletta,MLT,35.895,14.514
+porto cervo|maxi yacht rolex|swan cup|sardinia|porto rafael|porto rotondo,Porto Cervo,ITA,41.135,9.535
+tre golfi|sorrento|capri|naples|napoli,Naples,ITA,40.630,14.250
+loro piana|portofino|santa margherita,Portofino,ITA,44.303,9.210
+imperia|sanremo,Imperia,ITA,43.880,8.020
+151 miglia|livorno,Livorno,ITA,43.548,10.310
+garda|riva del garda,Lake Garda,ITA,45.880,10.850
+copa del rey|palma|mallorca|balears|joysail|ibiza,Palma de Mallorca,ESP,39.560,2.640
+menorca|mahon,Mahon,ESP,39.885,4.265
+princesa sof,Palma de Mallorca,ESP,39.560,2.640
+barcelona|j70 european championship 2026,Barcelona,ESP,41.370,2.190
+trofeo la reina|trofeo s.m|valencia,Valencia,ESP,39.450,-0.320
+cascais|lisbon|portugal,Cascais,PRT,38.690,-9.420
+la larga|mediterraneo|cartagena,Cartagena,ESP,37.590,-0.970
+aegean|athens|greece|cyclades,Athens,GRC,37.900,23.700
+kiel,Kiel,DEU,54.400,10.180
+nordseewoche|helgoland,Helgoland,DEU,54.180,7.890
+north sea regatta|scheveningen|stellendam|hoek,Scheveningen,NLD,52.100,4.260
+rorc north sea race|north sea race,Scheveningen,NLD,52.100,4.260
+rund um|lindau|constance|bodensee,Lake Constance,DEU,47.545,9.685
+silverrudder|svendborg,Svendborg,DNK,55.060,10.610
+gotland runt|gotlund runt|sandhamn|stockholm,Stockholm,SWE,59.300,18.500
+marstrand|gothenburg,Marstrand,SWE,57.885,11.590
+baltic 500|roschier|helsinki|hanko,Helsinki,FIN,60.150,24.950
+johan anker|oslo|norway,Oslo,NOR,59.890,10.640
+kaszube|sopot|gdansk|gdynia,Gdynia,POL,54.520,18.550
+maior|tallinn|estonia,Tallinn,EST,59.450,24.750
+round ireland|wicklow,Wicklow,IRL,52.980,-6.030
+dun laoghaire|dingle,Dun Laoghaire,IRL,53.295,-6.130
+lyver|isle of man|liverpool|north west,Liverpool,GBR,53.410,-3.020
+carrickfergus|bangor|belfast|northern ireland,Belfast Lough,GBR,54.700,-5.700
+tarbert|scottish series|clyde,Tarbert,GBR,55.865,-5.425
+pwllheli|cardigan bay|welsh,Pwllheli,GBR,52.885,-4.415
+portishead|shanghai cup|bristol channel,Portishead,GBR,51.490,-2.770
+ramsgate|goodwins,Ramsgate,GBR,51.330,1.425
+mersea|burnham|essex rum|east coast,West Mersea,GBR,51.775,0.915
+rorc east coast|harwich,Harwich,GBR,51.945,1.285
+dartmouth,Dartmouth,GBR,50.350,-3.575
+plymouth|royal western,Plymouth,GBR,50.360,-4.140
+falmouth,Falmouth,GBR,50.150,-5.065
+torbay|torquay,Torbay,GBR,50.455,-3.520
+poole|international paint poole,Poole,GBR,50.690,-1.945
+weymouth|portland,Weymouth,GBR,50.605,-2.450
+eastbourne,Eastbourne,GBR,50.760,0.290
+rnsa|portsmouth,Portsmouth,GBR,50.790,-1.100
+round britain,Solent,GBR,50.740,-1.310
+whitby,Whitby,GBR,54.490,-0.610
+rorc transatlantic|imа transatlantic|lanzarote|canary,Lanzarote,ESP,28.960,-13.560
+caribbean 600|antigua|nelson's cup|falmouth harbour,Antigua,ATG,17.010,-61.765
+st barth|saint barth,Saint-Barthelemy,BLM,17.900,-62.850
+\bbvi\b|tortola|nanny cay|virgin gorda,Tortola,VGB,18.420,-64.620
+grenada,Grenada,GRD,12.050,-61.750
+bermuda|newport bermuda|antigua bermuda,Bermuda,BMU,32.300,-64.780
+annapolis,Annapolis,USA,38.975,-76.485
+newport regatta|nyyc|rolex big boat series|ida lewis|newport,Newport RI,USA,41.480,-71.320
+marblehead|halifax ocean race,Marblehead,USA,42.500,-70.845
+boston,Boston,USA,42.350,-70.990
+nantucket|opera house cup,Nantucket,USA,41.285,-70.100
+edgartown|vineyard,Edgartown,USA,41.390,-70.510
+camden|boothbay|maine,Camden ME,USA,44.210,-69.060
+larchmont|american yacht club|abyc|\beyc\b|long island sound,Larchmont,USA,40.925,-73.730
+vineyard race|stamford,Stamford,USA,41.040,-73.530
+charleston,Charleston,USA,32.780,-79.900
+miami|biscayne|bacardi|coconut grove,Miami,USA,25.730,-80.170
+key west|lauderdale|sorc,Fort Lauderdale,USA,26.100,-80.100
+st petersburg|tampa|sarasota|florida state,St Petersburg FL,USA,27.760,-82.630
+southern bay|hampton|chesapeake|screwpile|solomons,Chesapeake Bay,USA,37.020,-76.330
+safe harbor|jamestown,Newport RI,USA,41.480,-71.320
+chicago|verve cup|\bilya\b,Chicago,USA,41.890,-87.610
+mackinac|harbor springs|little traverse|ugotta,Mackinac Island,USA,45.850,-84.620
+bayview|detroit,Detroit,USA,42.330,-82.930
+queen's cup|milwaukee,Milwaukee,USA,43.030,-87.890
+lake geneva|melges 19|melges 24 midwest,Lake Geneva WI,USA,42.580,-88.440
+macatawa|holland mi,Lake Macatawa,USA,42.790,-86.190
+hook race|sheboygan|green bay,Sheboygan,USA,43.750,-87.700
+san francisco|folkboat|knarr|balena bay|belvedere,San Francisco,USA,37.830,-122.440
+san diego|yachting cup|socal|coronado,San Diego,USA,32.710,-117.230
+long beach|congressional cup|newport beach|pacific coast championship,Long Beach,USA,33.740,-118.190
+transpac|los angeles,Los Angeles,USA,33.720,-118.280
+pacific cup|pacific nw|swiftsure|patos island|salish|southern straits|round saltspring|round bowen|north sound|howe sound,Strait of Juan de Fuca,CAN,48.400,-123.400
+seattle|puget sound,Seattle,USA,47.610,-122.340
+vancouver|van isle|tcyc|english bay,Vancouver,CAN,49.290,-123.140
+victoria bc,Victoria BC,CAN,48.420,-123.370
+kingston|lake ontario|lo300|susan hood|thrash|pcyc,Kingston ON,CAN,44.230,-76.480
+toronto,Toronto,CAN,43.630,-79.380
+chester race week|chester,Chester NS,CAN,44.540,-64.240
+halifax,Halifax,CAN,44.650,-63.570
+cow bay,Cow Bay,CAN,44.620,-63.470
+sydney hobart|rolex sydney|sydney|flinders islet|cabbage tree|solas|nsw,Sydney,AUS,-33.855,151.240
+hobart,Hobart,AUS,-42.880,147.330
+hamilton island|airlie|whitsunday,Hamilton Island,AUS,-20.350,148.955
+noakes|gold coast|sail paradise|southport,Southport QLD,AUS,-27.960,153.420
+melbourne|port phillip,Melbourne,AUS,-37.860,144.920
+perth|fremantle,Fremantle,AUS,-32.055,115.740
+bay of islands|auckland|new zealand,Auckland,NZL,-36.840,174.780
+rolex china sea|hong kong,Hong Kong,HKG,22.280,114.180
+phuket|thailand,Phuket,THA,7.890,98.290
+cape town|south africa,Cape Town,ZAF,-33.910,18.420
+rio|brazil,Rio de Janeiro,BRA,-22.960,-43.180
+punta del este|uruguay,Punta del Este,URY,-34.960,-54.950
+buenos aires|argentina,Buenos Aires,ARG,-34.610,-58.370
+america's cup|americas cup|ac preliminary,Barcelona,ESP,41.370,2.190
+ocean race,Alicante,ESP,38.340,-0.480
+52 super series|puerto portals,Palma de Mallorca,ESP,39.560,2.640
+\b44 ?cup\b|rc ?44,Porto Cervo,ITA,41.135,9.535
+irc national|irc nationals|irc european,Solent,GBR,50.740,-1.310
+orc world|orc european|orc dh|garmin orc,Kiel,DEU,54.400,10.180
+round the county|san juan,San Juan Islands,USA,48.540,-122.980
+ted hood regatta,Marblehead,USA,42.500,-70.845
+crescent one design|nova scotia,Chester NS,CAN,44.540,-64.240
+e scow nationals|white bear|minnetonka,White Bear Lake,USA,45.075,-92.980
+flying scot|thistle nationals|interlake|daysailer|snipe nationals,Lake Erie,USA,41.480,-82.710
+martin 242|shark worlds|shark north american,Vancouver,CAN,49.290,-123.140

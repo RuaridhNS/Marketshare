@@ -29,6 +29,11 @@
     --series-other:    #71717a;
     --series-partial:  #0d9488;
     --series-unknown-text: #292524;
+    --globe-sea:   #dbeafe;
+    --globe-land:  #e8e6df;
+    --globe-coast: #a8a599;
+    --globe-grid:  rgba(11,11,11,0.07);
+    --globe-ring:  rgba(11,11,11,0.35);
   }
   @media (prefers-color-scheme: dark) {
     :root {
@@ -55,6 +60,11 @@
       --series-other:    #9a999a;
       --series-partial:  #22b6a6;
       --series-unknown-text: #1c1917;
+      --globe-sea:   #0f2033;
+      --globe-land:  #2a2a26;
+      --globe-coast: #565349;
+      --globe-grid:  rgba(255,255,255,0.07);
+      --globe-ring:  rgba(255,255,255,0.45);
     }
   }
   * { box-sizing: border-box; }
@@ -430,6 +440,22 @@ tr.enrich-miss > td:first-child { box-shadow: inset 3px 0 0 var(--series-doyle);
 .share-unknown { color: var(--text-muted); }
 .share-none { color: var(--text-muted); font-style: italic; }
 .tree-series .share-wrap { margin-left: 10px; }
+
+/* ---- globe ---- */
+.globe-wrap { display: grid; grid-template-columns: minmax(0,1fr) 340px;
+  gap: 20px; align-items: start; }
+@media (max-width: 900px) { .globe-wrap { grid-template-columns: 1fr; } }
+.globe-stage { background: var(--surface-1); border: 1px solid var(--border);
+  border-radius: 12px; padding: 14px; box-shadow: var(--card-shadow); }
+#globe-canvas { display: block; width: 100%; aspect-ratio: 1 / 1;
+  max-width: 100%; touch-action: none; }
+.globe-legend { display: flex; align-items: center; gap: 4px; margin-top: 10px;
+  font-size: 11px; justify-content: center; }
+.globe-legend i { display: block; width: 26px; height: 9px; border-radius: 1px; }
+.globe-legend .muted { margin: 0 6px; }
+.globe-side { display: flex; flex-direction: column; gap: 16px; }
+.globe-row { cursor: pointer; }
+.globe-row:hover td { background: var(--gridline); }
 @media (max-width: 720px) { .share-text { display: none; } }
 </style>
 </head>
@@ -438,6 +464,7 @@ tr.enrich-miss > td:first-child { box-shadow: inset 3px 0 0 var(--series-doyle);
   <nav class="sidebar" id="sidebar">
     <div class="brand">Marketshare<small>Race entry &amp; sailmaker tracker</small></div>
     <a class="nav-item" href="#/overview" data-route="#/overview">Overview</a>
+    <a class="nav-item" href="#/globe" data-route="#/globe">Globe</a>
     <a class="nav-item" href="#/boats" data-route="#/boats">Boats</a>
     <a class="nav-item" href="#/regattas" data-route="#/regattas">Regattas</a>
     <a class="nav-item" href="#/compare" data-route="#/compare">Compare</a>
@@ -1097,6 +1124,7 @@ function navigate() {
       const rq = query.get('regatta');
       if (rq) ENRICH.target = { regatta: rq, year: query.get('year') || '' };
       main.innerHTML = renderEnrich(); attachEnrichHandlers(); }
+    else if (route === 'globe') { main.innerHTML = renderGlobe(); attachGlobeHandlers(); }
     else if (route === 'segments') main.innerHTML = renderSegments();
     else if (route === 'coverage') main.innerHTML = renderCoverage();
     else if (route === 'quality') main.innerHTML = renderQuality();
@@ -3902,6 +3930,322 @@ const COVERAGE_BADGE = {
   partial: ['Part loaded', 'var(--series-quantum)', '#fff'],
   historical: ['Historical', 'var(--series-unknown)', 'var(--series-unknown-text)'],
 };
+
+// ---- Globe -----------------------------------------------------------------
+// An orthographic projection drawn on a canvas. No library: three.js plus a
+// globe wrapper is about a megabyte for what is, geometrically, eight lines of
+// trigonometry, and the page is already 2.9MB.
+const GLOBE = { lon: -20, lat: 25, r: 0, drag: null, hover: null,
+                mode: 'density', segs: null, y0: null, y1: null, spin: false };
+
+const GLOBE_HEAT = ['#FEE9A8', '#FBC96B', '#F19A3C', '#DE6A28', '#BE3B20', '#8C1D14'];
+const GLOBE_SHARE = ['#B9483C', '#C77A44', '#C9A94E', '#8FAE55', '#4E8F5C', '#1F6B4A'];
+
+function globeRows() {
+  const g = (DATA.globe && DATA.globe.rows) || [];
+  const segs = GLOBE.segs;
+  return g.filter(r => (!segs || segs.has(r.seg)) &&
+                       (GLOBE.y0 == null || r.y >= GLOBE.y0) &&
+                       (GLOBE.y1 == null || r.y <= GLOBE.y1));
+}
+
+// Boats are counted per venue/segment/season, so summing them across seasons
+// counts a boat once per season it turned up - which is the exposure we care
+// about, not a headcount of hulls. Said plainly in the caption.
+function globeVenues() {
+  const by = new Map();
+  globeRows().forEach(r => {
+    let v = by.get(r.v);
+    if (!v) by.set(r.v, v = { v: r.v, c: r.c, lat: r.lat, lon: r.lon,
+                              b: 0, n: 0, k: 0, segs: {} });
+    v.b += r.b; v.n += r.n || 0; v.k += r.k || 0;
+    v.segs[r.seg] = (v.segs[r.seg] || 0) + r.b;
+  });
+  return [...by.values()].sort((a, b) => b.b - a.b);
+}
+
+function globeColour(v, max) {
+  if (GLOBE.mode === 'share') {
+    if (!v.k) return 'var(--text-muted)';
+    const p = v.n / v.k;
+    return GLOBE_SHARE[Math.min(GLOBE_SHARE.length - 1,
+                                Math.floor(p * GLOBE_SHARE.length))];
+  }
+  // log scale: the Solent is 30x the next venue, so a linear ramp would paint
+  // every other harbour the same pale colour
+  const t = max > 1 ? Math.log(1 + v.b) / Math.log(1 + max) : 0;
+  return GLOBE_HEAT[Math.min(GLOBE_HEAT.length - 1,
+                             Math.floor(t * GLOBE_HEAT.length))];
+}
+
+function drawGlobe() {
+  const cv = document.getElementById('globe-canvas');
+  if (!cv) return;
+  const dpr = window.devicePixelRatio || 1;
+  const size = cv.clientWidth;
+  if (!size) return;
+  cv.width = size * dpr; cv.height = size * dpr;
+  const ctx = cv.getContext('2d');
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, size, size);
+
+  const cx = size / 2, cy = size / 2, R = size / 2 - 6;
+  GLOBE.r = R;
+  const css = getComputedStyle(document.documentElement);
+  const col = n => css.getPropertyValue(n).trim() || '#888';
+  const rad = Math.PI / 180;
+  const l0 = GLOBE.lon * rad, p0 = GLOBE.lat * rad;
+  const sinp0 = Math.sin(p0), cosp0 = Math.cos(p0);
+
+  // ocean
+  ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2);
+  ctx.fillStyle = col('--globe-sea'); ctx.fill();
+
+  const project = (lon, lat) => {
+    const l = lon * rad, p = lat * rad;
+    const cosp = Math.cos(p), sinp = Math.sin(p), dl = l - l0;
+    const cosc = sinp0 * sinp + cosp0 * cosp * Math.cos(dl);
+    let x = R * cosp * Math.sin(dl);
+    let y = R * (cosp0 * sinp - sinp0 * cosp * Math.cos(dl));
+    if (cosc <= 0) {            // behind the sphere: push out to the limb so a
+      const d = Math.hypot(x, y) || 1;   // part-hidden landmass still fills
+      x = x / d * R; y = y / d * R;
+    }
+    return { x: cx + x, y: cy - y, vis: cosc > 0 };
+  };
+
+  // land
+  ctx.fillStyle = col('--globe-land');
+  ctx.strokeStyle = col('--globe-coast');
+  ctx.lineWidth = 0.6;
+  ((DATA.globe && DATA.globe.land) || []).forEach(ring => {
+    if (!ring.some(pt => { const q = project(pt[0], pt[1]); return q.vis; })) return;
+    ctx.beginPath();
+    ring.forEach((pt, i) => {
+      const q = project(pt[0], pt[1]);
+      if (i === 0) ctx.moveTo(q.x, q.y); else ctx.lineTo(q.x, q.y);
+    });
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+  });
+
+  // graticule, every 30 degrees
+  ctx.strokeStyle = col('--globe-grid'); ctx.lineWidth = 0.5;
+  for (let lon = -180; lon < 180; lon += 30) {
+    ctx.beginPath(); let started = false;
+    for (let lat = -90; lat <= 90; lat += 3) {
+      const q = project(lon, lat);
+      if (!q.vis) { started = false; continue; }
+      if (!started) { ctx.moveTo(q.x, q.y); started = true; } else ctx.lineTo(q.x, q.y);
+    }
+    ctx.stroke();
+  }
+  for (let lat = -60; lat <= 60; lat += 30) {
+    ctx.beginPath(); let started = false;
+    for (let lon = -180; lon <= 180; lon += 3) {
+      const q = project(lon, lat);
+      if (!q.vis) { started = false; continue; }
+      if (!started) { ctx.moveTo(q.x, q.y); started = true; } else ctx.lineTo(q.x, q.y);
+    }
+    ctx.stroke();
+  }
+
+  // rim
+  ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2);
+  ctx.strokeStyle = col('--globe-coast'); ctx.lineWidth = 1; ctx.stroke();
+
+  // venues, smallest first so a big fleet never hides a small one
+  const vs = globeVenues();
+  const max = vs.length ? vs[0].b : 1;
+  GLOBE.points = [];
+  vs.slice().reverse().forEach(v => {
+    const q = project(v.lon, v.lat);
+    if (!q.vis) return;
+    const t = max > 1 ? Math.log(1 + v.b) / Math.log(1 + max) : 1;
+    const rr = (3.5 + 17 * t) * (size / 560);
+    GLOBE.points.push({ v, x: q.x, y: q.y, r: rr });
+    ctx.beginPath(); ctx.arc(q.x, q.y, rr, 0, Math.PI * 2);
+    ctx.fillStyle = globeColour(v, max);
+    ctx.globalAlpha = 0.78; ctx.fill(); ctx.globalAlpha = 1;
+    ctx.strokeStyle = col('--globe-ring'); ctx.lineWidth = 1; ctx.stroke();
+  });
+
+  const h = GLOBE.hover;
+  if (h) {
+    ctx.beginPath(); ctx.arc(h.x, h.y, h.r + 3, 0, Math.PI * 2);
+    ctx.strokeStyle = col('--text-primary'); ctx.lineWidth = 2; ctx.stroke();
+    const label = `${h.v.v} · ${h.v.b.toLocaleString()} boats`;
+    ctx.font = '600 12px system-ui, sans-serif';
+    const w = ctx.measureText(label).width + 12;
+    let lx = Math.min(Math.max(h.x - w / 2, 2), size - w - 2);
+    let ly = h.y - h.r - 24;
+    if (ly < 2) ly = h.y + h.r + 6;
+    ctx.fillStyle = col('--surface-1'); ctx.strokeStyle = col('--border');
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.rect(lx, ly, w, 20); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = col('--text-primary');
+    ctx.fillText(label, lx + 6, ly + 14);
+  }
+}
+
+function renderGlobe() {
+  const g = DATA.globe;
+  if (!g || !g.rows || !g.rows.length) return `<h1>Globe</h1>
+    <div class="card"><p class="muted">No placed venues yet. Run
+    <code>python scripts/geocode_regattas.py db/marketshare.db --apply</code>.</p></div>`;
+
+  const years = [...new Set(g.rows.map(r => r.y))].sort((a, b) => a - b);
+  if (GLOBE.y0 == null) { GLOBE.y0 = Math.max(years[0], years[years.length - 1] - 4);
+                          GLOBE.y1 = years[years.length - 1]; }
+  const segRank = x => { const i = SEGMENT_ORDER.indexOf(x);
+                         return i < 0 ? SEGMENT_ORDER.length : i; };
+  const allSegs = [...new Set(g.rows.map(r => r.seg))]
+    .sort((a, b) => segRank(a) - segRank(b));
+  if (!GLOBE.segs) GLOBE.segs = new Set(allSegs);
+
+  const vs = globeVenues();
+  const totalBoats = vs.reduce((s, v) => s + v.b, 0);
+  const chips = allSegs.map(s => `<label class="chip">
+      <input type="checkbox" class="globe-seg" value="${esc(s)}"
+             ${GLOBE.segs.has(s) ? 'checked' : ''}> ${esc(s)}</label>`).join('');
+
+  const legend = (GLOBE.mode === 'density' ? GLOBE_HEAT : GLOBE_SHARE)
+    .map(c => `<i style="background:${c};"></i>`).join('');
+
+  const rows = vs.slice(0, 18).map(v => {
+    const share = v.k ? `${Math.round(100 * v.n / v.k)}%` : '—';
+    const top = Object.entries(v.segs).sort((a, b) => b[1] - a[1])[0];
+    return `<tr class="globe-row" data-venue="${esc(v.v)}">
+      <td>${esc(v.v)}<small class="muted" style="display:block;font-size:11px;">
+        ${esc(v.c || '')} · mostly ${esc(top ? top[0] : '—')}</small></td>
+      <td class="num">${v.b.toLocaleString()}</td>
+      <td class="num">${share}</td></tr>`;
+  }).join('');
+
+  return `<h1>Globe</h1>
+  <p class="muted" style="max-width:78ch;margin:-6px 0 16px;">
+    Every venue we hold results for, sized by fleet and coloured by
+    ${GLOBE.mode === 'density' ? 'density' : 'North share'}. Drag to spin.
+    Counts are boat-seasons — a boat that raced at a venue in three years counts
+    three times, which is exposure rather than a headcount of hulls.</p>
+
+  <div class="globe-wrap">
+    <div class="globe-stage">
+      <canvas id="globe-canvas"></canvas>
+      <div class="globe-legend">
+        <span class="muted">${GLOBE.mode === 'density' ? 'fewer' : '0%'}</span>
+        ${legend}
+        <span class="muted">${GLOBE.mode === 'density' ? 'more' : '100%'}</span>
+      </div>
+    </div>
+    <div class="globe-side">
+      <div class="card" style="padding:14px 16px;">
+        <div class="filter-group-title">Colour by</div>
+        <div class="mode-row" style="margin-bottom:12px;">
+          <label><input type="radio" name="globe-mode" value="density"
+            ${GLOBE.mode === 'density' ? 'checked' : ''}> Density</label>
+          <label><input type="radio" name="globe-mode" value="share"
+            ${GLOBE.mode === 'share' ? 'checked' : ''}> North share</label>
+        </div>
+        <div class="filter-group-title">Segments</div>
+        <div class="chip-row">${chips}</div>
+        <div class="btn-row" style="margin-bottom:12px;">
+          <button class="btn secondary" id="globe-all" type="button">All</button>
+          <button class="btn secondary" id="globe-none" type="button">None</button>
+        </div>
+        <div class="filter-group-title">Seasons</div>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <select id="globe-y0">${years.map(y =>
+            `<option value="${y}"${y === GLOBE.y0 ? ' selected' : ''}>${y}</option>`).join('')}</select>
+          <span class="muted">to</span>
+          <select id="globe-y1">${years.map(y =>
+            `<option value="${y}"${y === GLOBE.y1 ? ' selected' : ''}>${y}</option>`).join('')}</select>
+        </div>
+        <p class="muted" style="font-size:12px;margin:12px 0 0;">
+          <strong>${vs.length}</strong> venues · <strong>${totalBoats.toLocaleString()}</strong>
+          boat-seasons shown.${g.unplaced_boats ? ` <strong>${g.unplaced_regattas}</strong>
+          regattas (${g.unplaced_boats.toLocaleString()} boats) have no venue yet —
+          mostly one-design championships that move country each year. Add them to
+          <code>data/venues.csv</code>.` : ''}</p>
+      </div>
+      <div class="card" style="padding:0;overflow:auto;">
+        <table>
+          <thead><tr><th>Venue</th><th class="num">Boats</th><th class="num">North</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+    </div>
+  </div>`;
+}
+
+function attachGlobeHandlers() {
+  const cv = document.getElementById('globe-canvas');
+  if (!cv) return;
+  const redraw = () => drawGlobe();
+  requestAnimationFrame(redraw);
+  window.addEventListener('resize', redraw);
+
+  const at = e => {
+    const rct = cv.getBoundingClientRect();
+    const t = e.touches ? e.touches[0] : e;
+    return { x: t.clientX - rct.left, y: t.clientY - rct.top };
+  };
+  const start = e => { GLOBE.drag = { ...at(e), lon: GLOBE.lon, lat: GLOBE.lat }; };
+  const move = e => {
+    const p = at(e);
+    if (GLOBE.drag) {
+      const k = 180 / Math.max(GLOBE.r, 1);
+      GLOBE.lon = GLOBE.drag.lon + (p.x - GLOBE.drag.x) * k * 0.6;
+      GLOBE.lat = Math.max(-89, Math.min(89, GLOBE.drag.lat - (p.y - GLOBE.drag.y) * k * 0.6));
+      if (e.cancelable) e.preventDefault();
+      redraw();
+      return;
+    }
+    const hit = (GLOBE.points || []).find(q => Math.hypot(q.x - p.x, q.y - p.y) <= q.r + 3);
+    if (hit !== GLOBE.hover) { GLOBE.hover = hit || null; cv.style.cursor = hit ? 'pointer' : 'grab'; redraw(); }
+  };
+  const end = () => { GLOBE.drag = null; };
+  cv.addEventListener('mousedown', start);
+  window.addEventListener('mousemove', move);
+  window.addEventListener('mouseup', end);
+  cv.addEventListener('touchstart', start, { passive: true });
+  cv.addEventListener('touchmove', move, { passive: false });
+  cv.addEventListener('touchend', end);
+  cv.style.cursor = 'grab';
+
+  // navigate(), not redraw(): the venue table and the counts beside the globe
+  // are rendered HTML, so repainting the canvas alone left them showing every
+  // segment while the globe showed one.
+  document.querySelectorAll('.globe-seg').forEach(el =>
+    el.addEventListener('change', () => {
+      GLOBE.segs = new Set([...document.querySelectorAll('.globe-seg:checked')]
+                           .map(x => x.value));
+      navigate();
+    }));
+  const setAll = on => {
+    document.querySelectorAll('.globe-seg').forEach(el => { el.checked = on; });
+    GLOBE.segs = new Set(on ? [...document.querySelectorAll('.globe-seg')].map(x => x.value) : []);
+    navigate();
+  };
+  const ba = document.getElementById('globe-all'), bn = document.getElementById('globe-none');
+  if (ba) ba.addEventListener('click', () => setAll(true));
+  if (bn) bn.addEventListener('click', () => setAll(false));
+  document.querySelectorAll('input[name="globe-mode"]').forEach(el =>
+    el.addEventListener('change', () => { GLOBE.mode = el.value; navigate(); }));
+  const y0 = document.getElementById('globe-y0'), y1 = document.getElementById('globe-y1');
+  if (y0) y0.addEventListener('change', () => { GLOBE.y0 = +y0.value; navigate(); });
+  if (y1) y1.addEventListener('change', () => { GLOBE.y1 = +y1.value; navigate(); });
+
+  // clicking a venue in the table spins the globe round to it
+  document.querySelectorAll('.globe-row').forEach(tr =>
+    tr.addEventListener('click', () => {
+      const v = globeVenues().find(x => x.v === tr.dataset.venue);
+      if (!v) return;
+      GLOBE.lon = -v.lon; GLOBE.lat = v.lat;
+      GLOBE.hover = null;
+      redraw();
+      cv.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    }));
+}
 
 // Segments. Built from segment_totals/segment_events, which the exporter
 // computes BEFORE the IRC filter - One-Design, Classic and Premier Cruise
