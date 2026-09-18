@@ -1,0 +1,13 @@
+# Where `python scripts/publish.py` copies the built dashboard.
+# One path per line. Blank lines and # comments ignored. %VARS% expanded.
+#
+# DO NOT RENAME these files. Colleagues' OneDrive shortcuts and every Teams
+# link already sent point at these exact paths; a new name breaks all of them
+# silently, and the reader just sees their old copy forever.
+
+# The shared copy colleagues have a OneDrive shortcut to.
+C:\Users\ruari\OneDrive - North Technology Group\Microsoft Teams Chat Files\Solent Marketshare dashboard.html
+
+# Local working copies, so the folder never disagrees with what was shipped.
+C:\Solent Marketshare\dashboard.html
+C:\Solent Marketshare\marketshare\dashboard\dashboard.html
