@@ -458,6 +458,14 @@ tr.enrich-miss > td:first-child { box-shadow: inset 3px 0 0 var(--series-doyle);
 .globe-side { display: flex; flex-direction: column; gap: 16px; }
 .globe-row { cursor: pointer; }
 .globe-row:hover td { background: var(--gridline); }
+
+/* ---- explore: pivot controls ---- */
+.ex-controls { display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+  padding: 12px 16px; }
+.ex-pick { display: flex; align-items: center; gap: 6px; font-size: 12.5px;
+  color: var(--text-muted); font-weight: 600; }
+.ex-pick select { font-weight: 600; color: var(--text-primary); }
+.tree-leaf.clickable { cursor: pointer; }
 .globe-zoom { display: flex; align-items: center; gap: 8px; margin-top: 10px;
   justify-content: center; flex-wrap: wrap; font-size: 12px; }
 .globe-zoom .btn { padding: 4px 11px; font-size: 13px; line-height: 1.1; }
@@ -472,7 +480,8 @@ tr.enrich-miss > td:first-child { box-shadow: inset 3px 0 0 var(--series-doyle);
     <div class="brand">Marketshare<small>Race entry &amp; sailmaker tracker</small>
       <small id="build-stamp" class="build-stamp"></small></div>
     <a class="nav-item" href="#/overview" data-route="#/overview">Overview</a>
-    <a class="nav-item" href="#/globe" data-route="#/globe">Globe</a>
+    <a class="nav-item" href="#/market" data-route="#/market">Market</a>
+    <a class="nav-item" href="#/location" data-route="#/location">Location</a>
     <a class="nav-item" href="#/boats" data-route="#/boats">Boats</a>
     <a class="nav-item" href="#/regattas" data-route="#/regattas">Regattas</a>
     <a class="nav-item" href="#/compare" data-route="#/compare">Compare</a>
@@ -1194,7 +1203,8 @@ function navigate(hashOverride) {
   const qCls = query.get('cls') || null;
   const main = document.getElementById('main');
   try {
-    if (!route || route === 'overview') main.innerHTML = renderOverview();
+    if (!route || route === 'overview') { main.innerHTML = renderOverview();
+                                          attachGlobeHandlers(); }
     else if (route === 'boats') main.innerHTML = renderBoatsList();
     else if (route === 'boat') { main.innerHTML = renderBoatProfile(parseInt(arg));
                                 attachOwnerTimelineHandlers(); }
@@ -1212,6 +1222,14 @@ function navigate(hashOverride) {
       const rq = query.get('regatta');
       if (rq) ENRICH.target = { regatta: rq, year: query.get('year') || '' };
       main.innerHTML = renderEnrich(); attachEnrichHandlers(); }
+    else if (route === 'market' || route === 'location') {
+      // Same view; the tab only decides which dimension leads.
+      const lead = route === 'location' ? 'v' : 'seg';
+      if (EXPLORE.order[0] !== lead) {
+        const o = EXPLORE.order.slice(), at = o.indexOf(lead);
+        o[at] = o[0]; o[0] = lead; EXPLORE.order = o;
+      }
+      main.innerHTML = renderExplore(); attachExploreHandlers(); }
     else if (route === 'globe') { main.innerHTML = renderGlobe(); attachGlobeHandlers(); }
     else if (route === 'segments') main.innerHTML = renderSegments();
     else if (route === 'coverage') main.innerHTML = renderCoverage();
@@ -1321,6 +1339,7 @@ function renderOverview() {
 
   return `
     <h1>Overview</h1>
+    ${renderGlobePanel()}
     <p class="subtitle">Boat-centric race entry &amp; market-share database. Generated ${fmtDate(DATA.generated_at)}.
       Figures below cover the <strong>active fleet</strong> — boats with at least one race entry in ${ACTIVE_CUTOFF_YEAR}–${MAX_SEASON_YEAR}
       (last 5 seasons). <a href="#/boats" data-route="#/boats">${s.n_boats} boats</a> are tracked in total, including inactive ones.</p>
@@ -4043,6 +4062,154 @@ const COVERAGE_BADGE = {
   historical: ['Historical', 'var(--series-unknown)', 'var(--series-unknown-text)'],
 };
 
+// ---- Explore: one pivotable tree over Market / Event / Location -------------
+// The same fact table, grouped three levels deep in whatever order you choose.
+// Making Location the top level and Market the second is the same data read a
+// different way round, so this is one view rather than three near-copies - and
+// it replaces scrolling a flat list of 462 events.
+const DIMS = {
+  seg: { label: 'Market',   plural: 'markets'   },
+  rg:  { label: 'Event',    plural: 'events'    },
+  v:   { label: 'Location', plural: 'locations' }
+};
+const DIM_KEYS = ['seg', 'rg', 'v'];
+const EXPLORE = { order: ['seg', 'v', 'rg'], y0: null, y1: null };
+
+function exploreFacts() {
+  return (DATA.facts || []).filter(f =>
+    (EXPLORE.y0 == null || f.y >= EXPLORE.y0) &&
+    (EXPLORE.y1 == null || f.y <= EXPLORE.y1));
+}
+
+// Boats are counted per event per season, so a boat racing three events in a
+// season contributes three. Rolled up it is exposure, not a headcount of hulls
+// - said plainly on the page rather than left for someone to trip over.
+function rollup(rows) {
+  const s = { b: 0, n: 0, k: 0, events: new Set(), years: new Set() };
+  rows.forEach(f => {
+    s.b += f.b; s.n += f.n || 0; s.k += f.k || 0;
+    s.events.add(f.rid); s.years.add(f.y);
+  });
+  return s;
+}
+
+function groupRows(rows, key) {
+  const m = new Map();
+  rows.forEach(f => {
+    const g = f[key] == null ? '—' : f[key];
+    if (!m.has(g)) m.set(g, []);
+    m.get(g).push(f);
+  });
+  return [...m.entries()]
+    .map(([name, rs]) => ({ name, rows: rs, s: rollup(rs) }))
+    .sort((a, b) => b.s.b - a.s.b || String(a.name).localeCompare(String(b.name)));
+}
+
+function shareStrip(s) {
+  if (!s.k) return '<span class="share-none" title="no sailmaker recorded">—</span>';
+  const pct = Math.round(100 * s.n / s.k);
+  return `<span class="share-wrap" title="${s.n} North of ${s.k} with a sailmaker recorded">
+    <span class="share-bar"><i class="sb-north" style="width:${pct}%"></i>
+      <i class="sb-other" style="width:${100 - pct}%"></i></span>
+    <span class="share-text">${pct}%</span></span>`;
+}
+
+function exploreNode(node, dims, depth) {
+  const s = node.s;
+  const kidKey = dims[depth + 1];
+  const meta = `<span class="tree-meta">
+      <span>${s.b.toLocaleString()} boat-seasons</span>
+      ${dims[depth] !== 'rg' ? `<span>${s.events.size} ${s.events.size === 1 ? 'event' : 'events'}</span>` : ''}
+      <span>${Math.min(...s.years)}&ndash;${Math.max(...s.years)}</span>
+      ${shareStrip(s)}</span>`;
+
+  if (!kidKey) {                       // leaf level
+    const rid = node.rows[0] && node.rows[0].rid;
+    const openable = dims[depth] === 'rg' && rid;
+    return `<div class="tree-leaf${openable ? ' clickable' : ''}"
+       ${openable ? `data-route="#/regatta/${rid}"` : ''}>
+      <span class="tree-leaf-name">${esc(String(node.name))}</span>${meta}</div>`;
+  }
+  const kids = groupRows(node.rows, kidKey);
+  return `<details class="tree-node">
+    <summary><span class="tree-name">${esc(String(node.name))}</span>${meta}
+      <span class="tree-open">${kids.length} ${DIMS[kidKey].plural}</span></summary>
+    <div class="tree-kids">${kids.map(k => exploreNode(k, dims, depth + 1)).join('')}</div>
+  </details>`;
+}
+
+function renderGlobePanel() {
+  if (!globeSource().length) return '';
+  const body = renderGlobe();
+  // strip the standalone page's own heading and standfirst
+  return body.replace(/^[\s\S]*?<div class="globe-wrap">/, '<div class="globe-wrap">');
+}
+
+function renderExplore() {
+  const facts = DATA.facts || [];
+  if (!facts.length) return `<h1>Explore</h1><div class="card"><p class="muted">
+    No data. Run the exporter.</p></div>`;
+
+  const years = [...new Set(facts.map(f => f.y))].sort((a, b) => a - b);
+  if (EXPLORE.y0 == null) {
+    EXPLORE.y0 = Math.max(years[0], years[years.length - 1] - 4);
+    EXPLORE.y1 = years[years.length - 1];
+  }
+  const rows = exploreFacts();
+  const dims = EXPLORE.order;
+  const top = groupRows(rows, dims[0]);
+  const all = rollup(rows);
+
+  const pickers = dims.map((d, i) => `
+    <label class="ex-pick"><span>${i === 0 ? 'Group by' : 'then'}</span>
+      <select class="ex-dim" data-level="${i}">
+        ${DIM_KEYS.map(k => `<option value="${k}"${k === d ? ' selected' : ''}>${DIMS[k].label}</option>`).join('')}
+      </select></label>`).join('');
+
+  return `<h1>${esc(DIMS[dims[0]].label)}</h1>
+  <p class="muted" style="max-width:78ch;margin:-6px 0 14px;">
+    ${all.events.size} events in ${new Set(rows.map(r => r.v)).size} locations across
+    ${new Set(rows.map(r => r.seg)).size} markets. Change the order below and the same
+    numbers regroup &mdash; Location first answers "where should we be", Market first
+    answers "what kind of racing is growing". Counts are boat-seasons: a boat racing
+    three events in a season counts three times, which is exposure rather than a
+    headcount of hulls.</p>
+
+  <div class="card ex-controls">
+    ${pickers}
+    <label class="ex-pick"><span>Seasons</span>
+      <select id="ex-y0">${years.map(y => `<option value="${y}"${y === EXPLORE.y0 ? ' selected' : ''}>${y}</option>`).join('')}</select>
+    </label>
+    <label class="ex-pick"><span>to</span>
+      <select id="ex-y1">${years.map(y => `<option value="${y}"${y === EXPLORE.y1 ? ' selected' : ''}>${y}</option>`).join('')}</select>
+    </label>
+    <span class="muted" style="margin-left:auto;font-size:12.5px;">
+      ${all.b.toLocaleString()} boat-seasons shown</span>
+  </div>
+
+  <div class="card" style="padding:6px 10px;">
+    ${top.map(n => exploreNode(n, dims, 0)).join('')}
+  </div>`;
+}
+
+function attachExploreHandlers() {
+  document.querySelectorAll('.ex-dim').forEach(sel =>
+    sel.addEventListener('change', () => {
+      const lvl = +sel.dataset.level, want = sel.value;
+      const order = EXPLORE.order.slice();
+      // Swap rather than duplicate: picking Location where Market was puts
+      // Market where Location came from, so all three dimensions survive.
+      const at = order.indexOf(want);
+      order[at] = order[lvl];
+      order[lvl] = want;
+      EXPLORE.order = order;
+      navigate();
+    }));
+  const y0 = document.getElementById('ex-y0'), y1 = document.getElementById('ex-y1');
+  if (y0) y0.addEventListener('change', () => { EXPLORE.y0 = +y0.value; navigate(); });
+  if (y1) y1.addEventListener('change', () => { EXPLORE.y1 = +y1.value; navigate(); });
+}
+
 // ---- Globe -----------------------------------------------------------------
 // An orthographic projection drawn on a canvas. No library: three.js plus a
 // globe wrapper is about a megabyte for what is, geometrically, eight lines of
@@ -4053,8 +4220,9 @@ const GLOBE = { lon: -20, lat: 25, r: 0, zoom: 1, drag: null, hover: null,
 const GLOBE_HEAT = ['#FEE9A8', '#FBC96B', '#F19A3C', '#DE6A28', '#BE3B20', '#8C1D14'];
 const GLOBE_SHARE = ['#B9483C', '#C77A44', '#C9A94E', '#8FAE55', '#4E8F5C', '#1F6B4A'];
 
+function globeSource() { return (DATA.facts || []).filter(f => f.lat != null); }
 function globeRows() {
-  const g = (DATA.globe && DATA.globe.rows) || [];
+  const g = (DATA.facts || []).filter(f => f.lat != null);
   const segs = GLOBE.segs;
   return g.filter(r => (!segs || segs.has(r.seg)) &&
                        (GLOBE.y0 == null || r.y >= GLOBE.y0) &&
@@ -4244,17 +4412,17 @@ function drawGlobe() {
 }
 
 function renderGlobe() {
-  const g = DATA.globe;
-  if (!g || !g.rows || !g.rows.length) return `<h1>Globe</h1>
+  const g = DATA.globe || {};
+  if (!globeSource().length) return `<h1>Globe</h1>
     <div class="card"><p class="muted">No placed venues yet. Run
     <code>python scripts/geocode_regattas.py db/marketshare.db --apply</code>.</p></div>`;
 
-  const years = [...new Set(g.rows.map(r => r.y))].sort((a, b) => a - b);
+  const years = [...new Set(globeSource().map(r => r.y))].sort((a, b) => a - b);
   if (GLOBE.y0 == null) { GLOBE.y0 = Math.max(years[0], years[years.length - 1] - 4);
                           GLOBE.y1 = years[years.length - 1]; }
   const segRank = x => { const i = SEGMENT_ORDER.indexOf(x);
                          return i < 0 ? SEGMENT_ORDER.length : i; };
-  const allSegs = [...new Set(g.rows.map(r => r.seg))]
+  const allSegs = [...new Set(globeSource().map(r => r.seg))]
     .sort((a, b) => segRank(a) - segRank(b));
   if (!GLOBE.segs) GLOBE.segs = new Set(allSegs);
 

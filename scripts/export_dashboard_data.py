@@ -49,12 +49,23 @@ def main():
          HAVING boats > 0
          ORDER BY r.segment, boats DESC""")]
 
-    # --- Globe ----------------------------------------------------------------
-    # One row per venue / segment / season. Also before the IRC filter, for the
-    # same reason as the segment totals: half these fleets are not IRC-rated.
-    globe_rows = [dict(r) for r in cur.execute("""
-        SELECT r.venue AS v, r.country AS c, r.lat, r.lon,
-               COALESCE(r.segment,'Unsegmented') AS seg, e.season_year AS y,
+    # --- Facts ----------------------------------------------------------------
+    # ONE table carrying the three dimensions the dashboard pivots on - market
+    # segment, event, location - plus the season and the measures. Every view
+    # that groups things (the Market and Location trees, the globe) derives its
+    # own shape from this, rather than each getting its own near-identical
+    # query, which is how the globe rows and the segment rows came to disagree
+    # about what they were counting.
+    #
+    # Computed before the IRC filter further down, for the same reason as the
+    # segment totals: half these fleets are not IRC-rated.
+    facts = [dict(r) for r in cur.execute("""
+        SELECT COALESCE(r.segment, 'Unsegmented')      AS seg,
+               r.name                                  AS rg,
+               r.id                                    AS rid,
+               COALESCE(r.venue, 'Location not set')   AS v,
+               r.country AS c, r.lat, r.lon, r.region AS reg,
+               e.season_year AS y,
                COUNT(DISTINCT re.boat_id) AS b,
                SUM(CASE WHEN s.name = 'North Sails' THEN 1 ELSE 0 END) AS n,
                SUM(CASE WHEN re.sailmaker_id IS NOT NULL
@@ -65,9 +76,12 @@ def main():
           JOIN races ra        ON ra.event_id  = e.id
           JOIN race_entries re ON re.race_id   = ra.id
           LEFT JOIN sailmakers s ON s.id = re.sailmaker_id
-         WHERE r.lat IS NOT NULL AND e.season_year IS NOT NULL
-         GROUP BY r.venue, seg, e.season_year
+         WHERE e.season_year IS NOT NULL
+         GROUP BY r.id, e.season_year
          HAVING b > 0""")]
+
+    # The globe wants only the placed ones, and reads coordinates off the facts.
+    globe_rows = [f for f in facts if f["lat"] is not None]
     unplaced = cur.execute("""
         SELECT COUNT(DISTINCT r.id), COUNT(DISTINCT re.boat_id)
           FROM regattas r
@@ -84,7 +98,7 @@ def main():
         land = []
         print("  no data/land_110m.json - run scripts/fetch_land.py; globe will "
               "draw without coastlines")
-    globe = {"rows": globe_rows, "land": land,
+    globe = {"land": land,
              "unplaced_regattas": unplaced[0], "unplaced_boats": unplaced[1]}
 
     segment_totals = [dict(r) for r in cur.execute("""
@@ -657,6 +671,7 @@ def main():
         "segment_totals": segment_totals,
         "segment_events": segment_events,
         "globe": globe,
+        "facts": facts,
         "class_counts": class_counts,
         # Crew, for the Analysis tab. Only the boats that survived the IRC
         # filter, so the panel cannot show people sailing boats the rest of the
