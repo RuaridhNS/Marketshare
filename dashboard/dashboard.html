@@ -465,6 +465,8 @@ tr.enrich-miss > td:first-child { box-shadow: inset 3px 0 0 var(--series-doyle);
 .ex-pick { display: flex; align-items: center; gap: 6px; font-size: 12.5px;
   color: var(--text-muted); font-weight: 600; }
 .ex-pick select { font-weight: 600; color: var(--text-primary); }
+.ex-hier { font-family: var(--f-m, ui-monospace), Consolas, monospace; font-size: 12.5px;
+  font-weight: 600; letter-spacing: .02em; color: var(--text-primary); }
 .tree-leaf.clickable { cursor: pointer; }
 .globe-zoom { display: flex; align-items: center; gap: 8px; margin-top: 10px;
   justify-content: center; flex-wrap: wrap; font-size: 12px; }
@@ -4160,23 +4162,25 @@ function renderExplore() {
   const top = groupRows(rows, dims[0]);
   const all = rollup(rows);
 
-  const pickers = dims.map((d, i) => `
-    <label class="ex-pick"><span>${i === 0 ? 'Group by' : 'then'}</span>
-      <select class="ex-dim" data-level="${i}">
-        ${DIM_KEYS.map(k => `<option value="${k}"${k === d ? ' selected' : ''}>${DIMS[k].label}</option>`).join('')}
-      </select></label>`).join('');
+  // No dimension pickers. The tab IS the choice - Market or Location leads,
+  // and an event is always the leaf, because it is the most granular of the
+  // three. The old level-0 dropdown could not work anyway: the route handler
+  // forces the leading dimension back to match the tab on every render, so
+  // selecting there changed the value and then had it overwritten, which is
+  // exactly the "no change when I select" that was reported.
+  const hierarchy = dims.map(d => DIMS[d].label).join(' → ');
 
   return `<h1>${esc(DIMS[dims[0]].label)}</h1>
   <p class="muted" style="max-width:78ch;margin:-6px 0 14px;">
     ${all.events.size} events in ${new Set(rows.map(r => r.v)).size} locations across
-    ${new Set(rows.map(r => r.seg)).size} markets. Change the order below and the same
-    numbers regroup &mdash; Location first answers "where should we be", Market first
-    answers "what kind of racing is growing". Counts are boat-seasons: a boat racing
+    ${new Set(rows.map(r => r.seg)).size} markets. The <strong>Location</strong> tab is the
+    same numbers the other way round &mdash; Location first answers "where should we be",
+    Market first answers "what kind of racing is growing". Counts are boat-seasons: a boat racing
     three events in a season counts three times, which is exposure rather than a
     headcount of hulls.</p>
 
   <div class="card ex-controls">
-    ${pickers}
+    <span class="ex-hier">${hierarchy}</span>
     <label class="ex-pick"><span>Seasons</span>
       <select id="ex-y0">${years.map(y => `<option value="${y}"${y === EXPLORE.y0 ? ' selected' : ''}>${y}</option>`).join('')}</select>
     </label>
@@ -4193,18 +4197,6 @@ function renderExplore() {
 }
 
 function attachExploreHandlers() {
-  document.querySelectorAll('.ex-dim').forEach(sel =>
-    sel.addEventListener('change', () => {
-      const lvl = +sel.dataset.level, want = sel.value;
-      const order = EXPLORE.order.slice();
-      // Swap rather than duplicate: picking Location where Market was puts
-      // Market where Location came from, so all three dimensions survive.
-      const at = order.indexOf(want);
-      order[at] = order[lvl];
-      order[lvl] = want;
-      EXPLORE.order = order;
-      navigate();
-    }));
   const y0 = document.getElementById('ex-y0'), y1 = document.getElementById('ex-y1');
   if (y0) y0.addEventListener('change', () => { EXPLORE.y0 = +y0.value; navigate(); });
   if (y1) y1.addEventListener('change', () => { EXPLORE.y1 = +y1.value; navigate(); });
