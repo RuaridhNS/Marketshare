@@ -465,6 +465,13 @@ tr.enrich-miss > td:first-child { box-shadow: inset 3px 0 0 var(--series-doyle);
 .ex-pick { display: flex; align-items: center; gap: 6px; font-size: 12.5px;
   color: var(--text-muted); font-weight: 600; }
 .ex-pick select { font-weight: 600; color: var(--text-primary); }
+.ex-toggle { display: inline-flex; border: 1px solid var(--border); border-radius: 8px;
+  overflow: hidden; }
+.ex-lead { font: inherit; font-size: 12.5px; font-weight: 600; cursor: pointer;
+  border: 0; padding: 7px 13px; background: var(--surface-1); color: var(--text-secondary); }
+.ex-lead + .ex-lead { border-left: 1px solid var(--border); }
+.ex-lead:hover { background: var(--gridline); color: var(--text-primary); }
+.ex-lead.on { background: var(--series-north); color: #fff; }
 .ex-hier { font-family: var(--f-m, ui-monospace), Consolas, monospace; font-size: 12.5px;
   font-weight: 600; letter-spacing: .02em; color: var(--text-primary); }
 .tree-leaf.clickable { cursor: pointer; }
@@ -483,7 +490,6 @@ tr.enrich-miss > td:first-child { box-shadow: inset 3px 0 0 var(--series-doyle);
       <small id="build-stamp" class="build-stamp"></small></div>
     <a class="nav-item" href="#/overview" data-route="#/overview">Overview</a>
     <a class="nav-item" href="#/market" data-route="#/market">Market</a>
-    <a class="nav-item" href="#/location" data-route="#/location">Location</a>
     <a class="nav-item" href="#/boats" data-route="#/boats">Boats</a>
     <a class="nav-item" href="#/regattas" data-route="#/regattas">Regattas</a>
     <a class="nav-item" href="#/compare" data-route="#/compare">Compare</a>
@@ -1225,12 +1231,9 @@ function navigate(hashOverride) {
       if (rq) ENRICH.target = { regatta: rq, year: query.get('year') || '' };
       main.innerHTML = renderEnrich(); attachEnrichHandlers(); }
     else if (route === 'market' || route === 'location') {
-      // Same view; the tab only decides which dimension leads.
-      const lead = route === 'location' ? 'v' : 'seg';
-      if (EXPLORE.order[0] !== lead) {
-        const o = EXPLORE.order.slice(), at = o.indexOf(lead);
-        o[at] = o[0]; o[0] = lead; EXPLORE.order = o;
-      }
+      // ONE view now, and it does NOT force the leading dimension. Forcing it
+      // from the route is what made the old picker inert: it set the value and
+      // the next render overwrote it. The toggle on the page owns the lead.
       main.innerHTML = renderExplore(); attachExploreHandlers(); }
     else if (route === 'globe') { main.innerHTML = renderGlobe(); attachGlobeHandlers(); }
     else if (route === 'segments') main.innerHTML = renderSegments();
@@ -4169,17 +4172,23 @@ function renderExplore() {
   // selecting there changed the value and then had it overwritten, which is
   // exactly the "no change when I select" that was reported.
   const hierarchy = dims.map(d => DIMS[d].label).join(' → ');
+  const lead = dims[0];
+  const toggle = [['seg', 'Market first'], ['v', 'Location first']].map(([k, label]) =>
+    `<button type="button" class="ex-lead${k === lead ? ' on' : ''}" data-lead="${k}">${label}</button>`
+  ).join('');
 
-  return `<h1>${esc(DIMS[dims[0]].label)}</h1>
+  return `<h1>Market</h1>
   <p class="muted" style="max-width:78ch;margin:-6px 0 14px;">
     ${all.events.size} events in ${new Set(rows.map(r => r.v)).size} locations across
-    ${new Set(rows.map(r => r.seg)).size} markets. The <strong>Location</strong> tab is the
-    same numbers the other way round &mdash; Location first answers "where should we be",
-    Market first answers "what kind of racing is growing". Counts are boat-seasons: a boat racing
+    ${new Set(rows.map(r => r.seg)).size} markets. The two buttons below are the same numbers
+    the other way round &mdash; <strong>Location first</strong> answers "where should we be",
+    <strong>Market first</strong> answers "what kind of racing is growing".
+    Counts are boat-seasons: a boat racing
     three events in a season counts three times, which is exposure rather than a
     headcount of hulls.</p>
 
   <div class="card ex-controls">
+    <span class="ex-toggle">${toggle}</span>
     <span class="ex-hier">${hierarchy}</span>
     <label class="ex-pick"><span>Seasons</span>
       <select id="ex-y0">${years.map(y => `<option value="${y}"${y === EXPLORE.y0 ? ' selected' : ''}>${y}</option>`).join('')}</select>
@@ -4197,6 +4206,14 @@ function renderExplore() {
 }
 
 function attachExploreHandlers() {
+  document.querySelectorAll('.ex-lead').forEach(btn =>
+    btn.addEventListener('click', () => {
+      const want = btn.dataset.lead, o = EXPLORE.order.slice();
+      const at = o.indexOf(want);
+      o[at] = o[0]; o[0] = want;          // swap, so all three survive
+      EXPLORE.order = o;
+      navigate();
+    }));
   const y0 = document.getElementById('ex-y0'), y1 = document.getElementById('ex-y1');
   if (y0) y0.addEventListener('change', () => { EXPLORE.y0 = +y0.value; navigate(); });
   if (y1) y1.addEventListener('change', () => { EXPLORE.y1 = +y1.value; navigate(); });
