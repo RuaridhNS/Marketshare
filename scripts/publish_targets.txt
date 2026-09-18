@@ -5,9 +5,12 @@
 # link already sent point at these exact paths; a new name breaks all of them
 # silently, and the reader just sees their old copy forever.
 
+# The team library - the one to give colleagues. A SharePoint group site,
+# so access is managed by membership rather than by per-person links.
+C:\Users\ruari\OneDrive - North Technology Group\NS_ISSP - General\Marketshare\dashboard.html
+
 # The shared copy colleagues have a OneDrive shortcut to.
 C:\Users\ruari\OneDrive - North Technology Group\Microsoft Teams Chat Files\Solent Marketshare dashboard.html
 
-# Local working copies, so the folder never disagrees with what was shipped.
-C:\Solent Marketshare\dashboard.html
+# Local working copy, so the folder never disagrees with what was shipped.
 C:\Solent Marketshare\marketshare\dashboard\dashboard.html
