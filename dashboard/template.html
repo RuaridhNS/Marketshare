@@ -696,6 +696,16 @@ DATA.boats.forEach(b => { b.active = b.lastActiveYear != null && b.lastActiveYea
 
 // ---------- pending edits (sailmaker / owner / TCC changes made in-browser) ----------
 // The dashboard is a static file with no backend, so edits are held here (persisted to
+// localStorage is not available to a page served into a sandboxed iframe with
+// an opaque origin - SharePoint, OneDrive and Teams previews all do this - and
+// there every read AND every write throws. The reads were already guarded; the
+// writes were not, so staging an edit in a viewer threw and took the rest of
+// the click handler with it.
+function lsSet(key, value) {
+  try { localStorage.setItem(key, value); return true; }
+  catch (_) { return false; }
+}
+
 // localStorage) and exported as a CSV to be applied to the DB via
 // scripts/apply_boat_updates.py - see the "Pending changes" page.
 const PENDING_KEY = 'marketshare_pending_edits_v1';
@@ -704,7 +714,7 @@ function loadPendingEdits() {
   catch (e) { return {}; }
 }
 let PENDING = loadPendingEdits();
-function savePendingEdits() { localStorage.setItem(PENDING_KEY, JSON.stringify(PENDING)); }
+function savePendingEdits() { lsSet(PENDING_KEY, JSON.stringify(PENDING)); }
 function setPendingEdit(boatId, patch) {
   const existing = PENDING[boatId] || {};
   PENDING[boatId] = { ...existing, ...patch };
@@ -773,7 +783,7 @@ function loadOwnerTimelines() {
 }
 let OWNER_TIMELINES = loadOwnerTimelines();
 function saveOwnerTimelines() {
-  localStorage.setItem(OWNER_TL_KEY, JSON.stringify(OWNER_TIMELINES));
+  lsSet(OWNER_TL_KEY, JSON.stringify(OWNER_TIMELINES));
   updatePendingBadge();
 }
 function setOwnerTimeline(boatId, rows) {
@@ -860,7 +870,7 @@ function loadPendingMerges() {
   catch (e) { return []; }
 }
 let PENDING_MERGES = loadPendingMerges();
-function savePendingMerges() { localStorage.setItem(MERGES_KEY, JSON.stringify(PENDING_MERGES)); }
+function savePendingMerges() { lsSet(MERGES_KEY, JSON.stringify(PENDING_MERGES)); }
 function addPendingMerge(keepId, mergeId, notes, onlyNamed) {
   PENDING_MERGES = PENDING_MERGES.filter(m => m.mergeId !== mergeId); // one pending merge per boat
   PENDING_MERGES.push({ keepId, mergeId, notes: notes||'', onlyNamed: onlyNamed||'' });
@@ -1007,17 +1017,17 @@ const UNKNOWN_DUP_KEY = 'marketshare_unknown_dupes_v1';
 function loadUnknownDupes() { try { return JSON.parse(localStorage.getItem(UNKNOWN_DUP_KEY)||'[]'); } catch(e){ return []; } }
 function markDupeUnknown(key) {
   const u = loadUnknownDupes();
-  if (!u.includes(key)) { u.push(key); localStorage.setItem(UNKNOWN_DUP_KEY, JSON.stringify(u)); }
+  if (!u.includes(key)) { u.push(key); lsSet(UNKNOWN_DUP_KEY, JSON.stringify(u)); }
 }
 function clearDupeUnknown(key) {
-  localStorage.setItem(UNKNOWN_DUP_KEY,
+  lsSet(UNKNOWN_DUP_KEY,
     JSON.stringify(loadUnknownDupes().filter(k => k !== key)));
 }
 const DISMISSED_DUP_KEY = 'marketshare_dismissed_dupes_v1';
 function loadDismissedDupes() { try { return JSON.parse(localStorage.getItem(DISMISSED_DUP_KEY)||'[]'); } catch(e){ return []; } }
 function dismissDuplicateGroup(key) {
   const d = loadDismissedDupes();
-  if (!d.includes(key)) { d.push(key); localStorage.setItem(DISMISSED_DUP_KEY, JSON.stringify(d)); }
+  if (!d.includes(key)) { d.push(key); lsSet(DISMISSED_DUP_KEY, JSON.stringify(d)); }
 }
 
 // ---------- tiny SVG chart helpers ----------
@@ -1140,8 +1150,18 @@ addEventListener('scroll', () => {
 // Stop the browser doing its own (wrong, pre-render) scroll restoration on
 // history navigation - we do it ourselves once the new page has laid out.
 if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
-function navigate() {
-  const hash = location.hash || '#/overview';
+// The route we last rendered. Needed because in a sandboxed viewer the address
+// bar may refuse to move, and then location.hash is not the truth about where
+// the reader is - this is.
+let CURRENT_ROUTE = null;
+
+// hashchange passes an Event as the first argument, so an explicit route is
+// only honoured when it is actually a string.
+function navigate(hashOverride) {
+  const hash = (typeof hashOverride === 'string' && hashOverride)
+    ? hashOverride
+    : (location.hash || CURRENT_ROUTE || '#/overview');
+  CURRENT_ROUTE = hash;
   document.querySelectorAll('.nav-item').forEach(n => {
     n.classList.toggle('active', hash.startsWith(n.dataset.route));
   });
@@ -1206,9 +1226,33 @@ function navigate() {
   requestAnimationFrame(() => requestAnimationFrame(() => window.scrollTo(0, target)));
 }
 window.addEventListener('hashchange', navigate);
+
+// Every [data-route] click is handled here, ANCHORS INCLUDED. The sidebar links
+// used to be left to the browser: click <a href="#/boats">, the browser moves
+// the hash, hashchange fires, navigate() runs. That works from a local file and
+// fails completely when the page is opened through a viewer that puts it in a
+// sandboxed iframe - SharePoint, OneDrive and Teams all do - where the document
+// has an opaque origin and touching location can throw or simply not stick.
+// The symptom is precise and baffling: the page loads, the data is there, and
+// every link in the sidebar does nothing at all.
+//
+// So: cancel the default, try to move the hash for a working back button, and
+// if the hash did not actually move, render the route directly.
 document.addEventListener('click', e => {
+  if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey ||
+      e.shiftKey || e.altKey) return;
   const el = e.target.closest('[data-route]');
-  if (el && el.tagName !== 'A') { location.hash = el.dataset.route; }
+  if (!el) return;
+  const route = el.dataset.route;
+  if (!route || !route.startsWith('#')) return;
+  e.preventDefault();
+  let moved = false;
+  try {
+    const before = location.hash;
+    location.hash = route;
+    moved = location.hash !== before;      // false when blocked, or already there
+  } catch (_) { /* opaque origin: location is not writable */ }
+  if (!moved) navigate(route);             // hashchange will not come; render now
 });
 
 // ---------- page: overview ----------
