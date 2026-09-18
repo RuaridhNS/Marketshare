@@ -488,7 +488,25 @@ tr.enrich-miss > td:first-child { box-shadow: inset 3px 0 0 var(--series-doyle);
     <a class="nav-item" href="#/quality" data-route="#/quality">Data quality</a>
     <a class="nav-item" href="#/changes" data-route="#/changes">Pending changes<span class="nav-badge" id="pending-badge" style="display:none;"></span></a>
   </nav>
-  <main class="main" id="main"><div class="card muted">Loading…</div></main>
+  <!-- What a reader sees when the page's JavaScript never runs - which is what
+       Teams and the SharePoint web preview do to it. The sidebar is static
+       markup and renders regardless, so the failure looks like "it opens but
+       every link is dead" rather than like a blocked script. Replaced the
+       moment the real page loads, so a working reader never reads it. -->
+  <main class="main" id="main">
+    <div class="card">
+      <h2 style="margin-top:0;">Loading&hellip;</h2>
+      <p class="muted" style="margin-bottom:10px;">If this is still here after a
+        few seconds, you are looking at the file through a <strong>preview</strong>
+        &mdash; Teams, or SharePoint in a browser tab &mdash; and a preview will
+        not run the page. Nothing is wrong with the file.</p>
+      <p class="muted" style="margin:0;"><strong>Open it from File&nbsp;Explorer
+        instead.</strong> In the team library, choose <em>Add shortcut to
+        OneDrive</em> on the Marketshare folder, then open
+        <code>dashboard.html</code> from OneDrive in File&nbsp;Explorer. Everything
+        works that way, and it stays up to date as new versions are published.</p>
+    </div>
+  </main>
   <dialog id="chart-modal">
     <div class="modal-box">
       <div class="modal-head">
