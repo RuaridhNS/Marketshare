@@ -467,11 +467,11 @@ tr.enrich-miss > td:first-child { box-shadow: inset 3px 0 0 var(--series-doyle);
 .ex-pick select { font-weight: 600; color: var(--text-primary); }
 .ex-toggle { display: inline-flex; border: 1px solid var(--border); border-radius: 8px;
   overflow: hidden; }
-.ex-lead { font: inherit; font-size: 12.5px; font-weight: 600; cursor: pointer;
+.ex-lead, .cmp-group { font: inherit; font-size: 12.5px; font-weight: 600; cursor: pointer;
   border: 0; padding: 7px 13px; background: var(--surface-1); color: var(--text-secondary); }
-.ex-lead + .ex-lead { border-left: 1px solid var(--border); }
-.ex-lead:hover { background: var(--gridline); color: var(--text-primary); }
-.ex-lead.on { background: var(--series-north); color: #fff; }
+.ex-lead + .ex-lead, .cmp-group + .cmp-group { border-left: 1px solid var(--border); }
+.ex-lead:hover, .cmp-group:hover { background: var(--gridline); color: var(--text-primary); }
+.ex-lead.on, .cmp-group.on { background: var(--series-north); color: #fff; }
 .ex-hier { font-family: var(--f-m, ui-monospace), Consolas, monospace; font-size: 12.5px;
   font-weight: 600; letter-spacing: .02em; color: var(--text-primary); }
 .tree-leaf.clickable { cursor: pointer; }
@@ -4967,6 +4967,8 @@ function renderQuality() {
 }
 
 // ---------- page: compare regattas ----------
+const CMP = { groupBy: 'v' };
+
 function renderCompare(selectedIds) {
   const sel = new Set((selectedIds || []).map(Number));
   // only offer regattas that actually have a trend worth plotting
@@ -4987,6 +4989,25 @@ function renderCompare(selectedIds) {
   // Alphabetical, because you come here knowing which regatta you want.
   const unpicked = candidates.filter(x => !sel.has(x.r.id))
     .sort((a, b) => a.r.name.localeCompare(b.r.name));
+
+  // Grouped the same way as the Market tab, rather than 400-odd regattas in
+  // one alphabetical run. The dimension each regatta belongs to comes off the
+  // shared fact table, so this cannot drift from the tree.
+  const dimOf = new Map();
+  (DATA.facts || []).forEach(f => { if (!dimOf.has(f.rid)) dimOf.set(f.rid, f); });
+  const gk = CMP.groupBy;                       // 'v' location, 'seg' market
+  const groups = new Map();
+  unpicked.forEach(x => {
+    const f = dimOf.get(x.r.id);
+    const g = (f && f[gk]) || 'Not recorded';
+    if (!groups.has(g)) groups.set(g, []);
+    groups.get(g).push(x);
+  });
+  const groupedOptions = [...groups.entries()]
+    .sort((a, b) => b[1].length - a[1].length || String(a[0]).localeCompare(String(b[0])))
+    .map(([g, xs]) => `<optgroup label="${esc(String(g))} (${xs.length})">` +
+        xs.map(x => `<option value="${x.r.id}">${esc(x.r.name)} (${x.s.pts.length} seasons)</option>`).join('') +
+      `</optgroup>`).join('');
   const chips = chosen.map((x, i) => `
     <span class="cmp-chip" style="display:inline-flex;align-items:center;gap:8px;margin:0 8px 8px 0;
           padding:6px 10px;border-radius:999px;background:var(--surface-2);border:1px solid var(--border);">
@@ -4998,9 +5019,13 @@ function renderCompare(selectedIds) {
 
   const picker = `
     <div style="display:flex;flex-wrap:wrap;align-items:center;gap:10px;">
-      <select id="cmp-add" style="min-width:280px;">
+      <span class="ex-toggle">
+        <button type="button" class="cmp-group${gk === 'v' ? ' on' : ''}" data-group="v">By location</button>
+        <button type="button" class="cmp-group${gk === 'seg' ? ' on' : ''}" data-group="seg">By market</button>
+      </span>
+      <select id="cmp-add" style="min-width:300px;">
         <option value="">+ Add a regatta…</option>
-        ${unpicked.map(x => `<option value="${x.r.id}">${esc(x.r.name)} (${x.s.pts.length} seasons)</option>`).join('')}
+        ${groupedOptions}
       </select>
       ${chosen.length ? `<button class="btn secondary" id="cmp-clear" type="button">Clear all</button>` : ''}
     </div>
@@ -5036,6 +5061,8 @@ function renderCompare(selectedIds) {
 }
 
 function attachCompareHandlers() {
+  document.querySelectorAll('.cmp-group').forEach(btn =>
+    btn.addEventListener('click', () => { CMP.groupBy = btn.dataset.group; navigate(); }));
   const add = document.getElementById('cmp-add');
   if (!add) return;
   // replaceState rather than assigning location.hash: picking regattas
