@@ -1,0 +1,16 @@
+Pattern,Segment,Notes
+# Sets a regatta's market segment, overriding whatever the importer guessed.
+# Matched case-insensitively against the regatta NAME. FIRST MATCH WINS, so put
+# the specific patterns above the general ones. Re-applied on every refresh, so
+# an edit here is permanent; an edit made in the dashboard is not until it
+# lands in this file.
+#
+# Segments: Grand Prix | Premier Race | Race | One-Design | Classic | Cruise | Premier Cruise
+
+cape ?31,Grand Prix,"Grand prix one-design, not club one-design. Confirmed by the owner."
+52 ?super ?series|tp ?52,Grand Prix,TP52 circuit
+\bgl ?52\b,Grand Prix,GL52 circuit
+rc ?44|\b44 ?cup\b,Grand Prix,RC44 circuit
+clubswan 50|swan 50,Grand Prix,ClubSwan 50 circuit
+sardinia cup,Grand Prix,"Not in the database yet - no results captured. Kept here so it lands in the right segment the day it is."
+(?<!vice )admiral's cup,Grand Prix,"The RORC Admiral's Cup. NOT the Vice Admiral's Cup, which is a different Solent inshore regatta. A \b guard does NOT separate the two - 'Vice Admiral's Cup' contains 'Admiral's Cup' at a word boundary - so this needs the negative lookbehind."

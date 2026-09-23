@@ -465,6 +465,8 @@ tr.enrich-miss > td:first-child { box-shadow: inset 3px 0 0 var(--series-doyle);
 .ex-pick { display: flex; align-items: center; gap: 6px; font-size: 12.5px;
   color: var(--text-muted); font-weight: 600; }
 .ex-pick select { font-weight: 600; color: var(--text-primary); }
+.seg-edit select { min-width: 210px; }
+.seg-edit .edited-flag { vertical-align: 2px; }
 .ex-toggle { display: inline-flex; border: 1px solid var(--border); border-radius: 8px;
   overflow: hidden; }
 .ex-lead, .cmp-group { font: inherit; font-size: 12.5px; font-weight: 600; cursor: pointer;
@@ -743,6 +745,31 @@ function lsSet(key, value) {
 
 // localStorage) and exported as a CSV to be applied to the DB via
 // scripts/apply_boat_updates.py - see the "Pending changes" page.
+
+// Segment edits are staged the same way boat edits are: held in this browser
+// and exported as rows for data/segment_overrides.csv, which
+// scripts/apply_segment_overrides.py re-applies on every refresh. A change made
+// here is a suggestion until it reaches that file - the page cannot write to
+// the database, and pretending otherwise would lose the edit at the next build.
+const SEGMENTS_ALL = ['Grand Prix', 'Premier Race', 'Race', 'One-Design',
+                      'Classic', 'Cruise', 'Premier Cruise'];
+const PENDING_SEG_KEY = 'marketshare_pending_segments_v1';
+function loadPendingSegments() {
+  try { return JSON.parse(localStorage.getItem(PENDING_SEG_KEY) || '{}'); }
+  catch (e) { return {}; }
+}
+let PENDING_SEG = loadPendingSegments();
+function setPendingSegment(regattaId, segment) {
+  if (!segment) delete PENDING_SEG[regattaId];
+  else PENDING_SEG[regattaId] = segment;
+  lsSet(PENDING_SEG_KEY, JSON.stringify(PENDING_SEG));
+  updatePendingBadge();
+}
+function clearPendingSegments() {
+  PENDING_SEG = {}; lsSet(PENDING_SEG_KEY, '{}'); updatePendingBadge();
+}
+function segmentOf(r) { return PENDING_SEG[r.id] || r.segment || ''; }
+
 const PENDING_KEY = 'marketshare_pending_edits_v1';
 function loadPendingEdits() {
   try { return JSON.parse(localStorage.getItem(PENDING_KEY) || '{}'); }
@@ -761,6 +788,7 @@ function setPendingEdit(boatId, patch) {
 }
 function clearPendingEdit(boatId) { delete PENDING[boatId]; savePendingEdits(); updatePendingBadge(); }
 function clearAllPendingEdits() { PENDING = {}; savePendingEdits(); updatePendingBadge(); }
+function pendingSegmentCount() { return Object.keys(PENDING_SEG || {}).length; }
 function updatePendingBadge() {
   // Count only work still OUTSTANDING. An edit that has already been applied to
   // the database is done, and leaving it in the badge meant the number never
@@ -1217,7 +1245,8 @@ function navigate(hashOverride) {
     else if (route === 'boat') { main.innerHTML = renderBoatProfile(parseInt(arg));
                                 attachOwnerTimelineHandlers(); }
     else if (route === 'regattas') main.innerHTML = renderRegattasList();
-    else if (route === 'regatta') main.innerHTML = renderRegattaProfile(parseInt(arg), qYear, qCls);
+    else if (route === 'regatta') { main.innerHTML = renderRegattaProfile(parseInt(arg), qYear, qCls);
+                                    attachSegmentHandler(); }
     else if (route === 'race') main.innerHTML = renderRacePage(parseInt(arg));
     else if (route === 'analysis') { main.innerHTML = renderAnalysis(); attachAnalysisHandlers(); }
     else if (route === 'market-analysis') main.innerHTML = renderMarketAnalysis();
@@ -2202,6 +2231,40 @@ function pendingApplied(b, p) {
   return checks.length > 0 && checks.every(Boolean);
 }
 
+// Staged segment changes, rendered as rows you can paste straight into
+// data/segment_overrides.csv. The regatta NAME is used as the pattern, escaped,
+// so a paste matches exactly one regatta rather than everything sharing a word.
+function renderPendingSegments() {
+  const ids = Object.keys(PENDING_SEG);
+  if (!ids.length) return '';
+  const esc_re = s => String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const lines = ids.map(id => {
+    const r = regattasById[id];
+    if (!r) return '';
+    return `^${esc_re(r.name)}$,${PENDING_SEG[id]},"Set from the dashboard."`;
+  }).filter(Boolean).join('\n');
+  const rows = ids.map(id => {
+    const r = regattasById[id];
+    if (!r) return '';
+    return `<tr><td>${esc(r.name)}</td><td class="muted">${esc(r.segment || '— not set —')}</td>
+            <td><strong>${esc(PENDING_SEG[id])}</strong></td></tr>`;
+  }).join('');
+  return `<div class="card">
+    <h2 style="margin-top:0;">Segment changes <span class="muted"
+      style="font-weight:400;font-size:13px;">${ids.length} staged</span></h2>
+    <table><thead><tr><th>Regatta</th><th>Now</th><th>Change to</th></tr></thead>
+      <tbody>${rows}</tbody></table>
+    <p class="muted" style="font-size:13px;margin:14px 0 6px;">Append these to
+      <code>data/segment_overrides.csv</code>, then run:</p>
+    <textarea class="csv-box" readonly rows="3" style="min-height:0;">python scripts/apply_segment_overrides.py db/marketshare.db --apply</textarea>
+    <textarea class="csv-box" id="seg-csv" readonly>${esc(lines)}</textarea>
+    <div class="btn-row">
+      <button class="btn" id="seg-copy" type="button">Copy rows</button>
+      <button class="btn secondary" id="seg-clear" type="button">Discard staged segments</button>
+    </div>
+  </div>`;
+}
+
 function renderPendingChanges() {
   const ids = Object.keys(PENDING);
   const appliedIds = ids.filter(id => boatsById[id] && pendingApplied(boatsById[id], PENDING[id]));
@@ -2287,7 +2350,9 @@ function renderPendingChanges() {
     <p class="subtitle">${ids.length - appliedIds.length} edit(s) still to apply${appliedIds.length ? `, ${appliedIds.length} already in the database` : ''},
       ${PENDING_MERGES.length} pending merge(s)${Object.keys(OWNER_TIMELINES).length ?
         `, ${Object.keys(OWNER_TIMELINES).length} ownership timeline correction(s)` : ''}.
-      Edits are held in this browser until applied.</p>
+      Edits are held in this browser until applied.${pendingSegmentCount() ?
+        ` ${pendingSegmentCount()} segment change(s) staged.` : ''}</p>
+    ${renderPendingSegments()}
     ${appliedIds.length ? `<div class="card" style="border-left:3px solid var(--series-quantum);">
       <p style="margin:0 0 8px;"><strong>${appliedIds.length} of these ${ids.length} edit(s) are already in the database.</strong>
         They were exported and applied, but the export cannot tell this browser that, so they stayed on the list.</p>
@@ -2340,6 +2405,7 @@ function renderPendingChanges() {
 }
 
 function attachPendingChangesHandlers() {
+  attachPendingSegmentHandlers();
   const clearApplied = document.getElementById('clear-applied');
   if (clearApplied) clearApplied.addEventListener('click', () => {
     Object.keys(PENDING).forEach(id => {
@@ -5060,6 +5126,30 @@ function renderCompare(selectedIds) {
   `;
 }
 
+function attachPendingSegmentHandlers() {
+  const copy = document.getElementById('seg-copy');
+  const box = document.getElementById('seg-csv');
+  if (copy && box) copy.addEventListener('click', () => {
+    box.select();
+    navigator.clipboard?.writeText(box.value).then(
+      () => { copy.textContent = 'Copied'; setTimeout(() => copy.textContent = 'Copy rows', 1400); },
+      () => {});
+  });
+  const clr = document.getElementById('seg-clear');
+  if (clr) clr.addEventListener('click', () => {
+    if (confirm('Discard all staged segment changes?')) { clearPendingSegments(); navigate(); }
+  });
+}
+
+function attachSegmentHandler() {
+  const sel = document.getElementById('seg-pick');
+  if (!sel) return;
+  sel.addEventListener('change', () => {
+    setPendingSegment(sel.dataset.regatta, sel.value);
+    navigate();
+  });
+}
+
 function attachCompareHandlers() {
   document.querySelectorAll('.cmp-group').forEach(btn =>
     btn.addEventListener('click', () => { CMP.groupBy = btn.dataset.group; navigate(); }));
@@ -5329,7 +5419,20 @@ function renderRegattaProfile(id, year, cls) {
   return `
     <a class="back-link" href="#/regattas" data-route="#/regattas">← All regattas</a>
     <h1>${esc(r.name)}</h1>
-    <p class="subtitle">${esc(r.category||'')} · ${esc(r.region||'')}</p>
+    <p class="subtitle">${esc(r.category||'')} · ${esc(r.region||'')}${r.venue ? ' · ' + esc(r.venue) : ''}</p>
+    <div class="card seg-edit">
+      <label class="field-label" for="seg-pick">Market segment</label>
+      <select id="seg-pick" data-regatta="${r.id}">
+        <option value="">— not set —</option>
+        ${SEGMENTS_ALL.map(x => `<option value="${esc(x)}"${x === segmentOf(r) ? ' selected' : ''}>${esc(x)}</option>`).join('')}
+      </select>
+      ${PENDING_SEG[r.id] ? `<span class="edited-flag">staged</span>` : ''}
+      <p class="muted" style="font-size:12px;margin:8px 0 0;">Drives the Market tab and the
+        globe. Staged here and exported from
+        <a href="#/changes" data-route="#/changes">Pending changes</a> into
+        <code>data/segment_overrides.csv</code> &mdash; this page cannot write to the
+        database, so an edit is not permanent until it lands in that file.</p>
+    </div>
     <div class="card" style="padding:0;overflow:auto;">
       <h2 style="padding:18px 20px 0;">Seasons</h2>
       <p class="muted" style="font-size:12px;padding:0 20px;margin:4px 0 0;">Click a season to see who entered it.</p>
