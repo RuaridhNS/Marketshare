@@ -93,6 +93,8 @@
   }
   .nav-item:hover { background: var(--gridline); color: var(--text-primary); }
   .nav-item.active { background: var(--series-north); color: white; }
+  .nav-group { font-size: 10.5px; font-weight: 700; letter-spacing: .1em;
+    text-transform: uppercase; color: var(--text-muted); padding: 16px 10px 5px; }
 
   .main { flex: 1; min-width: 0; padding: 28px 36px 80px; max-width: 1180px; }
   h1 { font-size: 22px; margin: 0 0 4px; letter-spacing: -0.01em; }
@@ -467,13 +469,30 @@ tr.enrich-miss > td:first-child { box-shadow: inset 3px 0 0 var(--series-doyle);
 .ex-pick select { font-weight: 600; color: var(--text-primary); }
 .seg-edit select { min-width: 210px; }
 .seg-edit .edited-flag { vertical-align: 2px; }
+.ov-bar { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; margin: 0 0 8px; }
+.ov-bar h1 { margin: 0; }
+.ov-context { font-size: 13px; color: var(--text-muted); margin: 0 0 16px; }
+/* The canvas is square and sized from its own clientWidth, so every pixel of
+   extra width is a pixel of height. Capping it is what lets the globe be the
+   centrepiece AND fit on one screen. */
+#globe-canvas { max-width: 640px; margin: 0 auto; }
+.globe-caption { font-size: 12.5px; margin: 10px auto 0; max-width: 640px;
+  text-align: center; line-height: 1.5; }
+.ov-tree { padding: 6px 10px; }
+.ov-notes summary { cursor: pointer; font-weight: 600; font-size: 14px; }
+.ov-notes[open] summary { margin-bottom: 4px; }
+.ov-tree-head { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap;
+  padding: 10px 10px 6px; }
+.ov-tree-head .muted { font-size: 12.5px; margin-left: auto; }
+.ov-tree-foot { font-size: 12px; padding: 10px 10px 6px; margin: 0; }
 .ex-toggle { display: inline-flex; border: 1px solid var(--border); border-radius: 8px;
   overflow: hidden; }
-.ex-lead, .cmp-group { font: inherit; font-size: 12.5px; font-weight: 600; cursor: pointer;
+.ex-lead, .cmp-group, .ov-mode { font: inherit; font-size: 12.5px; font-weight: 600; cursor: pointer;
   border: 0; padding: 7px 13px; background: var(--surface-1); color: var(--text-secondary); }
-.ex-lead + .ex-lead, .cmp-group + .cmp-group { border-left: 1px solid var(--border); }
-.ex-lead:hover, .cmp-group:hover { background: var(--gridline); color: var(--text-primary); }
-.ex-lead.on, .cmp-group.on { background: var(--series-north); color: #fff; }
+.ex-lead + .ex-lead, .cmp-group + .cmp-group, .ov-mode + .ov-mode { border-left: 1px solid var(--border); }
+.ex-lead:hover, .cmp-group:hover, .ov-mode:hover { background: var(--gridline); color: var(--text-primary); }
+.ex-lead.on, .cmp-group.on, .ov-mode.on { background: var(--series-north); color: #fff; }
+.ov-mode { padding: 9px 20px; font-size: 13px; }
 .ex-hier { font-family: var(--f-m, ui-monospace), Consolas, monospace; font-size: 12.5px;
   font-weight: 600; letter-spacing: .02em; color: var(--text-primary); }
 .tree-leaf.clickable { cursor: pointer; }
@@ -491,20 +510,15 @@ tr.enrich-miss > td:first-child { box-shadow: inset 3px 0 0 var(--series-doyle);
     <div class="brand">Marketshare<small>Race entry &amp; sailmaker tracker</small>
       <small id="build-stamp" class="build-stamp"></small></div>
     <a class="nav-item" href="#/overview" data-route="#/overview">Overview</a>
-    <a class="nav-item" href="#/market" data-route="#/market">Market</a>
     <a class="nav-item" href="#/boats" data-route="#/boats">Boats</a>
     <a class="nav-item" href="#/regattas" data-route="#/regattas">Regattas</a>
-    <a class="nav-item" href="#/compare" data-route="#/compare">Compare</a>
-    <a class="nav-item" href="#/segments" data-route="#/segments">Segments</a>
-    <a class="nav-item" href="#/coverage" data-route="#/coverage">Coverage</a>
     <a class="nav-item" href="#/analysis" data-route="#/analysis">Analysis</a>
-    <a class="nav-item" href="#/market-analysis" data-route="#/market-analysis">Market analysis</a>
-    <a class="nav-item" href="#/market-share" data-route="#/market-share">Market share</a>
     <a class="nav-item" href="#/sales" data-route="#/sales">Sales opportunities</a>
+    <div class="nav-group">Data</div>
     <a class="nav-item" href="#/calendar" data-route="#/calendar">Calendar</a>
     <a class="nav-item" href="#/enrich" data-route="#/enrich">Entry list</a>
-    <a class="nav-item" href="#/duplicates" data-route="#/duplicates">Duplicates<span class="nav-badge" id="duplicates-badge" style="display:none;"></span></a>
-    <a class="nav-item" href="#/quality" data-route="#/quality">Data quality</a>
+    <a class="nav-item" href="#/coverage" data-route="#/coverage">Coverage</a>
+    <a class="nav-item" href="#/quality" data-route="#/quality">Data quality<span class="nav-badge" id="duplicates-badge" style="display:none;"></span></a>
     <a class="nav-item" href="#/changes" data-route="#/changes">Pending changes<span class="nav-badge" id="pending-badge" style="display:none;"></span></a>
   </nav>
   <!-- What a reader sees when the page's JavaScript never runs - which is what
@@ -1372,18 +1386,19 @@ function renderOverview() {
     (!liveSailmaker(b) || bucketOf(liveSailmaker(b)) === 'Unknown') && b.owner_name).length;
 
   return `
-    <h1>Overview</h1>
-    ${renderGlobePanel()}
-    <p class="subtitle">Boat-centric race entry &amp; market-share database. Generated ${fmtDate(DATA.generated_at)}.
-      Figures below cover the <strong>active fleet</strong> — boats with at least one race entry in ${ACTIVE_CUTOFF_YEAR}–${MAX_SEASON_YEAR}
-      (last 5 seasons). <a href="#/boats" data-route="#/boats">${s.n_boats} boats</a> are tracked in total, including inactive ones.</p>
-    <div class="stat-row">
-      <div class="stat-tile"><div class="v">${activeBoats.length}</div><div class="l">Active boats (last 5 seasons)</div></div>
-      <div class="stat-tile"><div class="v">${s.n_entries}</div><div class="l">Boat-level race entries (all-time)</div></div>
-      <div class="stat-tile"><div class="v">${s.n_regattas}</div><div class="l">Regattas / races</div></div>
-      <div class="stat-tile"><div class="v">${s.n_class_count_rows}</div><div class="l">Historical class-count records</div></div>
-      <div class="stat-tile"><div class="v">${smKnownPct}%</div><div class="l">Sailmaker known</div></div>
+    <div class="ov-bar">
+      <h1>Marketshare</h1>
+      <span class="ex-toggle" role="group" aria-label="View mode">
+        <button type="button" class="ov-mode${GLOBE.mode === 'share' ? ' on' : ''}" data-mode="share">Marketshare</button>
+        <button type="button" class="ov-mode${GLOBE.mode === 'density' ? ' on' : ''}" data-mode="density">Location</button>
+      </span>
     </div>
+    <p class="ov-context">${activeBoats.length.toLocaleString()} active boats &middot;
+      ${ACTIVE_CUTOFF_YEAR}&ndash;${MAX_SEASON_YEAR} &middot; ${smKnownPct}% sailmaker known &middot;
+      <a href="#/boats" data-route="#/boats">${s.n_boats.toLocaleString()} tracked in total &rarr;</a>
+      &middot; built ${fmtDate(DATA.generated_at)}</p>
+    ${renderGlobePanel()}
+    ${renderOverviewTree()}
 
     <div class="card-row">
       <div class="card" style="border-left:4px solid var(--series-north);">
@@ -1405,27 +1420,30 @@ function renderOverview() {
           <strong>${s.n_entries_with_sailmaker ?? 0}</strong> of ${s.n_entries} entries do. These are not lost
           business, they are <em>unmeasured</em> business — <strong>${contactableCount}</strong> of them already
           have an owner on file and could be approached tomorrow.</p>
-        <p class="muted" style="font-size:12px;margin:0;">
+        ${svgBarChart(bucketItems, {colorFn: it => BUCKET_COLOR[it.sailmaker], width: 460})}
+        <p class="muted" style="font-size:12px;margin:8px 0 0;">Every active boat, counted once by
+          its most recently observed sailmaker; "Unknown" is the unmeasured fleet above.
+          <a href="#/market-share" data-route="#/market-share">Full breakdown →</a> &middot;
           <a href="#/market-analysis" data-route="#/market-analysis">Targets →</a></p>
       </div>
     </div>
-    <div class="card-row">
-      <div class="card">
-        <h2>Sailmaker share — distinct boats (active fleet)</h2>
-        ${svgBarChart(bucketItems, {colorFn: it => BUCKET_COLOR[it.sailmaker]})}
-        <p class="muted" style="font-size:12px;margin-top:10px;">Boats active in the last 5 seasons, counted once by their most recently observed sailmaker (no signal at all = "Unknown"). "Other" groups low-volume brands (Relling, GP, UK...). <a href="#/market-share" data-route="#/market-share">Full breakdown →</a></p>
-      </div>
-      <div class="card">
-        <h2>Solent IRC entries — last 5 seasons</h2>
-        ${distinctPts.length ? sparkline(distinctPts) : '<p class="muted">No boat-level Solent entries with a season year on file yet.</p>'}
-        <p class="muted" style="font-size:12px;margin-top:6px;">Distinct boats that raced at least once that season — a boat entering multiple races only counts once. <a href="#/boats" data-route="#/boats">All boats →</a></p>
-      </div>
     </div>
-    <div class="card">
-      <h2>Where the data comes from</h2>
-      <p style="margin:0 0 8px;">Boat-level entries: your JOG fleet register + entry lists (manual), plus one proof-of-concept RORC race scraped live from rorc.org's legacy results archive. Aggregate historical entry counts (2007–2026, no boat-level detail): your IRC Solent Report, covering RORC Inshore, RSYC, Round the Island, Cowes Week, Warsash, ORC Worlds/Euros, and RORC offshore races.</p>
-      <p class="muted" style="font-size:12px;margin:0;">Note: the JOG entry-list sheets had no season year recorded, so they're filed under the current season (assumed) — flag to correct if wrong. See the README shipped alongside this file for the full scraping/automation notes.</p>
-    </div>
+    <details class="card ov-notes">
+      <summary>Where the data comes from, and the other views</summary>
+      <p style="margin:10px 0 8px;">Boat-level entries: the JOG fleet register and entry lists, the
+        Marketshare workbooks, and results scraped from organisers' own sites. Aggregate historical
+        entry counts (2007&ndash;2026, no boat-level detail) come from the IRC Solent Report.</p>
+      <p class="muted" style="font-size:12px;margin:0 0 10px;">
+        <a href="#/coverage" data-route="#/coverage">Coverage</a> says which regatta-seasons are
+        aggregate-only, which is the honest account of what is missing.</p>
+      <p class="muted" style="font-size:12px;margin:0;">Also available, without a tab:
+        <a href="#/market" data-route="#/market">Market tree</a> &middot;
+        <a href="#/segments" data-route="#/segments">Segments</a> &middot;
+        <a href="#/compare" data-route="#/compare">Compare</a> &middot;
+        <a href="#/market-analysis" data-route="#/market-analysis">Market analysis</a> &middot;
+        <a href="#/market-share" data-route="#/market-share">Market share</a> &middot;
+        <a href="#/duplicates" data-route="#/duplicates">Duplicates</a></p>
+    </details>
   `;
 }
 
@@ -4209,11 +4227,14 @@ function exploreNode(node, dims, depth) {
   </details>`;
 }
 
+// The globe is embedded by ASKING for it, not by cutting a heading off the
+// standalone page with a regex. That regex keyed on the exact text of the
+// opening <div class="globe-wrap"> tag, so adding an id or a second class to it
+// would silently have returned the whole page, heading and all, into the middle
+// of the Overview.
 function renderGlobePanel() {
   if (!globeSource().length) return '';
-  const body = renderGlobe();
-  // strip the standalone page's own heading and standfirst
-  return body.replace(/^[\s\S]*?<div class="globe-wrap">/, '<div class="globe-wrap">');
+  return renderGlobe({ embedded: true });
 }
 
 function renderExplore() {
@@ -4285,12 +4306,57 @@ function attachExploreHandlers() {
   if (y1) y1.addEventListener('change', () => { EXPLORE.y1 = +y1.value; navigate(); });
 }
 
+// ---- Overview: the slider drives the globe, the tree and the caption --------
+// GLOBE.mode is the single source of truth. overviewDims() is DERIVED from it
+// rather than written into EXPLORE.order, so #/market keeps its own independent
+// state and remains the escape hatch that includes unplaced venues.
+function overviewDims() {
+  return GLOBE.mode === 'density' ? ['v', 'seg', 'rg'] : ['seg', 'v', 'rg'];
+}
+
+function overviewCaption() {
+  return GLOBE.mode === 'density'
+    ? 'Coloured by fleet density on a log scale, because the Solent is around thirty times the next venue. Bigger dot, bigger fleet.'
+    : 'Coloured by North share of the boats whose sailmaker we know — green strong, red weak. Grey means no sailmaker is recorded there at all.';
+}
+
+// The tree the globe is pointing at. Built from globeRows(), the SAME rows the
+// globe plots, so the two can never disagree - the price is that regattas with
+// no venue are missing, which the footer says out loud.
+function renderOverviewTree() {
+  const rows = globeRows().filter(f =>
+    (!GLOBE.segs || GLOBE.segs.has(f.seg)) &&
+    (GLOBE.y0 == null || f.y >= GLOBE.y0) &&
+    (GLOBE.y1 == null || f.y <= GLOBE.y1));
+  if (!rows.length) return '';
+  const dims = overviewDims();
+  const top = groupRows(rows, dims[0]);
+  const cap = dims[0] === 'v' ? 20 : top.length;
+  const g = DATA.globe || {};
+  const hidden = top.length - cap;
+  return `<div class="card ov-tree">
+    <div class="ov-tree-head">
+      <span class="ex-hier">${dims.map(d => DIMS[d].label).join(' &rarr; ')}</span>
+      <span class="muted">${top.length} ${DIMS[dims[0]].plural} &middot;
+        ${rows.reduce((n, r) => n + r.b, 0).toLocaleString()} boat-seasons</span>
+    </div>
+    ${top.slice(0, cap).map(n => exploreNode(n, dims, 0)).join('')}
+    <p class="muted ov-tree-foot">
+      ${hidden > 0 ? `${hidden} more ${DIMS[dims[0]].plural} not shown. ` : ''}
+      ${g.unplaced_boats ? `${g.unplaced_regattas} regattas
+        (${g.unplaced_boats.toLocaleString()} boats) have no location yet and are
+        missing here, so the globe and this tree agree. ` : ''}
+      <a href="#/market" data-route="#/market">Everything, including unplaced &rarr;</a></p>
+  </div>`;
+}
+
 // ---- Globe -----------------------------------------------------------------
 // An orthographic projection drawn on a canvas. No library: three.js plus a
 // globe wrapper is about a megabyte for what is, geometrically, eight lines of
 // trigonometry, and the page is already 2.9MB.
+let globeAbort = null;
 const GLOBE = { lon: -20, lat: 25, r: 0, zoom: 1, drag: null, hover: null,
-                mode: 'density', segs: null, y0: null, y1: null, spin: false };
+                mode: 'share', segs: null, y0: null, y1: null, spin: false };
 
 const GLOBE_HEAT = ['#FEE9A8', '#FBC96B', '#F19A3C', '#DE6A28', '#BE3B20', '#8C1D14'];
 const GLOBE_SHARE = ['#B9483C', '#C77A44', '#C9A94E', '#8FAE55', '#4E8F5C', '#1F6B4A'];
@@ -4486,7 +4552,8 @@ function drawGlobe() {
   }
 }
 
-function renderGlobe() {
+function renderGlobe(opts) {
+  const embedded = !!(opts && opts.embedded);
   const g = DATA.globe || {};
   if (!globeSource().length) return `<h1>Globe</h1>
     <div class="card"><p class="muted">No placed venues yet. Run
@@ -4520,12 +4587,12 @@ function renderGlobe() {
       <td class="num">${share}</td></tr>`;
   }).join('');
 
-  return `<h1>Globe</h1>
+  return `${embedded ? '' : `<h1>Globe</h1>
   <p class="muted" style="max-width:78ch;margin:-6px 0 16px;">
     Every venue we hold results for, sized by fleet and coloured by
     ${GLOBE.mode === 'density' ? 'density' : 'North share'}. Drag to spin.
     Counts are boat-seasons — a boat that raced at a venue in three years counts
-    three times, which is exposure rather than a headcount of hulls.</p>
+    three times, which is exposure rather than a headcount of hulls.</p>`}
 
   <div class="globe-wrap">
     <div class="globe-stage">
@@ -4535,6 +4602,7 @@ function renderGlobe() {
         ${legend}
         <span class="muted">${GLOBE.mode === 'density' ? 'more' : '100%'}</span>
       </div>
+      <p class="globe-caption muted">${overviewCaption()}</p>
       <div class="globe-zoom">
         <button class="btn secondary" id="globe-zoom-out" type="button"
                 aria-label="Zoom out">&minus;</button>
@@ -4547,14 +4615,7 @@ function renderGlobe() {
     </div>
     <div class="globe-side">
       <div class="card" style="padding:14px 16px;">
-        <div class="filter-group-title">Colour by</div>
-        <div class="mode-row" style="margin-bottom:12px;">
-          <label><input type="radio" name="globe-mode" value="density"
-            ${GLOBE.mode === 'density' ? 'checked' : ''}> Density</label>
-          <label><input type="radio" name="globe-mode" value="share"
-            ${GLOBE.mode === 'share' ? 'checked' : ''}> North share</label>
-        </div>
-        <div class="filter-group-title">Segments</div>
+        <div class="filter-group-title">Filter segments</div>
         <div class="chip-row">${chips}</div>
         <div class="btn-row" style="margin-bottom:12px;">
           <button class="btn secondary" id="globe-all" type="button">All</button>
@@ -4575,22 +4636,28 @@ function renderGlobe() {
           mostly one-design championships that move country each year. Add them to
           <code>data/venues.csv</code>.` : ''}</p>
       </div>
-      <div class="card" style="padding:0;overflow:auto;">
+      ${embedded ? '' : `<div class="card" style="padding:0;overflow:auto;">
         <table>
           <thead><tr><th>Venue</th><th class="num">Boats</th><th class="num">North</th></tr></thead>
           <tbody>${rows}</tbody>
         </table>
-      </div>
+      </div>`}
     </div>
   </div>`;
 }
 
 function attachGlobeHandlers() {
+  // Drop the previous render's listeners. These are on window, so without this
+  // every navigate() - every filter change, every slider press - left another
+  // live set behind, all firing drawGlobe against one canvas.
+  if (globeAbort) globeAbort.abort();
+  globeAbort = new AbortController();
+  const sig = { signal: globeAbort.signal };
   const cv = document.getElementById('globe-canvas');
   if (!cv) return;
   const redraw = () => drawGlobe();
   requestAnimationFrame(redraw);
-  window.addEventListener('resize', redraw);
+  window.addEventListener('resize', redraw, sig);
 
   const at = e => {
     const rct = cv.getBoundingClientRect();
@@ -4618,12 +4685,22 @@ function attachGlobeHandlers() {
   };
   const end = () => { GLOBE.drag = null; };
   cv.addEventListener('mousedown', start);
-  window.addEventListener('mousemove', move);
-  window.addEventListener('mouseup', end);
+  window.addEventListener('mousemove', move, sig);
+  window.addEventListener('mouseup', end, sig);
   cv.addEventListener('touchstart', start, { passive: true });
   cv.addEventListener('touchmove', move, { passive: false });
   cv.addEventListener('touchend', end);
   cv.style.cursor = 'grab';
+
+  // The Marketshare/Location slider. Plain buttons with NO data-route - the
+  // delegated router intercepts every [data-route] click - and no data-lead,
+  // which attachExploreHandlers binds and would double-fire navigate().
+  document.querySelectorAll('.ov-mode').forEach(b =>
+    b.addEventListener('click', () => {
+      if (GLOBE.mode === b.dataset.mode) return;   // a no-op press must not re-render
+      GLOBE.mode = b.dataset.mode;
+      navigate();
+    }, sig));
 
   const ZMIN = 1, ZMAX = 14;
   const setZoom = z => {
@@ -4682,8 +4759,6 @@ function attachGlobeHandlers() {
   const ba = document.getElementById('globe-all'), bn = document.getElementById('globe-none');
   if (ba) ba.addEventListener('click', () => setAll(true));
   if (bn) bn.addEventListener('click', () => setAll(false));
-  document.querySelectorAll('input[name="globe-mode"]').forEach(el =>
-    el.addEventListener('change', () => { GLOBE.mode = el.value; navigate(); }));
   const y0 = document.getElementById('globe-y0'), y1 = document.getElementById('globe-y1');
   if (y0) y0.addEventListener('change', () => { GLOBE.y0 = +y0.value; navigate(); });
   if (y1) y1.addEventListener('change', () => { GLOBE.y1 = +y1.value; navigate(); });
