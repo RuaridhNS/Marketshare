@@ -707,16 +707,22 @@ function boatRegattaEntries(boat) {
     if (!g) {
       g = { regattaId: ev.regatta_id, year: ev.season_year,
             regattaName: (regattasById[ev.regatta_id] || {}).name || '—',
-            classes: new Set(), races: 0, best: null, sailmaker: null,
+            classes: new Set(), races: 0, best: null, solo: 0, sailmaker: null,
             entries: [] };   // the individual races, so a boat page can reach them
       byKey.set(key, g);
     }
     g.races++;
     g.entries.push(e);
     if (e.class) g.classes.add(e.class);
-    // finishing positions only - DNF/DNC/RET and the like aren't placings
+    // finishing positions only - DNF/DNC/RET and the like aren't placings, and
+    // neither is a 1st in a fleet of one, which is what used to let a mid-fleet
+    // boat show "1st best" (see boatForm). Counted rather than just skipped:
+    // six recorded 1sts collapsing to a bare dash needs an explanation.
     const pos = parseInt(e.position, 10);
-    if (!isNaN(pos) && pos > 0 && (g.best === null || pos < g.best)) g.best = pos;
+    if (!isNaN(pos) && pos > 0) {
+      if (e.fleet >= 2) { if (g.best === null || pos < g.best) g.best = pos; }
+      else g.solo++;
+    }
     if (!g.sailmaker && e.sailmaker_name) g.sailmaker = e.sailmaker_name;
   });
   return Array.from(byKey.values())
@@ -2028,7 +2034,10 @@ function renderBoatProfile(id) {
         <span class="br-year">${g.year || ''}</span>
         <span class="br-meta">${esc(Array.from(g.classes).join(', '))}</span>
         <span class="br-meta">${countLabel}</span>
-        <span class="br-meta">${g.best != null ? 'best ' + ordinal(g.best) : '—'}</span>
+        <span class="br-meta"${g.best == null && g.solo ? ' title="The results here record this boat as the only entry in its division, so a 1st place beat nobody and is not counted as a finish."' : ''}>${
+          g.best != null ? 'best ' + ordinal(g.best)
+          : g.solo ? `<span class="muted">${g.solo} result${g.solo === 1 ? '' : 's'}, fleet of one</span>`
+          : '—'}</span>
         ${g.sailmaker ? `<span class="pill" style="${pillStyle(g.sailmaker)}">${esc(g.sailmaker)}</span>` : ''}
         <a class="br-open" href="#/regatta/${g.regattaId}?year=${g.year}">whole regatta &rsaquo;</a>
       </summary>
@@ -2760,7 +2769,8 @@ function renderRegattasList() {
     const byYear = (idx[club] = idx[club] || {});
     const byReg = (byYear[yr] = byYear[yr] || {});
     const byCls = (byReg[rg.id] = byReg[rg.id] || {});
-    (byCls[cls] = byCls[cls] || []).push({ b: b.id, p: e.position });
+    // p is dropped for a fleet of one - a 1st against nobody is not a placing
+    (byCls[cls] = byCls[cls] || []).push({ b: b.id, p: e.fleet >= 2 ? e.position : null });
   }));
 
   // Events with no boat-level results still need a place, or the tree silently
@@ -3008,7 +3018,118 @@ function fillTreeLeaf(det) {
 // One filter state, every panel below it. Splitting these into separate views
 // meant answering "how do J/109s attend?" and "who wins in J/109s?" in two
 // places with two filter settings that could silently disagree.
-const ANALYSIS = { sailmaker: '', type: '', club: '', from: 0, to: 0, minRaces: 5 };
+// minRaces is a floor on races that COUNT - scored, in a fleet of more than
+// one. It was 5 against raw scored races when a hard minimum was the only
+// defence against a fluke; the shrinkage in boatForm does that job now, so this
+// is only here to keep a one-race boat off the table under a narrow filter.
+const ANALYSIS = { sailmaker: '', type: '', club: '', from: 0, to: 0, minRaces: 3 };
+
+// ---------- how successful is a boat, really ----------
+// The old answer was podium RATE, and it was wrong in a way worth spelling out.
+// THE BODFATHER - a Cape 31 whose finishes against real fleets are 4,2,12,6,13,
+// 6,10,19,16,9,13,6,10,18,24,5,19,17, i.e. squarely mid-fleet - came top of this
+// table on six 1st places. Every one of those six was a race whose recorded
+// fleet is ONE BOAT: it was the only entry, so it beat nobody. 100 of the 2,509
+// first places in this data were won in a division of one.
+//
+// So the unit here is not a finishing position, it is the SHARE OF THE FLEET
+// BEATEN: (fleet - position) / (fleet - 1). A win in a fleet of 24 beats 23
+// boats and scores 1.0; a "win" in a fleet of 1 beats nobody and is not counted
+// at all. Fleet size comes from the export, counted before the IRC filter, and
+// cannot be derived in the browser - see the note in export_dashboard_data.py.
+//
+// Two further corrections, both made because the first attempt got them wrong:
+//
+// FLEET_CAP - a race is weighted by the boats in it, but that weight saturates.
+// Summing beaten-over-opposition straight let one 89-boat pursuit race outweigh
+// forty-three one-design races and put a two-race boat third. Beating 20 is
+// already strong evidence; beating 88 in a mixed handicap fleet is not four
+// times stronger.
+//
+// PRIOR - the rate is pulled toward the fleet-wide average by a fixed weight,
+// so a boat with two results cannot top the table on them. This replaces a hard
+// minimum race count, which threw away real boats to exclude flukes. The top of
+// the table is stable across PRIOR 20, 40 and 80 - the same boats in a slightly
+// different order - so the ranking is not an artefact of the number.
+const FLEET_CAP = 20;
+const FORM_PRIOR = 40;
+const RIVAL_MEETS = 3;     // races shared before another boat counts as a rival
+const RIVALS_SEVERAL = 3;  // "regattas SEVERAL of its competitors have competed in"
+
+// One row per boat. `rows` are the fully filtered rows and decide each boat's
+// own record; `universe` is the same period filtered by DATE ONLY.
+//
+// The split matters. Who a boat races against has nothing to do with what sails
+// they fly, so deriving rivals from the filtered rows made every Circuit column
+// read "—" as soon as a sailmaker was picked: a boat's only rivals were the
+// ones flying the same brand, and almost nobody met the "several" threshold.
+// The shrinkage target comes from the universe too, so a Rating means the same
+// thing whatever filter is on - otherwise picking a weak sailmaker would raise
+// everyone's rating by lowering the average they are pulled toward.
+function boatForm(rows, universe) {
+  const divBoats = {};   // race-division -> the boats in it
+  const attended = {};   // boat -> the regatta-seasons it turned up to
+  (universe || rows).forEach(r => {
+    const div = r.e.race_id + '|' + (r.e.class || '');
+    (divBoats[div] ||= new Set()).add(r.b.id);
+    (attended[r.b.id] ||= new Set()).add(r.regatta.id + ':' + r.year);
+  });
+
+  const byBoat = {};
+  rows.forEach(r => {
+    const g = (byBoat[r.b.id] ||= { b: r.b, n: 0, byYear: {}, races: 0, firsts: 0,
+                                    wsum: 0, wf: 0, solo: 0, unscored: 0,
+                                    divs: [], rgs: new Set() });
+    g.n++;
+    g.byYear[r.year] = (g.byYear[r.year] || 0) + 1;
+    g.rgs.add(r.regatta.id + ':' + r.year);
+    if (r.pos == null) { g.unscored++; return; }
+    // no fleet size means the race cannot be read, and a fleet of one means
+    // there was nobody to beat. Neither is evidence; both are reported.
+    if (!(r.e.fleet >= 2)) { g.solo++; return; }
+    const w = Math.min(r.e.fleet - 1, FLEET_CAP);
+    const f = (r.e.fleet - r.pos) / (r.e.fleet - 1);
+    g.races++; g.wsum += w; g.wf += w * f;
+    g.divs.push(r.e.race_id + '|' + (r.e.class || ''));
+    if (r.pos === 1) g.firsts++;
+  });
+
+  const all = Object.values(byBoat);
+  const raced = all.filter(g => g.races > 0);
+  // the average a boat is pulled toward is the whole fleet's, not the
+  // selection's - see the note on `universe` above
+  let sw = 0, swf = 0;
+  (universe || rows).forEach(r => {
+    if (r.pos == null || !(r.e.fleet >= 2)) return;
+    const w = Math.min(r.e.fleet - 1, FLEET_CAP);
+    sw += w; swf += w * ((r.e.fleet - r.pos) / (r.e.fleet - 1));
+  });
+  const mean = sw ? swf / sw : 0.5;
+  raced.forEach(g => {
+    g.beat = g.wf / g.wsum;
+    g.form = (g.wf + FORM_PRIOR * mean) / (g.wsum + FORM_PRIOR);
+    g.winPct = g.firsts / g.races;
+    // The user's brief: "measured performance across the entirety of the
+    // regattas several of its competitors have competed in". A competitor is a
+    // boat this one has actually raced against more than once, not anyone who
+    // shared a start line with it one afternoon - counting single meetings made
+    // every boat in a mixed IRC fleet a rival and ballooned the circuit to
+    // meaninglessness. The circuit is then the regatta-seasons that SEVERAL of
+    // those rivals turned up to.
+    const met = {};
+    g.divs.forEach(d => divBoats[d].forEach(id => {
+      if (id !== g.b.id) met[id] = (met[id] || 0) + 1;
+    }));
+    const rivals = Object.keys(met).filter(id => met[id] >= RIVAL_MEETS);
+    const seen = {};
+    rivals.forEach(id => (attended[id] || new Set()).forEach(k => { seen[k] = (seen[k] || 0) + 1; }));
+    const circuit = Object.keys(seen).filter(k => seen[k] >= RIVALS_SEVERAL);
+    g.rivals = rivals.length;
+    g.circuit = circuit.length;
+    g.onCircuit = circuit.filter(k => g.rgs.has(k)).length;
+  });
+  return { all, raced, mean };
+}
 
 function analysisRows() {
   // one flat row per entry, already joined to season / club / class
@@ -3056,14 +3177,12 @@ function renderAnalysis() {
     `<option value="${esc(v)}" ${cur === v ? 'selected' : ''}>${esc(v)}</option>`).join('');
 
   // ---- per-boat rollup ----
-  const byBoat = {};
-  rows.forEach(r => {
-    const g = (byBoat[r.b.id] ||= { b: r.b, n: 0, byYear: {}, places: [], podium: 0, scored: 0 });
-    g.n++;
-    g.byYear[r.year] = (g.byYear[r.year] || 0) + 1;
-    if (r.pos != null) { g.scored++; g.places.push(r.pos); if (r.pos <= 3) g.podium++; }
-  });
-  const boats = Object.values(byBoat);
+  // the date window only: who a boat races against, and the average it is
+  // measured against, must not move when a sailmaker or type is picked
+  const universe = all.filter(r => (!ANALYSIS.from || r.year >= ANALYSIS.from)
+                                && (!ANALYSIS.to || r.year <= ANALYSIS.to));
+  const form = boatForm(rows, universe);
+  const boats = form.all;
   const nBoats = boats.length;
 
   // 1. attendance
@@ -3079,22 +3198,30 @@ function renderAnalysis() {
       <td><span style="display:inline-block;height:8px;border-radius:2px;background:var(--series-north);width:${Math.max(3, g.n / maxN * 100)}%"></span></td>
     </tr>`).join('') + '</tbody></table>';
 
-  // 2. most successful - podium RATE, not raw wins, or the biggest fleets win
-  //    by arithmetic. A minimum race count stops a single lucky result topping it.
-  const succ = boats.filter(g => g.scored >= ANALYSIS.minRaces)
-    .map(g => ({ ...g, rate: g.podium / g.scored,
-                 avg: g.places.reduce((a, c) => a + c, 0) / g.places.length }))
-    .sort((a, b) => b.rate - a.rate || a.avg - b.avg).slice(0, 15);
+  // 2. most successful - see boatForm() for why this is not a podium rate.
+  //    The shrinkage already stops a short record topping the table outright,
+  //    but under a narrow filter a single race could still surface at number
+  //    two, which reads exactly like the problem this panel was rebuilt to
+  //    fix. So both: a floor on races AND the shrinkage. A boat on the floor
+  //    can reach about 81; an established one reaches 90+.
+  const succ = form.raced.filter(g => g.races >= ANALYSIS.minRaces)
+    .slice().sort((a, b) => b.form - a.form || b.races - a.races).slice(0, 15);
+  const soloTotal = form.raced.reduce((a, g) => a + g.solo, 0);
   const succBody = succ.length ? `<table><thead><tr><th>Boat</th><th>Type</th><th>Sailmaker</th>
-      <th class="num">Scored</th><th class="num">Podiums</th><th class="num">Podium rate</th><th class="num">Avg finish</th></tr></thead><tbody>` +
+      <th class="num">Races</th><th class="num">1sts</th><th class="num">Win %</th>
+      <th class="num">Fleet beaten</th><th class="num">Circuit</th><th class="num">Rating</th></tr></thead><tbody>` +
     succ.map(g => `<tr class="clickable" data-route="#/boat/${g.b.id}">
       <td><strong>${esc(g.b.boat_name || '—')}</strong> <span class="muted">${esc(g.b.sail_no || '')}</span></td>
       <td>${esc(g.b.boat_type || '')}</td>
       <td class="sm-cell">${smSelect(g.b, 'sailmaker')}</td>
-      <td class="num">${g.scored}</td><td class="num">${g.podium}</td>
-      <td class="num">${Math.round(g.rate * 100)}%</td>
-      <td class="num">${g.avg.toFixed(1)}</td></tr>`).join('') + '</tbody></table>'
-    : '<p class="muted" style="padding:0 20px 16px;">No boat has enough scored races in this selection.</p>';
+      <td class="num">${g.races}</td>
+      <td class="num"><strong>${g.firsts}</strong></td>
+      <td class="num">${Math.round(g.winPct * 100)}%</td>
+      <td class="num">${Math.round(g.beat * 100)}%</td>
+      <td class="num" title="Regatta-seasons sailed, out of those ${g.rivals} boats it races against regularly turned up to">${
+        g.circuit ? g.onCircuit + ' / ' + g.circuit : '—'}</td>
+      <td class="num">${(g.form * 100).toFixed(1)}</td></tr>`).join('') + '</tbody></table>'
+    : '<p class="muted" style="padding:0 20px 16px;">No boat in this selection has a result in a fleet of more than one.</p>';
 
   // 3. movers - first half of the window against the second
   const mid = Math.floor((ANALYSIS.from + ANALYSIS.to) / 2);
@@ -3232,7 +3359,17 @@ function renderAnalysis() {
     </div>
     ${warn}
     ${panel('Boat attendance', 'Most active boats in the selection. Activity is the buying signal - a boat that sails is a boat that wears sails out.', attendBody)}
-    ${panel('Most successful boats', `Ranked on podium rate, not raw wins - raw wins just find the biggest fleets. Minimum ${ANALYSIS.minRaces} scored races. 58% of entries carry a finishing position, so this covers the races where results were recorded.`, succBody)}
+    ${panel('Most successful boats', `<strong>Fleet beaten</strong> is the share of the fleet a boat
+      finishes ahead of, averaged over its races: a win in a fleet of 24 beats 23 boats and scores
+      100%, a win in a fleet of 2 beats one boat and counts for very little. <strong>Rating</strong>
+      is that number pulled toward the ${Math.round(form.mean * 100)}% fleet average in proportion to
+      how little racing there is to judge on, and is what the table is sorted by — so two good results
+      cannot outrank a season of them. <strong>Circuit</strong> is how many regatta-seasons the boat
+      sailed out of those its regular rivals turned up to. Minimum ${ANALYSIS.minRaces} counting races.<br>
+      A result in a fleet of one is not counted: it beat nobody.
+      ${soloTotal ? `<strong>${soloTotal}</strong> such result${soloTotal === 1 ? ' is' : 's are'} excluded here` : 'None appear'}
+      — they are a scraping artefact, and counting them is what used to put a mid-fleet boat at the top
+      of this table on six 1st places it won against an empty course.`, succBody)}
     ${panel('Movers', 'Change in race count between the halves of the window. A boat falling away has been sold or laid up; one climbing is campaigning, and campaigns buy sails.', moversBody)}
     ${panel('Recent ownership changes', 'A new owner is the best moment to sell a full inventory. Derived from the names boats raced under, so it lags a private sale.', ownBody)}
     ${panel('Fleet strength', 'Sorted by how many boats in each fleet we cannot identify. That last column is the size of the conversation nobody has had yet.', fleetBody)}
@@ -5865,7 +6002,8 @@ function regattaEntriesFor(regattaId, year, classFilter) {
       races++;
       if (e.class) cls.add(e.class);
       const pos = parseInt(e.position, 10);
-      if (!isNaN(pos) && pos > 0 && (best === null || pos < best)) best = pos;
+      // a 1st in a fleet of one beat nobody and is not a best finish
+      if (!isNaN(pos) && pos > 0 && e.fleet >= 2 && (best === null || pos < best)) best = pos;
       if (!sm && e.sailmaker_name) sm = e.sailmaker_name;
     });
     if (races) out.push({ boat: b, races, best, classes: cls, sailmaker: sm || b.current_sailmaker });

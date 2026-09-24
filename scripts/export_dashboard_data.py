@@ -7,6 +7,7 @@ import re
 import sys
 import json
 import sqlite3
+import collections
 import datetime
 
 def main():
@@ -300,6 +301,39 @@ def main():
               f"same boat was scored again under an aggregate class (IRC/ORC Overall, "
               f"Double Handed, Generation JOG...), keeping the most specific division; "
               f"{len(emptied)} race row(s) left holding nothing")
+
+    # ---- how big was the fleet? -------------------------------------------
+    # A finishing position means nothing without the size of the fleet it was
+    # scored in, and until now nothing carried that. THE BODFATHER, a mid-fleet
+    # Cape 31, topped "most successful boats" on six 1st places - every one of
+    # them in a race whose recorded fleet is ONE BOAT. 100 of the 2,509 first
+    # places in the export were won against nobody.
+    #
+    # Counted HERE, in the gap between two filters, and that position is the
+    # whole point:
+    #   - AFTER the aggregate dedupe above, so a boat scored twice in one race
+    #     (its division and again on IRC Overall) is counted once, and the
+    #     number is the size of the division it actually raced in.
+    #   - BEFORE the IRC filter below, so it counts everyone who was on the
+    #     water, not just the boats this tool keeps. Deriving it in the browser
+    #     from the exported entries instead would understate 18% of divisions
+    #     and INVENT 68 one-boat races out of divisions that had a real fleet -
+    #     which would flatter every boat in them, since a smaller apparent
+    #     fleet makes any given position look better.
+    #
+    # Stamped onto the entry rather than shipped as a lookup table because the
+    # IRC filter relabels some classes further down: carried on the entry, the
+    # count survives that untouched. Only scored entries carry it - an entry
+    # list with no results cannot contribute to a finishing record anyway.
+    fleet_of = collections.Counter(
+        (e["race_id"], e["class"]) for e in entries_rows)
+    entries_rows = [dict(e) for e in entries_rows]
+    for e in entries_rows:
+        if e["position"] is not None:
+            e["fleet"] = fleet_of[(e["race_id"], e["class"])]
+    solo = sum(1 for e in entries_rows if e.get("fleet") == 1)
+    print(f"  fleet sizes: {len(fleet_of)} race-divisions counted before the IRC filter; "
+          f"{solo} scored entr(y/ies) sit in a division of one and carry no evidence")
 
     # ---- IRC-only scope ----------------------------------------------------
     # This tool tracks the IRC fleet. Pure one-design boats (XOD, Squib,

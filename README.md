@@ -88,6 +88,41 @@ silently overwriting a maker moves the market-share numbers.
 
 Then rebuild (the three commands above) and the event appears in the dashboard.
 
+## How "most successful boats" is measured
+
+A finishing position means nothing without the size of the fleet it was scored
+in. Until this was fixed, the Analysis page ranked boats on podium rate, and
+THE BODFATHER - a mid-fleet Cape 31 whose finishes against real fleets run
+4, 2, 12, 6, 13, 6, 10, 19, 16, 9, 13, 6, 10, 18, 24, 5, 19, 17 - came top on
+six 1st places, every one of them in a race where it was the only entry.
+100 of the 2,509 first places in the export were won in a division of one.
+
+So the unit is the **share of the fleet beaten**, `(fleet - position) / (fleet - 1)`:
+
+| column | meaning |
+| --- | --- |
+| **1sts** | first places, in a fleet of more than one |
+| **Win %** | those firsts over the races that count |
+| **Fleet beaten** | share of the fleet finished ahead of, averaged over its races |
+| **Circuit** | regatta-seasons sailed, out of those its regular rivals turned up to |
+| **Rating** | Fleet beaten, pulled toward the 53% fleet average by how little racing there is to judge on. The sort key. |
+
+Three deliberate choices, each made after the obvious version failed on real data:
+
+- **A race is weighted by its fleet, but the weight saturates at 20.** Summing
+  boats-beaten straight let one 89-boat pursuit race outweigh forty-three
+  one-design races and put a two-race boat third.
+- **Rivals must have raced you at least 3 times.** Counting a single shared
+  start line made every boat in a mixed IRC fleet a rival and inflated one
+  boat's circuit to 161 regatta-seasons.
+- **Ratings shrink toward the whole fleet's average, not the selection's.**
+  Otherwise filtering to a weak sailmaker would raise everyone's rating.
+
+Fleet size is counted in `export_dashboard_data.py`, after the aggregate-class
+dedupe and **before** the IRC filter. It cannot be derived in the browser:
+doing so understates 18% of divisions and invents 68 one-boat races out of
+divisions that had a real fleet, which flatters every boat in them.
+
 ## Current state & honest limitations
 
 - **147 boats**, **184 boat-level race entries**, **695 aggregate historical
