@@ -107,12 +107,28 @@ def norm_sm(s):
     return "Other"
 
 
-def read_rows(path):
-    """-> list of dicts on the canonical field names."""
+def read_rows(path, sheet=None):
+    """-> list of dicts on the canonical field names.
+
+    `sheet` names the tab to read. These workbooks routinely carry one tab per
+    season - "Les Voiles de Saint-Tropez" ships a 2026 tab and a 2025 tab - and
+    reading worksheets[0] regardless would quietly load whichever year happened
+    to be leftmost into whatever year --year claims.
+    """
     path = pathlib.Path(path)
     if path.suffix.lower() in (".xlsx", ".xls"):
         from openpyxl import load_workbook
-        ws = load_workbook(path, read_only=True, data_only=True).worksheets[0]
+        wb = load_workbook(path, read_only=True, data_only=True)
+        if sheet:
+            if sheet not in wb.sheetnames:
+                sys.exit("no sheet named %r - this file has: %s"
+                         % (sheet, ", ".join(wb.sheetnames)))
+            ws = wb[sheet]
+        else:
+            if len(wb.sheetnames) > 1:
+                print("  note: %d sheets (%s); reading %r. Use --sheet to pick another."
+                      % (len(wb.sheetnames), ", ".join(wb.sheetnames), wb.sheetnames[0]))
+            ws = wb.worksheets[0]
         grid = [list(r) for r in ws.iter_rows(values_only=True)]
     else:
         # Hand-kept CSVs come out of Excel as cp1252 far more often than UTF-8;
@@ -167,6 +183,8 @@ def main():
     ap.add_argument("file")
     ap.add_argument("--regatta", required=True)
     ap.add_argument("--year", type=int, required=True)
+    ap.add_argument("--sheet", default=None,
+                    help="worksheet to read; these workbooks often hold one tab per season")
     ap.add_argument("--segment", default=None,
                     help="Grand Prix | Premier Race | Race | One-Design | Classic | Cruise | Premier Cruise")
     ap.add_argument("--country", default=None)
@@ -178,7 +196,7 @@ def main():
     ap.add_argument("--dry-run", action="store_true")
     a = ap.parse_args()
 
-    rows = read_rows(a.file)
+    rows = read_rows(a.file, a.sheet)
     print(f"read {len(rows)} entry rows from {pathlib.Path(a.file).name}")
 
     dbp = pathlib.Path(a.db)

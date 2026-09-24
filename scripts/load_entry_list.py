@@ -29,6 +29,7 @@ Usage:
 """
 import sys
 import argparse
+import csv
 import sqlite3
 import pathlib
 import datetime
@@ -49,24 +50,65 @@ HEADERS = {
 }
 
 
-def read_sheet(path, sheet=None):
+def read_grid(path, sheet=None):
+    """-> (sheet names, rows). Reads .xlsx/.xlsm/.xls, or a .csv.
+
+    The dashboard hands this script whatever the organiser sent, and that is a
+    CSV about as often as it is a workbook - openpyxl-only meant the command the
+    page generates simply could not open half of them.
+    """
+    path = pathlib.Path(path)
+    if path.suffix.lower() not in (".xlsx", ".xlsm", ".xls"):
+        # Hand-kept CSVs come out of Excel as cp1252 far more often than UTF-8;
+        # decoding one as the other is what turns Sebastien into S<?>bastien.
+        raw = path.read_bytes()
+        text = None
+        for enc in ("utf-8-sig", "cp1252", "latin-1"):
+            try:
+                text = raw.decode(enc)
+                break
+            except UnicodeDecodeError:
+                continue
+        if text is None:
+            sys.exit("could not decode %s as text" % path.name)
+        if sheet:
+            print("  note: --sheet %r ignored, %s is not a workbook" % (sheet, path.name))
+        return [], [list(r) for r in csv.reader(text.splitlines())]
+
     import openpyxl
     wb = openpyxl.load_workbook(path, data_only=True)
-    ws = wb[sheet] if sheet else wb.worksheets[0]
-    rows = [list(r) for r in ws.iter_rows(values_only=True)]
+    if sheet:
+        if sheet not in wb.sheetnames:
+            sys.exit("no sheet named %r - this file has: %s"
+                     % (sheet, ", ".join(wb.sheetnames)))
+        ws = wb[sheet]
+    else:
+        # one tab per season is the norm in these workbooks, and silently taking
+        # the leftmost one loads the wrong year under whatever --year claims
+        if len(wb.sheetnames) > 1:
+            print("  note: %d sheets (%s); reading %r. Use --sheet to pick another."
+                  % (len(wb.sheetnames), ", ".join(wb.sheetnames), wb.sheetnames[0]))
+        ws = wb.worksheets[0]
+    return wb.sheetnames, [list(r) for r in ws.iter_rows(values_only=True)]
+
+
+def read_sheet(path, sheet=None):
+    names, rows = read_grid(path, sheet)
     # the header is the first row carrying two or more non-empty cells
     h = 0
     while h < len(rows) and sum(1 for c in rows[h] if str(c or "").strip()) < 2:
         h += 1
+    if h >= len(rows):
+        sys.exit("no header row found in %s - is this an entry list?" % pathlib.Path(path).name)
     head = [str(c or "").strip().lower().replace("\n", " ") for c in rows[h]]
     idx = {}
-    for key, names in HEADERS.items():
+    for key, names_ in HEADERS.items():
         for i, col in enumerate(head):
-            if any(col.startswith(n) for n in names):
+            if any(col.startswith(n) for n in names_):
                 idx[key] = i
                 break
     body = [r for r in rows[h + 1:] if any(str(c or "").strip() for c in r)]
-    return wb.sheetnames, idx, body
+    return names, idx, body
 
 
 def cell(row, idx, key):

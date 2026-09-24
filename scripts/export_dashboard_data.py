@@ -23,8 +23,12 @@ def main():
     owners = [dict(r) for r in cur.execute("SELECT id, name, is_charter_operator FROM owners")]
     owner_by_id = {o["id"]: o for o in owners}
 
+    # venue travels with the regatta, not only inside `facts` below: the entry-list
+    # matcher names the place a regatta is held ("Saint-Tropez, FRA") and lets you
+    # filter the event finder by it, and facts carries only the regattas that have
+    # entries in a season.
     regattas = [dict(r) for r in cur.execute(
-        "SELECT id, name, category, region, segment, country FROM regattas ORDER BY name")]
+        "SELECT id, name, category, region, segment, country, venue FROM regattas ORDER BY name")]
 
     # --- Segments -------------------------------------------------------------
     # Computed straight off the database, BEFORE the IRC filter further down.

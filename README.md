@@ -45,6 +45,49 @@ python3 scripts/build_dashboard.py
 
 Third command produces `dashboard/dashboard.html` - the file to open/share.
 
+## Loading an event's entry list
+
+Open the dashboard, go to **Entry list**, and drop the organiser's spreadsheet on
+the page. Everything up to the last step happens in the browser and writes
+nothing.
+
+The page identifies which event the list belongs to, using four independent
+signals and showing you each one it used:
+
+| signal | where it comes from |
+| --- | --- |
+| regatta name | the filename, with brackets, years and "marketshare" stripped |
+| season | the sheet tab, which in these workbooks is usually the year |
+| dates | the date range in the filename's brackets, e.g. `[27th Sept - 5th October]` |
+| fleet | how many of the matched boats have raced that regatta before |
+
+Name matching weights rare words over common ones, so "Les Voiles de
+Saint-Tropez" is not confused with "Les Voiles d'Antibes" despite sharing three
+words out of five. Across the 379-workbook corpus this identifies 84% of files
+outright; the rest open an **event finder** (search by name, filter by month,
+location and season) or, if the event is genuinely new, a card that writes the
+`load_marketshare_csv.py` command for you.
+
+It deliberately falls through to the finder rather than guessing when two
+regattas match equally well - which is usually a sign the database holds the
+same regatta twice, and worth fixing before loading anything into either copy.
+
+Picking an event produces the command that does the write. Run it from the
+project directory:
+
+```
+python scripts/load_entry_list.py db/marketshare.db "<the file>" \
+  --regatta "Les Voiles de Saint-Tropez" --year 2026 --sheet "2026" --dry-run
+```
+
+`--sheet` matters: these workbooks routinely carry one tab per season, and
+without it the loader reads whichever tab is leftmost. Drop `--dry-run` to
+write. The sheet's own Sailmaker column is reported but **not** imported unless
+you add `--import-sailmakers` - it sometimes disagrees with what we hold, and
+silently overwriting a maker moves the market-share numbers.
+
+Then rebuild (the three commands above) and the event appears in the dashboard.
+
 ## Current state & honest limitations
 
 - **147 boats**, **184 boat-level race entries**, **695 aggregate historical
