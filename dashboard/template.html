@@ -3046,13 +3046,29 @@ const ANALYSIS = { sailmaker: '', type: '', club: '', from: 0, to: 0, minRaces: 
 // already strong evidence; beating 88 in a mixed handicap fleet is not four
 // times stronger.
 //
+// EVENT_SOFT - and one REGATTA is not a whole record. IONA came third on nine
+// races that are two Cowes Weeks and nothing else; AGUILA came first with
+// twelve of its nineteen races from a single Warsash series. The user's brief
+// was performance "across the entirety of the regattas several of its
+// competitors have competed in", and a boat that sailed two of them has not
+// answered it. So a regatta's weight grows as a square root beyond this point:
+// a twelve-race series still counts for more than a three-race one, but not
+// four times more. A hard cap was tried first and flattened that difference
+// away entirely.
+//
 // PRIOR - the rate is pulled toward the fleet-wide average by a fixed weight,
 // so a boat with two results cannot top the table on them. This replaces a hard
-// minimum race count, which threw away real boats to exclude flukes. The top of
-// the table is stable across PRIOR 20, 40 and 80 - the same boats in a slightly
-// different order - so the ranking is not an artefact of the number.
+// minimum race count, which threw away real boats to exclude flukes.
+//
+// An earlier version of this comment claimed the ranking was stable across
+// PRIOR 20, 40 and 80. That was measured before the damping above existed and
+// it was too narrow a range to be worth much: the median boat carries about 40
+// weight units, so a prior of 40 is one median record and 20 barely shrinks at
+// all. 60 is about one and a half. The numbers below were chosen by running the
+// whole 2022-2026 window and reading the resulting table, not by reasoning.
 const FLEET_CAP = 20;
-const FORM_PRIOR = 40;
+const EVENT_SOFT = 20;
+const FORM_PRIOR = 60;
 const RIVAL_MEETS = 3;     // races shared before another boat counts as a rival
 const RIVALS_SEVERAL = 3;  // "regattas SEVERAL of its competitors have competed in"
 
@@ -3075,36 +3091,59 @@ function boatForm(rows, universe) {
     (attended[r.b.id] ||= new Set()).add(r.regatta.id + ':' + r.year);
   });
 
-  const byBoat = {};
-  rows.forEach(r => {
-    const g = (byBoat[r.b.id] ||= { b: r.b, n: 0, byYear: {}, races: 0, firsts: 0,
-                                    wsum: 0, wf: 0, solo: 0, unscored: 0,
-                                    divs: [], rgs: new Set() });
-    g.n++;
-    g.byYear[r.year] = (g.byYear[r.year] || 0) + 1;
-    g.rgs.add(r.regatta.id + ':' + r.year);
-    if (r.pos == null) { g.unscored++; return; }
-    // no fleet size means the race cannot be read, and a fleet of one means
-    // there was nobody to beat. Neither is evidence; both are reported.
-    if (!(r.e.fleet >= 2)) { g.solo++; return; }
-    const w = Math.min(r.e.fleet - 1, FLEET_CAP);
-    const f = (r.e.fleet - r.pos) / (r.e.fleet - 1);
-    g.races++; g.wsum += w; g.wf += w * f;
-    g.divs.push(r.e.race_id + '|' + (r.e.class || ''));
-    if (r.pos === 1) g.firsts++;
-  });
+  // Banked per boat per EVENT first, then damped, because the damping is what
+  // stops one regatta being a whole record and it can only be applied once the
+  // regatta's races are all in.
+  function accumulate(set) {
+    const out = {};
+    set.forEach(r => {
+      const g = (out[r.b.id] ||= { b: r.b, n: 0, byYear: {}, races: 0, firsts: 0,
+                                   ev: {}, wsum: 0, wf: 0, solo: 0, unscored: 0,
+                                   divs: [], rgs: new Set() });
+      g.n++;
+      g.byYear[r.year] = (g.byYear[r.year] || 0) + 1;
+      g.rgs.add(r.regatta.id + ':' + r.year);
+      if (r.pos == null) { g.unscored++; return; }
+      // no fleet size means the race cannot be read, and a fleet of one means
+      // there was nobody to beat. Neither is evidence; both are reported.
+      if (!(r.e.fleet >= 2)) { g.solo++; return; }
+      const w = Math.min(r.e.fleet - 1, FLEET_CAP);
+      // Clamped. `fleet` is widened to the highest finishing place recorded in
+      // the division before it is exported, so a position above it should no
+      // longer occur - but a share of the fleet beaten below 0 or above 1 is
+      // meaningless whatever the data does, and unbounded it once produced a
+      // rating of -101 and a "beat -3400% of the fleet".
+      const f = Math.max(0, Math.min(1, (r.e.fleet - r.pos) / (r.e.fleet - 1)));
+      const ev = (g.ev[r.eventId] ||= { w: 0, wf: 0 });
+      ev.w += w; ev.wf += w * f;
+      g.races++;
+      g.divs.push(r.e.race_id + '|' + (r.e.class || ''));
+      if (r.pos === 1) g.firsts++;
+    });
+    let sw = 0, swf = 0;
+    Object.values(out).forEach(g => {
+      Object.values(g.ev).forEach(e => {
+        if (!e.w) return;
+        // square root past EVENT_SOFT: a twelve-race series at one venue still
+        // counts for more than a three-race one, but not four times more
+        const eff = e.w > EVENT_SOFT ? EVENT_SOFT * Math.sqrt(e.w / EVENT_SOFT) : e.w;
+        const s = eff / e.w;
+        g.wsum += e.w * s; g.wf += e.wf * s;
+      });
+      sw += g.wsum; swf += g.wf;
+    });
+    return { byBoat: out, mean: sw ? swf / sw : 0.5 };
+  }
+
+  const table = accumulate(rows);
+  const byBoat = table.byBoat;
+  // The average a boat is pulled toward is the whole fleet's, not the
+  // selection's - see the note on `universe` above. It is measured on the SAME
+  // damped weights the boats carry, or the anchor would not be on their scale.
+  const mean = (universe && universe !== rows) ? accumulate(universe).mean : table.mean;
 
   const all = Object.values(byBoat);
   const raced = all.filter(g => g.races > 0);
-  // the average a boat is pulled toward is the whole fleet's, not the
-  // selection's - see the note on `universe` above
-  let sw = 0, swf = 0;
-  (universe || rows).forEach(r => {
-    if (r.pos == null || !(r.e.fleet >= 2)) return;
-    const w = Math.min(r.e.fleet - 1, FLEET_CAP);
-    sw += w; swf += w * ((r.e.fleet - r.pos) / (r.e.fleet - 1));
-  });
-  const mean = sw ? swf / sw : 0.5;
   raced.forEach(g => {
     g.beat = g.wf / g.wsum;
     g.form = (g.wf + FORM_PRIOR * mean) / (g.wsum + FORM_PRIOR);
@@ -3138,8 +3177,10 @@ function analysisRows() {
     const ra = racesById[e.race_id]; if (!ra) return;
     const ev = eventsById[ra.event_id]; if (!ev) return;
     const rg = regattasById[ev.regatta_id]; if (!rg) return;
+    // eventId, not regatta id: the damping in boatForm is per EDITION, so two
+    // Cowes Weeks in different years are two separate bodies of evidence
     out.push({ b, e, year: ev.season_year || 0, club: seriesOf(rg), regatta: rg,
-               cls: normClass(e.class) || '', pos: e.position });
+               eventId: ev.id, cls: normClass(e.class) || '', pos: e.position });
   }));
   return out;
 }
@@ -3366,7 +3407,9 @@ function renderAnalysis() {
       how little racing there is to judge on, and is what the table is sorted by — so two good results
       cannot outrank a season of them. <strong>Circuit</strong> is how many regatta-seasons the boat
       sailed out of those its regular rivals turned up to. Minimum ${ANALYSIS.minRaces} counting races.<br>
-      A result in a fleet of one is not counted: it beat nobody.
+      One regatta counts as one regatta: a twelve-race series at a single venue is worth more than a
+      three-race one, but not four times more, so a boat cannot top this on one good week.
+      A result in a fleet of one is not counted either — it beat nobody.
       ${soloTotal ? `<strong>${soloTotal}</strong> such result${soloTotal === 1 ? ' is' : 's are'} excluded here` : 'None appear'}
       — they are a scraping artefact, and counting them is what used to put a mid-fleet boat at the top
       of this table on six 1st places it won against an empty course.`, succBody)}

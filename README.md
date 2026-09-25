@@ -107,21 +107,50 @@ So the unit is the **share of the fleet beaten**, `(fleet - position) / (fleet -
 | **Circuit** | regatta-seasons sailed, out of those its regular rivals turned up to |
 | **Rating** | Fleet beaten, pulled toward the 53% fleet average by how little racing there is to judge on. The sort key. |
 
-Three deliberate choices, each made after the obvious version failed on real data:
+Five deliberate choices, each made after the obvious version failed on real
+data. Four of the five were found by an adversarial pass that was asked to name
+a boat the metric ranked wrongly, not by reasoning about the formula:
 
 - **A race is weighted by its fleet, but the weight saturates at 20.** Summing
   boats-beaten straight let one 89-boat pursuit race outweigh forty-three
   one-design races and put a two-race boat third.
+- **One regatta counts as one regatta.** A regatta's weight grows as a square
+  root past 20 units, so a twelve-race series is worth more than a three-race
+  one but not four times more. Without it IONA came 3rd on nine races that were
+  two Cowes Weeks, and AGUILA came 1st with twelve of its nineteen races from a
+  single Warsash series.
 - **Rivals must have raced you at least 3 times.** Counting a single shared
   start line made every boat in a mixed IRC fleet a rival and inflated one
   boat's circuit to 161 regatta-seasons.
 - **Ratings shrink toward the whole fleet's average, not the selection's.**
   Otherwise filtering to a weak sailmaker would raise everyone's rating.
+- **The share of the fleet beaten is clamped to 0–100%.** It is arithmetically
+  bounded only if `fleet` is honest, and it was not: see below.
 
 Fleet size is counted in `export_dashboard_data.py`, after the aggregate-class
 dedupe and **before** the IRC filter. It cannot be derived in the browser:
 doing so understates 18% of divisions and invents 68 one-boat races out of
 divisions that had a real fleet, which flatters every boat in them.
+
+Two things the export has to repair before the number means anything:
+
+- **The count of entries we hold is a lower bound on the fleet, not the fleet.**
+  A scrape that captured 18 boats of a 98-boat race leaves 18, so 254 of 6,232
+  scored divisions recorded a finishing position above their own fleet size and
+  `(fleet - position)` went negative without limit — 61st in a "fleet of 18"
+  read as beating -253% of the fleet, and one such row threw WITH ALACRITY, a
+  boat with 21 firsts, off the table entirely. The fleet is now widened to the
+  highest finishing place recorded in that division: somebody finished 98th, so
+  at least 98 boats started.
+- **RORC publishes its two-handed season points as a regatta of its own.**
+  Regatta 103 "IRC Two-Handed" holds 32 races and 869 entries, all class-less,
+  every one a copy of a real RORC race that season. The existing dedupe keys on
+  (event, race name, boat) so it never fired, and because the copy carried the
+  bigger fleet it outweighed the class result it duplicated: five copies were
+  41% of CORA's record and put it 5th. The rule now also drops the aggregate
+  side of a cross-regatta duplicate, but only where the race name is
+  distinctive — widening the key for everything would merge 588 groups where
+  two genuinely different divisions share a name like "Season Standings".
 
 ## Current state & honest limitations
 

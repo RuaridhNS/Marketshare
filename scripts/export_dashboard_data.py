@@ -302,6 +302,64 @@ def main():
               f"Double Handed, Generation JOG...), keeping the most specific division; "
               f"{len(emptied)} race row(s) left holding nothing")
 
+    # ---- the same race scored again under a class-shaped REGATTA -----------
+    # The rule above keys on (event, race name, boat), so it only catches the
+    # duplication INSIDE one event. RORC also publishes its two-handed season
+    # points as what looks like a regatta of its own: regatta 103 "IRC
+    # Two-Handed" holds 32 races and 869 entries, every one with a NULL class,
+    # and every race name is a real RORC race that already exists under its own
+    # regatta that season.
+    #
+    # Left in, CORA's 2022 Cervantes Trophy is three rows - IRC Overall, IRC 3,
+    # and the two-handed copy - and only the first two collapse. Worse, the
+    # survivor is the BIGGER fleet, so the phantom copy of a race outweighed the
+    # class result it duplicated: five such copies carried 41% of CORA's entire
+    # record and put it 5th on the success table for racing it only did once.
+    #
+    # Deliberately narrow. Widening the key to (season, race name, boat) for
+    # everything would merge 588 groups where two GENUINELY different divisions
+    # share a name - "Season Standings" and "Entry List" recur across regattas -
+    # so a row is only dropped when it is the aggregate side of the pair, the
+    # name is distinctive, and a real division for that boat exists elsewhere.
+    generic_name = re.compile(
+        r"^(race|day|r|heat)\s*\d*$|^season standings$|^standings$|^entry list$|^\d+$",
+        re.I)
+    season_of = {e["id"]: e["season_year"] for e in events}
+    regatta_of = {e["id"]: e["regatta_id"] for e in events}
+    race_meta = {r["id"]: (r["event_id"], (r["race_name"] or "").strip()) for r in races}
+
+    groups = {}
+    for i, e in enumerate(entries_rows):
+        meta = race_meta.get(e["race_id"])
+        if not meta:
+            continue
+        ev_id, nm = meta
+        if not nm or generic_name.match(nm):
+            continue
+        key = (season_of.get(ev_id), nm.lower(), e["boat_id"])
+        groups.setdefault(key, []).append((i, regatta_of.get(ev_id), specificity(e["class"])))
+
+    cross_dropped = 0
+    drop = set()
+    for members in groups.values():
+        if len(members) < 2:
+            continue
+        if len({rg for _, rg, _ in members}) < 2:
+            continue                      # same regatta: the rule above owns it
+        if not any(sp == 0 for _, _, sp in members):
+            continue                      # no real division to prefer
+        for i, _, sp in members:
+            if sp > 0:                    # aggregate or class-less copy
+                drop.add(i)
+                cross_dropped += 1
+    if drop:
+        entries_rows = [e for i, e in enumerate(entries_rows) if i not in drop]
+        still_used = {e["race_id"] for e in entries_rows}
+        races = [r for r in races if r["id"] in still_used or r["id"] not in had_entries_before]
+        print(f"  one race one regatta: dropped {cross_dropped} entr(y/ies) where a race was "
+              f"scored a second time under a class-shaped regatta (RORC 'IRC Two-Handed' and "
+              f"the like) and the boat's real division already records it")
+
     # ---- how big was the fleet? -------------------------------------------
     # A finishing position means nothing without the size of the fleet it was
     # scored in, and until now nothing carried that. THE BODFATHER, a mid-fleet
@@ -325,15 +383,36 @@ def main():
     # IRC filter relabels some classes further down: carried on the entry, the
     # count survives that untouched. Only scored entries carry it - an entry
     # list with no results cannot contribute to a finishing record anyway.
-    fleet_of = collections.Counter(
-        (e["race_id"], e["class"]) for e in entries_rows)
+    # The count of entries we hold is a LOWER BOUND on the fleet, never the
+    # fleet itself - a scrape that captured 18 boats of a 98-boat race leaves
+    # 18. So the highest finishing place recorded in a division is used when it
+    # is larger: somebody finished 98th, so there were at least 98 boats. Both
+    # numbers are lower bounds; the bigger one is the better estimate.
+    #
+    # Without this, 254 of 6,232 scored divisions score a position ABOVE their
+    # own fleet size, which makes (fleet - position) negative and unbounded -
+    # 61st in a "fleet of 18" reads as beating -253% of the fleet. That one row
+    # was enough to throw WITH ALACRITY, a boat with 21 firsts, off the table
+    # entirely, and to drag the fleet-wide average every other boat is measured
+    # against.
+    fleet_of = collections.Counter((e["race_id"], e["class"]) for e in entries_rows)
+    max_pos = {}
+    for e in entries_rows:
+        p = e["position"]
+        if isinstance(p, int) and p > 0:
+            k = (e["race_id"], e["class"])
+            if p > max_pos.get(k, 0):
+                max_pos[k] = p
+    widened = sum(1 for k, n in fleet_of.items() if max_pos.get(k, 0) > n)
     entries_rows = [dict(e) for e in entries_rows]
     for e in entries_rows:
         if e["position"] is not None:
-            e["fleet"] = fleet_of[(e["race_id"], e["class"])]
+            k = (e["race_id"], e["class"])
+            e["fleet"] = max(fleet_of[k], max_pos.get(k, 0))
     solo = sum(1 for e in entries_rows if e.get("fleet") == 1)
     print(f"  fleet sizes: {len(fleet_of)} race-divisions counted before the IRC filter; "
-          f"{solo} scored entr(y/ies) sit in a division of one and carry no evidence")
+          f"{widened} widened to the highest finishing place recorded (we hold fewer boats "
+          f"than actually sailed); {solo} scored entr(y/ies) sit in a division of one")
 
     # ---- IRC-only scope ----------------------------------------------------
     # This tool tracks the IRC fleet. Pure one-design boats (XOD, Squib,
