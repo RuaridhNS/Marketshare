@@ -7,17 +7,36 @@
 <style>
   :root {
     color-scheme: light;
-    --surface-1:      #fcfcfb;
-    --surface-2:      #f1f0ec;   /* raised panels, hover, chips */
-    --page:           #f9f9f7;
-    --text-primary:   #0b0b0b;
-    --text-secondary: #52514e;
-    --text-muted:     #898781;
-    --gridline:       #e1e0d9;
-    --baseline:       #c3c2b7;
-    --border:         rgba(11,11,11,0.10);
-    --success:        #006300;
-    --card-shadow:    0 1px 2px rgba(11,11,11,0.06), 0 1px 1px rgba(11,11,11,0.04);
+    /* Blue-and-white, shared with the IRC Predictor
+       (IRC_Predictor/irc_sailmaker_dashboard_v1.html) so the two tools read as
+       one family. --navy is chrome, --accent is the interactive blue. Keep UI
+       furniture on these two and leave the --series-* ramp below to mean
+       sailmaker and nothing else; before this, active nav borrowed
+       --series-north, which made the chrome look like a data value. */
+    --navy:           #003d6b;
+    --accent:         #0063a6;
+    --accent-ink:     #ffffff;
+    --accent-soft:    rgba(0,99,166,0.10);
+
+    --surface-1:      #ffffff;
+    --surface-2:      #ecf1f7;   /* raised panels, hover, chips */
+    --page:           #f6f8fb;
+    --text-primary:   #0b1e33;
+    --text-secondary: #586c7e;
+    --text-muted:     #8296a8;
+    --gridline:       #e3eaf2;
+    --baseline:       #c3d0de;
+    --border:         rgba(0,61,107,0.16);
+    --success:        #0e7c3a;
+    --warn:           #9e4707;
+    --card-shadow:    0 1px 3px rgba(0,61,107,0.09), 0 6px 18px -8px rgba(0,61,107,0.18);
+
+    /* Sidebar is the navy block the Predictor wears as its header bar. */
+    --rail:           #003d6b;
+    --rail-text:      rgba(255,255,255,0.78);
+    --rail-text-hi:   #ffffff;
+    --rail-hover:     rgba(255,255,255,0.10);
+    --rail-border:    rgba(255,255,255,0.14);
 
     --series-north:    #2563eb;
     --series-doyle:    #eab308;
@@ -29,26 +48,42 @@
     --series-other:    #71717a;
     --series-partial:  #0d9488;
     --series-unknown-text: #292524;
-    --globe-sea:   #dbeafe;
-    --globe-land:  #e8e6df;
-    --globe-coast: #a8a599;
-    --globe-grid:  rgba(11,11,11,0.07);
-    --globe-ring:  rgba(11,11,11,0.35);
+    --globe-sea:   #dce8f5;
+    --globe-land:  #eef2f7;
+    --globe-coast: #9fb3c8;
+    --globe-grid:  rgba(0,61,107,0.08);
+    --globe-ring:  rgba(0,61,107,0.32);
   }
   @media (prefers-color-scheme: dark) {
     :root {
       color-scheme: dark;
-      --surface-1:      #1a1a19;
-      --surface-2:      #262624;   /* raised panels, hover, chips */
-      --page:           #0d0d0d;
-      --text-primary:   #ffffff;
-      --text-secondary: #c3c2b7;
-      --text-muted:     #898781;
-      --gridline:       #2c2c2a;
-      --baseline:       #383835;
-      --border:         rgba(255,255,255,0.10);
-      --success:        #0ca30c;
-      --card-shadow:    0 1px 2px rgba(0,0,0,0.4);
+      /* The Predictor is light-only. Rather than drop dark mode, the same
+         navy runs through it: surfaces are tints of #003d6b instead of the
+         neutral greys, so a colleague whose OS is dark still gets this
+         family rather than a different product. */
+      --navy:           #00253f;
+      --accent:         #4aa3e0;
+      --accent-ink:     #04192b;
+      --accent-soft:    rgba(74,163,224,0.16);
+
+      --surface-1:      #0f2438;
+      --surface-2:      #16304a;   /* raised panels, hover, chips */
+      --page:           #08182a;
+      --text-primary:   #f2f7fc;
+      --text-secondary: #a9c0d4;
+      --text-muted:     #7c96ac;
+      --gridline:       #1d3a55;
+      --baseline:       #2a4c6b;
+      --border:         rgba(255,255,255,0.12);
+      --success:        #35b86a;
+      --warn:           #d98324;
+      --card-shadow:    0 1px 2px rgba(0,0,0,0.45);
+
+      --rail:           #061d31;
+      --rail-text:      rgba(255,255,255,0.72);
+      --rail-text-hi:   #ffffff;
+      --rail-hover:     rgba(255,255,255,0.09);
+      --rail-border:    rgba(255,255,255,0.10);
 
       --series-north:    #4f83f1;
       --series-doyle:    #f0c33a;
@@ -60,9 +95,9 @@
       --series-other:    #9a999a;
       --series-partial:  #22b6a6;
       --series-unknown-text: #1c1917;
-      --globe-sea:   #0f2033;
-      --globe-land:  #2a2a26;
-      --globe-coast: #565349;
+      --globe-sea:   #081d30;
+      --globe-land:  #1d3348;
+      --globe-coast: #4a6a88;
       --globe-grid:  rgba(255,255,255,0.07);
       --globe-ring:  rgba(255,255,255,0.45);
     }
@@ -78,21 +113,25 @@
   .app { display: flex; min-height: 100vh; }
 
   .sidebar {
-    width: 220px; flex: none; background: var(--surface-1);
-    border-right: 1px solid var(--border); padding: 20px 12px;
+    width: 220px; flex: none; background: var(--rail); color: var(--rail-text);
+    border-right: 1px solid var(--rail-border); padding: 20px 12px;
     position: sticky; top: 0; height: 100vh; overflow-y: auto;
   }
+  .sidebar .brand { color: var(--rail-text-hi); }
+  .sidebar .brand small,
+  .sidebar .build-stamp { color: var(--rail-text); }
+  .sidebar .nav-group { color: rgba(255,255,255,0.55); }
   .brand { font-weight: 700; font-size: 15px; padding: 0 10px 18px; letter-spacing: -0.01em; }
   .build-stamp { font-family: ui-monospace, Consolas, monospace; font-size: 10px !important;
     letter-spacing: .02em; opacity: .85; margin-top: 5px !important; }
   .brand small { display:block; color: var(--text-muted); font-weight: 500; font-size: 11px; margin-top: 2px;}
   .nav-item {
     display: block; padding: 9px 10px; border-radius: 8px; margin-bottom: 2px;
-    color: var(--text-secondary); text-decoration: none; font-size: 13.5px; font-weight: 500;
+    color: var(--rail-text); text-decoration: none; font-size: 13.5px; font-weight: 500;
     cursor: pointer;
   }
-  .nav-item:hover { background: var(--gridline); color: var(--text-primary); }
-  .nav-item.active { background: var(--series-north); color: white; }
+  .nav-item:hover { background: var(--rail-hover); color: var(--rail-text-hi); }
+  .nav-item.active { background: var(--accent); color: var(--accent-ink); font-weight: 600; }
   .nav-group { font-size: 10.5px; font-weight: 700; letter-spacing: .1em;
     text-transform: uppercase; color: var(--text-muted); padding: 16px 10px 5px; }
 
@@ -133,13 +172,13 @@
   .kv { display:grid; grid-template-columns: auto 1fr; gap: 6px 14px; font-size: 13.5px; }
   .kv dt { color: var(--text-muted); }
   .kv dd { margin: 0; }
-  .tag-flag { color: var(--series-doyle); font-weight: 600; }
+  .tag-flag { color: var(--warn); font-weight: 600; }
   footer.note { color: var(--text-muted); font-size: 11.5px; margin-top: 40px; border-top: 1px solid var(--gridline); padding-top: 14px; }
   code { background: var(--gridline); padding: 1px 5px; border-radius: 4px; font-size: 12px; }
 
   .nav-badge {
     display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: 999px;
-    background: var(--series-doyle); color: white; font-size: 11px; font-weight: 700;
+    background: var(--warn); color: #ffffff; font-size: 11px; font-weight: 700;
     vertical-align: 1px;
   }
   input[type=number] {
@@ -150,7 +189,7 @@
   .field { margin-bottom: 12px; }
   .field input, .field select { width: 100%; }
   .btn {
-    display: inline-flex; align-items: center; gap: 6px; background: var(--series-north); color: white;
+    display: inline-flex; align-items: center; gap: 6px; background: var(--accent); color: var(--accent-ink);
     border: none; border-radius: 8px; padding: 8px 14px; font-size: 13px; font-weight: 600;
     cursor: pointer; font-family: inherit;
   }
@@ -159,8 +198,8 @@
   .btn.danger { background: var(--series-unknown); }
   .btn-row { display:flex; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
   .edited-flag {
-    display:inline-block; margin-left: 6px; font-size: 10.5px; font-weight: 700; color: var(--series-doyle);
-    border: 1px solid var(--series-doyle); border-radius: 999px; padding: 1px 7px; text-transform: uppercase;
+    display:inline-block; margin-left: 6px; font-size: 10.5px; font-weight: 700; color: var(--warn);
+    border: 1px solid var(--warn); border-radius: 999px; padding: 1px 7px; text-transform: uppercase;
     letter-spacing: 0.03em; vertical-align: 1px;
   }
   .filter-panel summary {
@@ -192,7 +231,7 @@
   th.clickable-axis, td.clickable-axis {
     cursor: pointer; text-decoration: underline dotted; text-underline-offset: 3px;
   }
-  th.clickable-axis:hover, td.clickable-axis:hover { color: var(--series-north); }
+  th.clickable-axis:hover, td.clickable-axis:hover { color: var(--accent); }
   /* <dialog> centers itself via a top/right/bottom/left inset trick in the UA
      stylesheet that author CSS can't cleanly override once showModal() promotes
      it to the top layer - so instead the dialog itself is a transparent,
@@ -244,14 +283,14 @@
 .tree-name{font-weight:600;flex:1 1 240px;}
 .tree-meta{display:flex;gap:14px;flex-wrap:wrap;align-items:center;
   font-size:12px;color:var(--text-muted);}
-.tree-open{font-size:12px;font-weight:600;text-decoration:none;color:var(--series-north,#1b4f6e);
+.tree-open{font-size:12px;font-weight:600;text-decoration:none;color:var(--accent,#0063a6);
   white-space:nowrap;}
 .tree-kids{display:flex;flex-direction:column;padding:2px 12px 12px 30px;gap:2px;}
 .tree-leaf{
   display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;text-decoration:none;
   color:inherit;padding:6px 10px;border-radius:5px;border-left:2px solid var(--border);
 }
-.tree-leaf:hover{background:var(--surface-2);border-left-color:var(--series-north,#1b4f6e);}
+.tree-leaf:hover{background:var(--surface-2);border-left-color:var(--accent,#0063a6);}
 .tree-leaf-name{font-weight:500;flex:1 1 200px;}
 .tree-leaf-meta{font-size:12px;color:var(--text-muted);font-variant-numeric:tabular-nums;}
 .tree-empty{padding:8px 10px;font-size:12.5px;color:var(--text-muted);margin:0;}
@@ -278,8 +317,8 @@
 .sales-save { padding: 5px 12px; font-size: 12px; }
 .sales-save[disabled] { opacity: .55; cursor: default; }
 tr.sales-dirty > td { background: var(--surface-2); }
-tr.sales-dirty > td:first-child { box-shadow: inset 3px 0 0 var(--series-doyle); }
-tr.sales-saved > td:first-child { box-shadow: inset 3px 0 0 var(--series-quantum); }
+tr.sales-dirty > td:first-child { box-shadow: inset 3px 0 0 var(--warn); }
+tr.sales-saved > td:first-child { box-shadow: inset 3px 0 0 var(--success); }
 
 /* deeper tree: Club > Year > Event > Class > boat */
 .tree-year > summary .tree-name { font-family: "IBM Plex Mono", ui-monospace, monospace;
@@ -297,7 +336,7 @@ tr.sales-saved > td:first-child { box-shadow: inset 3px 0 0 var(--series-quantum
   color:var(--text-muted); font-weight:600; }
 .analysis-filters select { min-width:130px; }
 .callout-warn { background:var(--surface-1); border:1px solid var(--border);
-  border-left:3px solid var(--series-doyle); border-radius:0 8px 8px 0;
+  border-left:3px solid var(--warn); border-radius:0 8px 8px 0;
   padding:12px 16px; margin-bottom:14px; font-size:13px; color:var(--text-secondary); }
 .callout-warn strong { color:var(--text-primary); }
 
@@ -321,14 +360,14 @@ tr.sales-saved > td:first-child { box-shadow: inset 3px 0 0 var(--series-quantum
   font-size: 12.5px; color: var(--text-muted); }
 .br-meta { font-size: 12px; color: var(--text-muted); }
 .br-open { font-size: 12px; font-weight: 600; text-decoration: none;
-  color: var(--series-north); white-space: nowrap; margin-left: auto; }
+  color: var(--accent); white-space: nowrap; margin-left: auto; }
 .boat-races { display: flex; flex-direction: column; gap: 2px; padding: 2px 8px 10px 26px; }
 .boat-race {
   display: grid; grid-template-columns: minmax(120px,1.5fr) minmax(80px,1fr) 70px 1fr 1fr;
   gap: 10px; align-items: baseline; text-decoration: none; color: inherit;
   padding: 5px 10px; border-radius: 5px; border-left: 2px solid var(--border);
 }
-.boat-race:hover { background: var(--surface-2); border-left-color: var(--series-north); }
+.boat-race:hover { background: var(--surface-2); border-left-color: var(--accent); }
 .boat-race-name { font-weight: 500; }
 .boat-race-meta { font-size: 12px; color: var(--text-muted);
   font-variant-numeric: tabular-nums; }
