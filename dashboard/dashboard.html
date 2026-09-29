@@ -70,9 +70,10 @@
     --series-other:    #71717a;
     --series-partial:  #0d9488;
     --series-unknown-text: #292524;
-    --globe-sea:   #dce8f5;
-    --globe-land:  #eef2f7;
-    --globe-coast: #9fb3c8;
+    --globe-sea:   #a6c9e2;   /* ocean */
+    --globe-land:  #ddd6bd;   /* land: warm and earthy, but NOT green - the
+                                 share bubbles drawn on top are green */
+    --globe-coast: #ab9f80;
     --globe-grid:  rgba(0,61,107,0.08);
     --globe-ring:  rgba(0,61,107,0.32);
   }
@@ -118,14 +119,16 @@
       --series-other:    #9a999a;
       --series-partial:  #22b6a6;
       --series-unknown-text: #1c1917;
-      --globe-sea:   #081d30;
-      --globe-land:  #1d3348;
-      --globe-coast: #4a6a88;
+      --globe-sea:   #0d2a44;   /* night ocean */
+      --globe-land:  #3b3a2c;   /* dark earth */
+      --globe-coast: #6e6a4f;
       --globe-grid:  rgba(255,255,255,0.07);
       --globe-ring:  rgba(255,255,255,0.45);
     }
   }
   * { box-sizing: border-box; }
+  /* form controls do not inherit the page font on their own */
+  input, select, textarea, button { font-family: 'Proxima Nova', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-variant-numeric: tabular-nums; }
   html, body { margin: 0; padding: 0; }
   body {
     background: var(--page);
@@ -149,7 +152,7 @@
   .logo { font-weight: 600; font-size: 22px; letter-spacing: .2px; color: #ffffff; }
   .logo span { font-size: 12px; letter-spacing: .3px; color: rgba(255,255,255,.72);
     margin-left: 10px; font-weight: 400; }
-  .hdr-stamp { margin-left: auto; font-family: ui-monospace, Consolas, monospace;
+  .hdr-stamp { margin-left: auto; font-family: 'Proxima Nova', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-variant-numeric: tabular-nums;
     font-size: 10.5px; letter-spacing: .02em; color: rgba(255,255,255,.72); }
 
   .sidebar {
@@ -158,7 +161,7 @@
     position: sticky; top: 56px; height: calc(100vh - 56px); overflow-y: auto;
   }
   .brand { font-weight: 700; font-size: 15px; padding: 0 10px 18px; letter-spacing: -0.01em; }
-  .build-stamp { font-family: ui-monospace, Consolas, monospace; font-size: 10px !important;
+  .build-stamp { font-family: 'Proxima Nova', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-variant-numeric: tabular-nums; font-size: 10px !important;
     letter-spacing: .02em; opacity: .85; margin-top: 5px !important; }
   .brand small { display:block; color: var(--text-muted); font-weight: 500; font-size: 11px; margin-top: 2px;}
   .nav-item {
@@ -218,7 +221,8 @@
   .kv dd { margin: 0; }
   .tag-flag { color: var(--warn); font-weight: 600; }
   footer.note { color: var(--text-muted); font-size: 11.5px; margin-top: 40px; border-top: 1px solid var(--gridline); padding-top: 14px; }
-  code { background: var(--gridline); padding: 1px 5px; border-radius: 4px; font-size: 12px; }
+  code { background: var(--gridline); padding: 1px 5px; border-radius: 4px; font-size: 12px;
+    font-family: 'Proxima Nova', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
 
   .nav-badge {
     display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: 999px;
@@ -264,7 +268,7 @@
   .regatta-checklist .cat-heading:first-child { margin-top: 0; }
   .regatta-checklist label { display:flex; align-items:center; gap: 7px; font-size: 13px; padding: 3px 0; cursor: pointer; }
   textarea.csv-box {
-    width: 100%; min-height: 140px; font-family: ui-monospace, "SF Mono", Consolas, monospace; font-size: 12px;
+    width: 100%; min-height: 140px; font-family: 'Proxima Nova', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 12px;
     background: var(--page); border: 1px solid var(--border); border-radius: 8px; padding: 10px; color: var(--text-primary);
     resize: vertical;
   }
@@ -365,7 +369,7 @@ tr.sales-dirty > td:first-child { box-shadow: inset 3px 0 0 var(--warn); }
 tr.sales-saved > td:first-child { box-shadow: inset 3px 0 0 var(--success); }
 
 /* deeper tree: Club > Year > Event > Class > boat */
-.tree-year > summary .tree-name { font-family: "IBM Plex Mono", ui-monospace, monospace;
+.tree-year > summary .tree-name { font-family: 'Proxima Nova', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-variant-numeric: tabular-nums;
   font-variant-numeric: tabular-nums; letter-spacing: .02em; }
 .tree-year > .tree-kids { padding-left: 18px; }
 .tree-class > summary .tree-name { font-weight: 500; }
@@ -400,7 +404,7 @@ tr.sales-saved > td:first-child { box-shadow: inset 3px 0 0 var(--success); }
 .boat-regatta[open] > summary::before { transform: rotate(90deg); }
 .boat-regatta > summary:hover { background: var(--surface-2); }
 .br-name { font-weight: 600; flex: 1 1 200px; }
-.br-year { font-family: "IBM Plex Mono", monospace; font-variant-numeric: tabular-nums;
+.br-year { font-family: 'Proxima Nova', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-variant-numeric: tabular-nums;
   font-size: 12.5px; color: var(--text-muted); }
 .br-meta { font-size: 12px; color: var(--text-muted); }
 .br-open { font-size: 12px; font-weight: 600; text-decoration: none;
@@ -576,7 +580,7 @@ tr.enrich-miss > td:first-child { box-shadow: inset 3px 0 0 var(--series-doyle);
 .ex-lead:hover, .cmp-group:hover, .ov-mode:hover { background: var(--gridline); color: var(--text-primary); }
 .ex-lead.on, .cmp-group.on, .ov-mode.on { background: var(--series-north); color: #fff; }
 .ov-mode { padding: 9px 20px; font-size: 13px; }
-.ex-hier { font-family: var(--f-m, ui-monospace), Consolas, monospace; font-size: 12.5px;
+.ex-hier { font-family: 'Proxima Nova', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-variant-numeric: tabular-nums; font-size: 12.5px;
   font-weight: 600; letter-spacing: .02em; color: var(--text-primary); }
 .tree-leaf.clickable { cursor: pointer; }
 .globe-zoom { display: flex; align-items: center; gap: 8px; margin-top: 10px;
@@ -2429,7 +2433,7 @@ function renderPendingChanges() {
         ? '— keeps its own entries; only the named ones move'
         : '— will be removed, history moved to the keeper'}</span></td>
       <td><input type="text" data-merge-only="${merge.id}" value="${esc(m.onlyNamed||'')}"
-                 placeholder="(all entries)" style="font-family:monospace;font-size:12px;padding:2px 5px;width:150px;"></td>
+                 placeholder="(all entries)" style="font-size:12px;padding:2px 5px;width:150px;"></td>
       <td>${esc(m.notes||'')}</td>
       <td><button class="btn secondary" type="button" data-discard-merge="${merge.id}">Discard</button></td>
     </tr>`;
@@ -2466,7 +2470,7 @@ function renderPendingChanges() {
         <button class="btn secondary" type="button" id="download-tl-csv-btn">Download CSV</button>
       </div>
       <textarea id="tl-csv-box" readonly rows="4"
-        style="width:100%;margin-top:10px;font-family:monospace;font-size:12px;">${esc(tlCsv)}</textarea>
+        style="width:100%;margin-top:10px;font-size:12px;">${esc(tlCsv)}</textarea>
       <p class="muted" style="font-size:12px;">Apply with
         <code>python3 scripts/apply_owner_timeline.py db/marketshare.db timelines.csv</code></p>
     </div>` : '';
@@ -2655,7 +2659,7 @@ function renderDuplicates() {
       ${boatOptions}
       <label style="display:block;font-size:13px;margin:10px 0 4px;">Move only entries named
         <input type="text" data-only-named="${esc(g.key)}" value="${esc(shared)}" placeholder="(all entries)"
-               style="font-family:monospace;font-size:12.5px;padding:3px 6px;margin-left:6px;width:220px;">
+               style="font-size:12.5px;padding:3px 6px;margin-left:6px;width:220px;">
         <span class="muted">— leave blank to move the whole record</span>
       </label>
       <div class="btn-row">
