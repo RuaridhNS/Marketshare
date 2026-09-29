@@ -11,6 +11,7 @@ import re
 import os
 import sys
 import shutil
+import datetime
 import tempfile
 import subprocess
 import json
@@ -91,6 +92,19 @@ def main(split=False):
 
     if "/*__DATA_JSON_B64GZ__*/" not in template:
         raise SystemExit("Placeholder not found in template.html")
+
+    # WHEN THIS PAGE WAS BUILT, which is not the same as when its data was
+    # exported. The sidebar stamp used to show data.json's generated_at and
+    # call it "Built", so a day of theme changes shipped under a frozen
+    # timestamp - and that stamp is the one thing telling a reader whether the
+    # copy in front of them is current. publish.py even promises "a stale copy
+    # is visible at a glance". It was not.
+    if "/*__BUILT_AT__*/" in template:
+        template = template.replace("/*__BUILT_AT__*/",
+                                    datetime.datetime.now().isoformat(timespec="seconds"))
+    else:
+        print("  note: no /*__BUILT_AT__*/ placeholder in the template - the "
+              "page will fall back to the data's export time")
 
     check_js(template)
 

@@ -678,16 +678,34 @@ if (b64) {
   }
 }
 
+// Two different times, and conflating them cost an afternoon. BUILT_AT is when
+// build_dashboard.py made THIS page; DATA.generated_at is when
+// export_dashboard_data.py last read the database. A theme change moves the
+// first and not the second, so a stamp showing only generated_at sits still
+// while the page changes under it - which is exactly backwards, because the
+// stamp exists to tell a reader whether their copy is the current one.
 const _stamp = document.getElementById('build-stamp');
-if (_stamp && DATA.generated_at) {
-  const d = new Date(DATA.generated_at);
-  _stamp.textContent = 'Built ' + d.toLocaleDateString(undefined,
-      { day: 'numeric', month: 'short', year: 'numeric' }) +
-    ' ' + d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
-  const days = (Date.now() - d.getTime()) / 864e5;
-  if (days > 21) {            // stale enough to be worth questioning
-    _stamp.textContent += '  — ' + Math.round(days) + ' days old';
-    _stamp.style.color = 'var(--flag-text)';
+if (_stamp) {
+  const raw = '/*__BUILT_AT__*/';
+  // unsubstituted placeholder means the page was opened straight from the
+  // template rather than built; fall back rather than print an Invalid Date
+  const built = raw.indexOf('__BUILT_AT__') === -1 ? new Date(raw) : null;
+  const shown = built && !isNaN(built) ? built
+              : (DATA.generated_at ? new Date(DATA.generated_at) : null);
+  if (shown) {
+    _stamp.textContent = 'Built ' + shown.toLocaleDateString(undefined,
+        { day: 'numeric', month: 'short', year: 'numeric' }) +
+      ' ' + shown.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+  }
+  // Data age is its own question: a page rebuilt today can still be showing
+  // results nobody has refreshed in a month, and that is worth flagging
+  // whatever the build time says.
+  if (DATA.generated_at) {
+    const days = (Date.now() - new Date(DATA.generated_at).getTime()) / 864e5;
+    if (days > 21) {          // stale enough to be worth questioning
+      _stamp.textContent += '  — data ' + Math.round(days) + ' days old';
+      _stamp.style.color = 'var(--flag-text)';
+    }
   }
 }
 
