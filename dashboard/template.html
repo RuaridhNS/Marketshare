@@ -37,9 +37,13 @@
     /* Surfaces exactly as the Predictor sets them: the PAGE is white and the
        panels are the tint, not the other way round. --surface-2 is its --bg3,
        the recessed fill behind inputs. */
-    --surface-1:      #f6f8fb;   /* cards and panels     (Predictor --bg2) */
-    --surface-2:      #ecf1f7;   /* inputs, hover, chips (Predictor --bg3) */
-    --page:           #ffffff;   /* body                 (Predictor --bg)  */
+    --surface-1:      #ffffff;   /* cards and panels - white, separated from
+                                    the page by border and shadow rather than
+                                    by a fill */
+    --surface-2:      #eef3f9;   /* inputs, hover, chips - the only tinted
+                                    surface left, so a field still reads as a
+                                    recess against all that white */
+    --page:           #ffffff;   /* body */
     --text-primary:   #0b1e33;
     --text-secondary: #586c7e;
     --text-muted:     #8296a8;
@@ -55,7 +59,7 @@
 
     /* The navy is the TOP BAR, as in the Predictor - not the sidebar, which
        was my own invention and is why the first attempt did not look like it. */
-    --rail:           #f6f8fb;
+    --rail:           #ffffff;
     --rail-text:      #586c7e;
     --rail-text-hi:   #0b1e33;
     --rail-hover:     #ecf1f7;
