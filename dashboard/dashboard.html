@@ -48,7 +48,8 @@
     --border:         rgba(0,61,107,0.16);
     --border-strong:  rgba(0,99,166,0.55);
     --success:        #0e7c3a;
-    --warn:           #9e4707;
+    --warn:           #9e4707;   /* amber TEXT on a light ground */
+    --warn-fill:      #f2c94c;   /* amber FILL under dark text */
     /* the Predictor's --shadow, inset highlight and all */
     --card-shadow:    0 1px 0 rgba(255,255,255,.7) inset, 0 1px 3px rgba(0,61,107,.09), 0 6px 18px -8px rgba(0,61,107,.18);
 
@@ -101,6 +102,7 @@
       --border-strong:  rgba(74,163,224,0.65);
       --success:        #35b86a;
       --warn:           #d98324;
+      --warn-fill:      #f0c33a;
       --card-shadow:    0 1px 2px rgba(0,0,0,0.45);
 
       --rail:           #0f2438;
@@ -226,7 +228,7 @@
 
   .nav-badge {
     display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: 999px;
-    background: var(--warn); color: #ffffff; font-size: 11px; font-weight: 700;
+    background: var(--warn-fill); font-size: 11px; font-weight: 700;
     vertical-align: 1px;
   }
   input[type=number] {
