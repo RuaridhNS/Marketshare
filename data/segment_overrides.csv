@@ -14,3 +14,4 @@ rc ?44|\b44 ?cup\b,Grand Prix,RC44 circuit
 clubswan 50|swan 50,Grand Prix,ClubSwan 50 circuit
 sardinia cup,Grand Prix,"Not in the database yet - no results captured. Kept here so it lands in the right segment the day it is."
 (?<!vice )admiral's cup,Grand Prix,"The RORC Admiral's Cup. NOT the Vice Admiral's Cup, which is a different Solent inshore regatta. A \b guard does NOT separate the two - 'Vice Admiral's Cup' contains 'Admiral's Cup' at a word boundary - so this needs the negative lookbehind."
+rorc caribbean 600,Premier Race,"Carried over from the '2026 RORC Caribbean 600' record folded into this one in data/regatta_merges.csv. That record held the segment and the surviving one held none, so without this line the fold would have quietly dropped it."
