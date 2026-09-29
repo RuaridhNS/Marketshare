@@ -143,6 +143,14 @@ def main():
         # showing three seasons when the database holds fifteen.
         ("Promote RORC races out of season buckets",
          ["promote_rorc_races.py", "--file", "data/rorc_race_regattas.csv"], "rorc promote"),
+        # Immediately before the merges, because a rename is what CREATES the
+        # correctly-named record a merge row then folds duplicates into. Where
+        # every record of a series carries a year - "2025 J70 European
+        # Championship" against "J70 European Championship 2026 Barcelona" -
+        # there is no keeper until one of them is renamed, so run the other way
+        # round the merge has nothing to aim at.
+        ("Rename regattas",
+         ["rename_regattas.py", "--file", "data/regatta_renames.csv"], "regatta renames"),
         ("Merge regattas", ["merge_regattas.py", "--file", "data/regatta_merges.csv"], "regatta merges"),
 
         # Class labels decide race identity - races are keyed on (event, race
