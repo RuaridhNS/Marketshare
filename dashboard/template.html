@@ -73,55 +73,13 @@
     --globe-grid:  rgba(0,61,107,0.08);
     --globe-ring:  rgba(0,61,107,0.32);
   }
-  @media (prefers-color-scheme: dark) {
-    :root {
-      color-scheme: dark;
-      /* Dark mode keeps the same family rather than reverting to neutral
-         greys: surfaces are tints of the same navy, so a colleague whose OS is
-         dark gets this product rather than a different one. */
-      --brand:          #00253f;
-      --accent:         #4aa3e0;
-      --accent-ink:     #04192b;
-      --accent-soft:    rgba(74,163,224,0.16);
+  /* NO DARK MODE, deliberately. The IRC TCC Dashboard is light-only - it has
+     no prefers-color-scheme rule anywhere and declares color-scheme:light -
+     so a dark-mode block here is precisely what stops the two pages looking
+     like one product: on a machine set to dark this page went navy-on-navy
+     while the TCC dashboard stayed white. :root declares color-scheme: light
+     above, which also keeps form controls light. */
 
-      --surface-1:      #0f2438;
-      --surface-2:      #16304a;   /* raised panels, hover, chips */
-      --page:           #08182a;
-      --text-primary:   #f2f7fc;
-      --text-secondary: #a9c0d4;
-      --text-muted:     #7c96ac;
-      --gridline:       #1d3a55;
-      --baseline:       #2a4c6b;
-      --border:         rgba(255,255,255,0.12);
-      --border-strong:  rgba(74,163,224,0.65);
-      --success:        #35b86a;
-      --warn:           #d98324;
-      --warn-fill:      #f0c33a;
-      --card-shadow:    0 1px 2px rgba(0,0,0,0.45);
-
-      --rail:           #0f2438;
-      --rail-text:      rgba(255,255,255,0.72);
-      --rail-text-hi:   #ffffff;
-      --rail-hover:     rgba(255,255,255,0.09);
-      --rail-border:    rgba(255,255,255,0.10);
-
-      --series-north:    #4f83f1;
-      --series-doyle:    #f0c33a;
-      --series-quantum:  #2fbf63;
-      --series-one:      #ef4444;
-      --series-sanders:  #9767f0;
-      --series-elvstrom: #fb7f36;
-      --series-unknown:  #e7e5e4;
-      --series-other:    #9a999a;
-      --series-partial:  #22b6a6;
-      --series-unknown-text: #1c1917;
-      --globe-sea:   #0d2a44;   /* night ocean */
-      --globe-land:  #3b3a2c;   /* dark earth */
-      --globe-coast: #6e6a4f;
-      --globe-grid:  rgba(255,255,255,0.07);
-      --globe-ring:  rgba(255,255,255,0.45);
-    }
-  }
   * { box-sizing: border-box; }
   /* form controls do not inherit the page font on their own */
   input, select, textarea, button { font-family: 'Proxima Nova', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-variant-numeric: tabular-nums; }
@@ -345,14 +303,11 @@
    which reads as invisible; used as a badge background with white text it
    fails the same way from the other side. Both now use a contrast-safe pair:
    a dark amber for text on light, the yellow kept only as a fill under dark
-   text. The dashboard themes on prefers-color-scheme, and the artifact viewer
-   also stamps data-theme, so both are covered. */
+   text. The page is light-only, so the dark and data-theme variants this rule
+   used to carry are gone with the dark palette - a light-amber flag on a white
+   card was the original bug, and leaving those variants in would let a viewer
+   that stamps data-theme="dark" reintroduce it. */
 :root { --flag-text: #8A5A00; }
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) { --flag-text: #F0C33A; }
-}
-:root[data-theme="dark"] { --flag-text: #F0C33A; }
-:root[data-theme="light"] { --flag-text: #8A5A00; }
 .tag-flag { color: var(--flag-text); }
 .nav-badge { color: #292524; }
 
