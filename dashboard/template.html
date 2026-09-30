@@ -2441,7 +2441,7 @@ function renderPendingChanges() {
       <textarea id="tl-csv-box" readonly rows="4"
         style="width:100%;margin-top:10px;font-size:12px;">${esc(tlCsv)}</textarea>
       <p class="muted" style="font-size:12px;">Apply with
-        <code>python3 scripts/apply_owner_timeline.py db/marketshare.db timelines.csv</code></p>
+        <code>python scripts/apply_owner_timeline.py db/marketshare.db timelines.csv</code></p>
     </div>` : '';
 
   return `
@@ -2461,7 +2461,7 @@ function renderPendingChanges() {
       <h2 style="margin-bottom:8px;">What happens next</h2>
       <p style="margin:0 0 8px;">Edits made in the dashboard (sailmaker, owner, TCC, merges, ...) only live in <em>this browser's</em> local storage until they're applied to the real database. Nothing here is final yet — that's why nothing seems to "happen" after you save one.</p>
       <p style="margin:0 0 8px;"><strong>Easiest path:</strong> click "Copy CSV to clipboard" below, then paste that CSV into your chat with Claude and ask it to apply the changes. Claude runs the matching script against the live database and rebuilds the dashboard for you.</p>
-      <p class="muted" style="margin:0;font-size:12.5px;">Prefer to do it yourself? Save the CSV, then run <code>python3 scripts/apply_boat_updates.py db/marketshare.db changes.csv</code> (or <code>merge_boats.py</code> for merges), and rebuild with <code>export_dashboard_data.py</code> + <code>build_dashboard.py</code>.</p>
+      <p class="muted" style="margin:0;font-size:12.5px;">Prefer to do it yourself? Save the CSV, then run <code>python scripts/apply_boat_updates.py db/marketshare.db changes.csv</code> (or <code>merge_boats.py</code> for merges), and rebuild with <code>export_dashboard_data.py</code> + <code>build_dashboard.py</code>.</p>
     </div>
     <div class="card" style="padding:0;overflow:auto;">
       <h2 style="padding:18px 20px 0;">Field edits</h2>
@@ -2491,7 +2491,7 @@ function renderPendingChanges() {
     ${PENDING_MERGES.length ? `
     <div class="card">
       <h2>Export merges as CSV</h2>
-      <p class="muted" style="font-size:12px;margin:0 0 10px;">Run <code>python3 scripts/merge_boats.py db/marketshare.db merges.csv</code> to apply, then rebuild the dashboard.</p>
+      <p class="muted" style="font-size:12px;margin:0 0 10px;">Run <code>python scripts/merge_boats.py db/marketshare.db merges.csv</code> to apply, then rebuild the dashboard.</p>
       <div class="btn-row">
         <button class="btn" type="button" id="copy-merges-csv-btn">Copy CSV to clipboard</button>
         <button class="btn secondary" type="button" id="download-merges-csv-btn">Download merges.csv</button>
@@ -3073,7 +3073,7 @@ function renderRegattasList() {
 
   return `
     <h1>Regattas</h1>
-    <p class="subtitle"><span id="regatta-count">${DATA.regattas.length}</span> events across ${clubs.length} clubs and series,
+    <p class="subtitle"><span id="regatta-count">${DATA.regattas.length}</span> events across ${clubs.length} clubs, series and locations,
       spanning ${DATA.stats.n_events} event-seasons. Open a club, then a season, an event and a class to reach the boats.</p>
     <div class="search-row">
       <input type="text" id="regatta-search" placeholder="Search event or club&hellip;">
@@ -3623,7 +3623,7 @@ function calendarRows() {
 // Filter state for the timeline. Module scope so it survives a re-render:
 // navigate() rebuilds the page on every change, and a filter that reset itself
 // each time you used it would be worse than no filter.
-const CAL = { club: '', category: '', cls: '', season: '', onlyShare: false };
+const CAL = { club: '', category: '', cls: '', season: '', area: '', onlyShare: false };
 
 // One row per EVENT, not per regatta: a timeline is a sequence of things that
 // happened on days, and a regatta is the series they belong to.
@@ -3663,20 +3663,29 @@ function calendarEvents() {
   }).filter(Boolean).filter(x => x.races || x.start);
 }
 
+// Where an event is, for the calendar filter. Country first because that is
+// the question a rep asks; venue when it is all we hold.
+function calArea(rg) {
+  return COUNTRY_NAMES[rg.country] || rg.country || rg.venue || '';
+}
+
 function calendarFacets(rows) {
-  const clubs = {}, cats = {}, classes = {}, seasons = {};
+  const clubs = {}, cats = {}, classes = {}, seasons = {}, areas = {};
   rows.forEach(r => {
     clubs[r.club] = (clubs[r.club] || 0) + 1;
     if (r.rg.category) cats[r.rg.category] = (cats[r.rg.category] || 0) + 1;
     seasons[r.ev.season_year] = (seasons[r.ev.season_year] || 0) + 1;
+    const a = calArea(r.rg);
+    if (a) areas[a] = (areas[a] || 0) + 1;
     r.classes.forEach(c => classes[c] = (classes[c] || 0) + 1);
   });
-  return { clubs, cats, classes, seasons };
+  return { clubs, cats, classes, seasons, areas };
 }
 
 function calendarFiltered(rows) {
   return rows.filter(r =>
     (!CAL.club || r.club === CAL.club) &&
+    (!CAL.area || calArea(r.rg) === CAL.area) &&
     (!CAL.category || r.rg.category === CAL.category) &&
     (!CAL.season || String(r.ev.season_year) === CAL.season) &&
     (!CAL.cls || r.classes.includes(CAL.cls)) &&
@@ -3800,6 +3809,8 @@ function renderCalendar() {
             <select id="cal-club"><option value="">All clubs</option>${opts(facets.clubs, CAL.club)}</select></div>
           <div class="field"><label class="field-label" for="cal-cat">Organiser</label>
             <select id="cal-cat"><option value="">All organisers</option>${opts(facets.cats, CAL.category)}</select></div>
+          <div class="field"><label class="field-label" for="cal-area">Area</label>
+            <select id="cal-area"><option value="">All areas</option>${opts(facets.areas, CAL.area)}</select></div>
           <div class="field"><label class="field-label" for="cal-class">Class</label>
             <select id="cal-class"><option value="">All classes</option>${opts(facets.classes, CAL.cls)}</select></div>
           <div class="field"><label class="field-label" for="cal-season">Season</label>
@@ -3808,9 +3819,10 @@ function renderCalendar() {
             <input type="checkbox" id="cal-only-share"${CAL.onlyShare ? ' checked' : ''}>
             Only events we hold boats for</label>
           <div class="btn-row"><button class="btn secondary" type="button" id="cal-reset">Reset</button></div>
-          <p class="muted" style="font-size:11.5px;margin:12px 0 0;">There is no country filter because
-            there is no country data: all 182 regattas are recorded as Solent, and no venue is stored.
-            Organiser is the nearest real dimension.</p>
+          <p class="muted" style="font-size:11.5px;margin:12px 0 0;">Area is the country where we
+            hold one, the venue where that is all we have. Regattas with neither - travelling class
+            championships, mostly - are left out of that filter rather than guessed at, so choosing
+            an area hides them.</p>
         </div>
       </aside>
       <div class="cal-scroll">
@@ -3833,13 +3845,15 @@ function attachCalendarHandlers() {
   };
   bind('cal-club', 'club');
   bind('cal-cat', 'category');
+  bind('cal-area', 'area');
   bind('cal-class', 'cls');
   bind('cal-season', 'season');
   const only = document.getElementById('cal-only-share');
   if (only) only.addEventListener('change', () => { CAL.onlyShare = only.checked; navigate(); });
   const reset = document.getElementById('cal-reset');
   if (reset) reset.addEventListener('click', () => {
-    CAL.club = CAL.category = CAL.cls = CAL.season = ''; CAL.onlyShare = false; navigate();
+    CAL.club = CAL.category = CAL.cls = CAL.season = CAL.area = '';
+    CAL.onlyShare = false; navigate();
   });
 }
 
@@ -5615,10 +5629,15 @@ function attachGlobeHandlers() {
 const SEGMENT_ORDER = ['Grand Prix','Premier Race','Race','One-Design',
                        'Classic','Cruise','Premier Cruise'];
 const SEGMENT_NOTE = {
-  'Grand Prix':     'Professional circuits and pro-campaign offshore.',
+  'Grand Prix':     'Professional circuits and pro-campaign offshore. Includes the ' +
+                    'grand-prix one-designs - RC44, Cape 31, TP52 - which are one-design ' +
+                    'boats but not club one-design racing, and are classed by who sails ' +
+                    'them rather than by the rule they sail under.',
   'Premier Race':   'The marquee handicap and offshore events.',
   'Race':           'Club, regional and series handicap racing.',
-  'One-Design':     'One-design class racing, keelboat and dinghy.',
+  'One-Design':     'Club and class one-design racing, keelboat and dinghy. Exclusive: a ' +
+                    'regatta is this or it is something else, never both. The grand-prix ' +
+                    'one-design circuits sit under Grand Prix.',
   'Classic':        'Classic, vintage and metre-rule yachts.',
   'Cruise':         'Cruising rallies.',
   'Premier Cruise': 'Superyacht regattas and blue-water rallies.'
