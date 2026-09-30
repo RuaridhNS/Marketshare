@@ -2723,7 +2723,7 @@ function seriesOf(r) {
   // even named "RORC Vice Admiral's Cup"; the third is written
   // "Vice admirals cup/ RTYC", which is why it needs naming here rather
   // than matching on the RORC prefix.
-  if (/fastnet|myth of malham|cervantes|north sea race|roschier|caribbean|transatlantic|vice admiral|RTYC|^RORC|^NSR|easter challenge|inshore series/i.test(n)) return 'RORC';
+  if (/fastnet|myth of malham|cervantes|north sea race|roschier|caribbean 600|transatlantic|vice admiral|RTYC|^RORC|^NSR|easter challenge|inshore series/i.test(n)) return 'RORC';
   if (/^JOG/i.test(n)) return 'JOG';
   // Anything still unmatched falls back to its recorded organiser. Every
   // regatta that reached this point with category RORC came from
@@ -2744,7 +2744,10 @@ function seriesOf(r) {
   // year, and venue is a column on the REGATTA. Naming that branch honestly
   // puts the gap in front of someone who can fill it, which is better than
   // hiding it inside a bucket named after a spreadsheet.
-  if (r.category === 'Marketshare') {
+  // 'Fixture' is a regatta added from data/fixtures.csv - dates published, not
+  // sailed yet - and it groups by area for the same reason: there is no
+  // organising club recorded for it either.
+  if (r.category === 'Marketshare' || r.category === 'Fixture') {
     return COUNTRY_NAMES[r.country] || r.country || r.venue || 'Location not recorded';
   }
   return r.category === 'Club' ? 'Other clubs' : (r.category || 'Other');
@@ -2762,6 +2765,8 @@ const COUNTRY_NAMES = {
   GRC: 'Greece', HRV: 'Croatia', TUR: 'Turkey', BMU: 'Bermuda',
   ATG: 'Antigua', VGB: 'British Virgin Islands', BRA: 'Brazil',
   EST: 'Estonia', MCO: 'Monaco', BLM: 'Saint Barthelemy',
+  SXM: 'Sint Maarten', VIR: 'US Virgin Islands', LCA: 'Saint Lucia',
+  GRD: 'Grenada', BRB: 'Barbados', KNA: 'St Kitts and Nevis',
   ARG: 'Argentina', JPN: 'Japan', HKG: 'Hong Kong', SGP: 'Singapore',
   ZAF: 'South Africa', MEX: 'Mexico', CHN: 'China', POL: 'Poland',
 };
