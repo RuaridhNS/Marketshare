@@ -641,7 +641,7 @@ if (b64) {
 // stamp exists to tell a reader whether their copy is the current one.
 const _stamp = document.getElementById('build-stamp');
 if (_stamp) {
-  const raw = '2026-09-29T17:35:28';
+  const raw = '2026-09-30T17:35:08';
   // unsubstituted placeholder means the page was opened straight from the
   // template rather than built; fall back rather than print an Invalid Date
   const built = raw.indexOf('__BUILT_AT__') === -1 ? new Date(raw) : null;
@@ -2731,8 +2731,40 @@ function seriesOf(r) {
   // Race the Wight series among them - so they belong with the club,
   // not in a generic bucket labelled "Club".
   if (r.category === 'RORC') return 'RORC';
+
+  // The marketshare workbooks have no organiser to group by, so until now all
+  // 299 of them sat under one branch literally called "Marketshare" - the name
+  // of the import, not of anything a reader is looking for. Group them by AREA
+  // instead: the country where the class of regatta has a home, the venue when
+  // that is all we hold.
+  //
+  // 108 of them have no area at all, and that is not an oversight to paper
+  // over. They are travelling class championships - Moth Worlds, 470 Worlds,
+  // OK Worlds, the Finn Gold Cup - which are in a different country every
+  // year, and venue is a column on the REGATTA. Naming that branch honestly
+  // puts the gap in front of someone who can fill it, which is better than
+  // hiding it inside a bucket named after a spreadsheet.
+  if (r.category === 'Marketshare') {
+    return COUNTRY_NAMES[r.country] || r.country || r.venue || 'Location not recorded';
+  }
   return r.category === 'Club' ? 'Other clubs' : (r.category || 'Other');
 }
+
+// ISO-3 to something a reader recognises, for the area branches above. Only
+// the countries the marketshare import actually reaches; anything else falls
+// through to its code, which is still better than "Marketshare".
+const COUNTRY_NAMES = {
+  USA: 'United States', CAN: 'Canada', ESP: 'Spain', ITA: 'Italy',
+  GBR: 'United Kingdom', FRA: 'France', DEU: 'Germany', NLD: 'Netherlands',
+  AUS: 'Australia', NZL: 'New Zealand', SWE: 'Sweden', DNK: 'Denmark',
+  NOR: 'Norway', FIN: 'Finland', IRL: 'Ireland', PRT: 'Portugal',
+  CHE: 'Switzerland', AUT: 'Austria', BEL: 'Belgium', MLT: 'Malta',
+  GRC: 'Greece', HRV: 'Croatia', TUR: 'Turkey', BMU: 'Bermuda',
+  ATG: 'Antigua', VGB: 'British Virgin Islands', BRA: 'Brazil',
+  EST: 'Estonia', MCO: 'Monaco', BLM: 'Saint Barthelemy',
+  ARG: 'Argentina', JPN: 'Japan', HKG: 'Hong Kong', SGP: 'Singapore',
+  ZAF: 'South Africa', MEX: 'Mexico', CHN: 'China', POL: 'Poland',
+};
 
 // Per-regatta rollup used by the list: seasons covered and distinct boats,
 // counted from boat-level entries where we have them and falling back to the
@@ -3000,7 +3032,16 @@ function renderRegattasList() {
           '" data-seasonboats="' + evBoats.size +
           '" data-seasonreported="' + reportedOver(eventsOf(rg.id, yr)) + '">' +
           '<summary><span class="tree-name">' + esc(rg.name) + '</span>' +
-          '<span class="tree-meta">' + countMeta(evBoats.size, reportedOver(eventsOf(rg.id, yr))) +
+          '<span class="tree-meta">' +
+          // Segment on the row, not just buried on the regatta page. It is half
+          // of what the tree is now organised by, so it has to be readable
+          // without opening anything. Unset is said out loud for the same
+          // reason the area branch is: 125 regattas carry no segment.
+          (segmentOf(rg)
+            ? '<span class="pill" style="background:var(--surface-2);color:var(--text-secondary);' +
+              'font-weight:600;">' + esc(segmentOf(rg)) + '</span>'
+            : '<span class="muted" style="font-style:italic;">segment not set</span>') +
+          countMeta(evBoats.size, reportedOver(eventsOf(rg.id, yr))) +
           '<span>' + classes.length + ' class' + (classes.length === 1 ? '' : 'es') + '</span>' +
           shareMeta(Array.from(evBoats)) + '</span>' +
           '<a class="tree-open" href="#/regatta/' + rg.id + '?year=' + yr + '">open &rsaquo;</a></summary>' +
