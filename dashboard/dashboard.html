@@ -641,7 +641,7 @@ if (b64) {
 // stamp exists to tell a reader whether their copy is the current one.
 const _stamp = document.getElementById('build-stamp');
 if (_stamp) {
-  const raw = '2026-09-30T22:02:42';
+  const raw = '2026-09-30T22:14:19';
   // unsubstituted placeholder means the page was opened straight from the
   // template rather than built; fall back rather than print an Invalid Date
   const built = raw.indexOf('__BUILT_AT__') === -1 ? new Date(raw) : null;
@@ -6757,7 +6757,11 @@ let salesLimit = 50;
 const salesDraft = {};      // boat id -> staged {owner, sailmaker, leadRep, contactedBy}
 const salesKeep = new Set(); // boat ids pinned to the list for this session
 
-let salesWho = 'unknown';   // the gap is the default view: it is the biggest one
+let salesWho = 'competitor';  // Asked for on the artifact: open on the boats we
+                              // KNOW are on a competitor. 'Sailmaker unknown' is the
+                              // bigger list, but it is a research job - nobody has
+                              // recorded what those boats fly. A known competitor is a
+                              // boat you can ring today, which is what this page is for.
 
 function renderSales() {
   const allTargets = DATA.boats.filter(b =>
