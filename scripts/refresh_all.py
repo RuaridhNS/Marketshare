@@ -153,6 +153,13 @@ def main():
          ["rename_regattas.py", "--file", "data/regatta_renames.csv"], "regatta renames"),
         ("Merge regattas", ["merge_regattas.py", "--file", "data/regatta_merges.csv"], "regatta merges"),
 
+        # After the renames and merges, so a fixture can be attached to the
+        # record those steps settle on rather than minting a second one beside
+        # it. Fixtures are regattas that have not been sailed yet - dates and
+        # nothing else - and a re-import never creates them, so without this
+        # they would exist only until someone rebuilt the database from source.
+        ("Add fixtures", ["add_fixtures.py", "--file", "data/fixtures.csv"], "fixtures"),
+
         # Class labels decide race identity - races are keyed on (event, race
         # name, class) - so canonicalising them can make two race rows
         # identical. That is why this runs BEFORE the dedupe rather than after.
