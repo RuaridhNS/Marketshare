@@ -4,3 +4,35 @@ Sat 9th - Sat 16th June 2018,IRC European Championship,"Not a name - a date rang
 2025 J70 European Championship,J70 European Championship,"Year in the record name, same both-sides problem as the Corinthian Worlds above: the partner record is 'J70 European Championship 2026 Barcelona', carrying a year AND a venue. This rename makes the keeper; the merge row folds 2026 in. data/venues.csv had Barcelona keyed to the old name 'j70 european championship 2026', which would have stopped matching the moment that record was folded away, so that pattern is widened to the series name in the same change."
 2026 St Barths Bucket Regatta,St Barths Bucket Regatta,"Year in the record name, and it already held two seasons - 2025 and 2026 - so the name was wrong for half its own contents before a third was added. Renamed so the 2027 fixture can join it rather than spawning a second record."
 Tre Golfi Sailing Week 1,Tre Golfi Sailing Week,Neither record of this regatta was usable as a keeper: this one carried a stray '1' and the other was written 'Tre Golfi Sailing Week_2025'. Renamed to the plain series name so the 2025 record can fold into it.
+2025 J24 World Championship,J24 World Championship,Year in the record name and nothing else wrong with it: the season on the event already says which edition this is.
+2025 Star Class Western Hemisphere Championship,Star Class Western Hemisphere Championship,Year in the record name and nothing else wrong with it: the season on the event already says which edition this is.
+2026 Flying Scot Midwinters,Flying Scot Midwinters,Year in the record name and nothing else wrong with it: the season on the event already says which edition this is.
+2026 International 14 World Championship,International 14 World Championship,Year in the record name and nothing else wrong with it: the season on the event already says which edition this is.
+"2026 Lightning Womens, Juniors, and Masters North American Championships","Lightning Womens, Juniors, and Masters North American Championships",Year in the record name and nothing else wrong with it: the season on the event already says which edition this is.
+2026 Melges 24 Canadian National Championship,Melges 24 Canadian National Championship,Year in the record name and nothing else wrong with it: the season on the event already says which edition this is.
+2026 Melges 24 US Nationals,Melges 24 US Nationals,Year in the record name and nothing else wrong with it: the season on the event already says which edition this is.
+2026 SORC Lauderdale to Key West Race,SORC Lauderdale to Key West Race,Year in the record name and nothing else wrong with it: the season on the event already says which edition this is.
+2026 SWAN PORTO RAFAEL CHALLENGE,SWAN PORTO RAFAEL CHALLENGE,Year in the record name and nothing else wrong with it: the season on the event already says which edition this is.
+470 Worlds 2025,470 Worlds,Year in the record name and nothing else wrong with it: the season on the event already says which edition this is.
+49ers 2026 European Championship,49ers European Championship,Year in the record name and nothing else wrong with it: the season on the event already says which edition this is.
+49ers 2026 Junior World Championship,49ers Junior World Championship,Year in the record name and nothing else wrong with it: the season on the event already says which edition this is.
+52 Super Series 2026,52 Super Series,Year in the record name and nothing else wrong with it: the season on the event already says which edition this is.
+Antigua Bermuda Race 2026,Antigua Bermuda Race,Year in the record name and nothing else wrong with it: the season on the event already says which edition this is.
+Bacardi Winter Series 2026,Bacardi Winter Series,Year in the record name and nothing else wrong with it: the season on the event already says which edition this is.
+Cape 31 EU&MED 2025,Cape 31 EU&MED,Year in the record name and nothing else wrong with it: the season on the event already says which edition this is.
+Cape 31 UK 2025,Cape 31 UK,Year in the record name and nothing else wrong with it: the season on the event already says which edition this is.
+Dragon European Championship 2026,Dragon European Championship,Year in the record name and nothing else wrong with it: the season on the event already says which edition this is.
+Interlake Nationals 2026,Interlake Nationals,Year in the record name and nothing else wrong with it: the season on the event already says which edition this is.
+Johan Anker Cup 2026,Johan Anker Cup,Year in the record name and nothing else wrong with it: the season on the event already says which edition this is.
+Moth Worlds 2025,Moth Worlds,Year in the record name and nothing else wrong with it: the season on the event already says which edition this is.
+Rolex China Sea Race 2026,Rolex China Sea Race,Year in the record name and nothing else wrong with it: the season on the event already says which edition this is.
+Rolex Swan Cup 2026,Rolex Swan Cup,Year in the record name and nothing else wrong with it: the season on the event already says which edition this is.
+Rolex Sydney Hobart Yacht Race 2025,Rolex Sydney Hobart Yacht Race,Year in the record name and nothing else wrong with it: the season on the event already says which edition this is.
+TRANSPAC 2025,TRANSPAC,Year in the record name and nothing else wrong with it: the season on the event already says which edition this is.
+The Nations League 2025 - Copa del Rey MAPFRE,The Nations League - Copa del Rey MAPFRE,Year in the record name and nothing else wrong with it: the season on the event already says which edition this is.
+The Nations League 2025 - Swan Lake Garda Challenge,The Nations League - Swan Lake Garda Challenge,Year in the record name and nothing else wrong with it: the season on the event already says which edition this is.
+The Nations League 2025 Swan Tuscany Challenge-Swan OD Europeans,The Nations League Swan Tuscany Challenge-Swan OD Europeans,Year in the record name and nothing else wrong with it: the season on the event already says which edition this is.
+The Nations League 2025 The Nations Trophy,The Nations League The Nations Trophy,Year in the record name and nothing else wrong with it: the season on the event already says which edition this is.
+UK IRC Nationals 2025,UK IRC Nationals,Year in the record name and nothing else wrong with it: the season on the event already says which edition this is.
+Normandy Channel Race 2026,Normandy Channel Race,"Year in the record name, and it already holds 2025 as well as 2026 - so the name was wrong for half its own contents."
+Star Winter Series 2025-26,Star Winter Series,"A season span rather than a year, '2025-26'. A winter series straddles a new year by nature, which is exactly what the event's own season is for."
