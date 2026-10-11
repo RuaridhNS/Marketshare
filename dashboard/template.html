@@ -144,6 +144,30 @@
   .card-row { display: grid; grid-template-columns: 1.3fr 1fr; gap: 20px; align-items: start; }
   @media (max-width: 900px) { .card-row { grid-template-columns: 1fr; } }
 
+  /* A long list sits behind a heading you open, and scrolls inside its own box
+     rather than stretching the page. Six tables on one page is otherwise a
+     scroll long enough to hide whatever sits at the bottom - which is exactly
+     how the segment worklist went unnoticed. */
+  details.drawer { background: var(--surface-1); border: 1px solid var(--border);
+    border-radius: 10px; box-shadow: var(--card-shadow); margin-bottom: 12px; overflow: hidden; }
+  details.drawer > summary { list-style: none; cursor: pointer; padding: 14px 20px;
+    display: flex; align-items: baseline; gap: 10px; font-weight: 600; font-size: 15px;
+    color: var(--text-primary); }
+  details.drawer > summary::-webkit-details-marker { display: none; }
+  details.drawer > summary::before { content: "\25B8"; color: var(--accent); font-size: 13px;
+    display: inline-block; transition: transform .12s ease; }
+  details.drawer[open] > summary::before { transform: rotate(90deg); }
+  details.drawer > summary:hover { background: var(--surface-2); }
+  details.drawer[open] > summary { border-bottom: 1px solid var(--border); }
+  .drawer-meta { color: var(--text-secondary); font-weight: 400; font-size: 12.5px;
+    margin-left: auto; text-align: right; }
+  /* A fixed cap, not 68vh: a viewer that reports a zero-height viewport - an
+     embedded iframe mid-layout - would collapse a vh cap to nothing and hide
+     the list entirely. */
+  .drawer-body, .scroll-box { max-height: 620px; overflow: auto; }
+  .drawer-body > p { padding: 0 20px; margin: 12px 0 0; }
+  .drawer-body > table { margin-top: 10px; }
+
   table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
   th { text-align: left; color: var(--text-muted); font-weight: 600; font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.03em; padding: 8px 10px; border-bottom: 1px solid var(--gridline); position: sticky; top:0; background: var(--surface-1);}
   td { padding: 8px 10px; border-bottom: 1px solid var(--gridline); vertical-align: top; }
@@ -1382,6 +1406,7 @@ function navigate(hashOverride) {
   attachCompareHandlers();
   attachMarketAnalysisHandlers();
   attachSalesHandlers();
+  attachDrawers();
   updatePendingBadge();
   lastHash = hash;
   // Restore AFTER the new content has been laid out. Scrolling in the same
@@ -1963,7 +1988,7 @@ function renderBoatsList() {
       <button class="btn secondary" id="clear-regatta-filter" type="button">Clear regatta filters</button>
     </details>
     <div id="filtered-share"></div>
-    <div class="card" style="padding:0; overflow:auto;">
+    <div class="card scroll-box" style="padding:0;">
       <table>
         <thead><tr><th>Boat</th><th>Sail No</th><th>Type</th><th class="num">TCC</th><th>Owner</th><th>Sailmaker</th><th>Partial</th><th>Status</th><th>Tag</th><th class="num" title="Distinct regatta-seasons attended">Regattas</th><th class="num" title="Individual race entries">Entries</th></tr></thead>
         <tbody id="boats-tbody">${rows}</tbody>
@@ -3306,11 +3331,14 @@ function analysisFiltered(rows) {
 }
 
 function panel(title, note, body, extra) {
-  return `<div class="card" style="padding:0;overflow:auto;">
+  // The table scrolls in its own box rather than adding its whole length to the
+  // page: seven of these sections at full height is eight screens. The heading
+  // and the note stay put above it.
+  return `<div class="card" style="padding:0;">
     <h2 style="padding:16px 20px 0;">${title}</h2>
     <p class="muted" style="padding:0 20px;font-size:12px;margin:4px 0 0;">${note}</p>
     ${extra || ''}
-    ${body}
+    <div class="scroll-box">${body}</div>
   </div>`;
 }
 
@@ -3764,7 +3792,7 @@ function renderCalendar() {
   // planned for is at the top rather than 2007.
   const MONTH_FULL = ['January','February','March','April','May','June',
                       'July','August','September','October','November','December'];
-  const timeline = years.map(y => {
+  const timeline = years.map((y, yi) => {
     const list = byYear[y];
     const dated = list.filter(r => r.start);
     const undated = list.filter(r => !r.start).sort((a, b) => b.boats.length - a.boats.length);
@@ -3789,12 +3817,13 @@ function renderCalendar() {
         ${undated.map(card).join('')}
       </div>` : '';
 
-    return `<section class="cal-year">
-      <h2 class="cal-year-head">${y}
-        <span class="muted">${list.length} event${list.length === 1 ? '' : 's'}${
-          dated.length ? `, ${dated.length} dated` : ', none dated'}</span></h2>
-      ${monthBlocks}${undatedBlock}
-    </section>`;
+    // The two newest seasons start open - the one being sailed and the one being
+    // planned. Twenty seasons expanded was a 60,000 pixel page; each drawer caps
+    // its own height, so opening one costs a screen rather than a season.
+    return drawer('cal-' + y, String(y),
+      `${list.length} event${list.length === 1 ? '' : 's'}${
+        dated.length ? `, ${dated.length} dated` : ', none dated'}`,
+      monthBlocks + undatedBlock, yi < 2);
   }).join('') || `<div class="card muted">Nothing matches those filters.</div>`;
 
   const opts = (obj, cur, sortNum) => {
@@ -5703,15 +5732,15 @@ function renderSegments() {
         </tr>`;
       }).join('');
     const n = evs.filter(e => e.segment === name).length;
-    return `<div class="card" style="padding:0;overflow:auto;">
-      <h2 style="padding:18px 20px 0;">${esc(name)}
-        <span class="muted" style="font-weight:400;font-size:13px;">
-          ${n} event-year${n === 1 ? '' : 's'}</span></h2>
+    // Open when you have picked one segment, closed when every segment is on
+    // screen: all of them expanded is 559 event-years and 26,000 pixels.
+    return drawer('seg-' + name, esc(name),
+      `${n} event-year${n === 1 ? '' : 's'}`, `
       <table>
         <thead><tr><th>Regatta</th><th>Year</th><th style="text-align:right;">Boats</th>
           <th style="text-align:right;">North</th><th>Region</th></tr></thead>
         <tbody>${rows}</tbody>
-      </table></div>`;
+      </table>`, shown.length === 1);
   }).join('');
 
   return `<h1>Segments</h1>
@@ -5737,7 +5766,8 @@ function renderSegments() {
         }).join('')}
       </select>
     </label>
-    <span class="muted" style="font-size:12.5px;">Every event-year is listed in full.</span>
+    <span class="muted" style="font-size:12.5px;">Every event-year is listed in full &mdash;
+      open a segment heading to see it.</span>
   </div>
   ${groups}`;
 }
@@ -5804,13 +5834,12 @@ function renderCoverage() {
           <td style="font-size:12px;" class="muted">${esc(x.note)}</td>
         </tr>`;
       }).join('');
-    return `<div class="card" style="padding:0;overflow:auto;">
-      <h2 style="padding:18px 20px 0;">${esc(g)}</h2>
+    const gn = bySeries[g].length;
+    return drawer('cov-' + g, esc(g), `${gn} regatta${gn === 1 ? '' : 's'}`, `
       <table>
         <thead><tr><th>Regatta</th><th>Boat-level seasons</th><th>Aggregate only</th><th>Status</th><th>What's needed</th></tr></thead>
         <tbody>${body}</tbody>
-      </table>
-    </div>`;
+      </table>`);
   }).join('');
 
   return `
@@ -5831,8 +5860,9 @@ function renderCoverage() {
         them; the rest are entry counts from the IRC Solent Report with nothing underneath.
         ${(tally.blocked || 0) ? `<strong>${tally.blocked}</strong> cannot be collected automatically —
           their results moved behind a crawler block, and closing those needs permission rather than code.` : ''}</p>
-      <p class="muted" style="font-size:12.5px;margin:0;">The table below is the detail, one row per regatta,
-        grouped by series. The last column says specifically what each gap would take.</p>
+      <p class="muted" style="font-size:12.5px;margin:0;">The detail is below, one row per regatta,
+        grouped by series &mdash; open a series heading to read it. The last column says specifically
+        what each gap would take.</p>
     </div>
     <div class="card">
       <h2 style="margin-top:0;">How entries are counted</h2>
@@ -5877,6 +5907,29 @@ function typeFamilies() {
     .map(([base, v]) => ({base, variants: v.sort((a, b) => b.n - a.n),
                           total: v.reduce((s, x) => s + x.n, 0)}))
     .sort((a, b) => b.total - a.total);
+}
+
+// Open/closed lives here rather than in the DOM: staging an edit re-renders
+// the whole page, which would shut every panel you had opened each time you
+// touched a dropdown.
+// Named drawer, not panel: panel() already exists further up for the Analysis
+// page's sections, with a different signature. Two function declarations of one
+// name do not collide loudly - the later one simply replaces the earlier - so
+// the duplicate quietly fed Analysis's arguments into the wrong slots and
+// dropped its tables.
+const DRAWERS = {};
+
+function drawer(id, title, meta, body, openByDefault) {
+  const open = (id in DRAWERS) ? DRAWERS[id] : !!openByDefault;
+  return `<details class="drawer" data-drawer="${id}"${open ? ' open' : ''}>
+      <summary>${title}${meta ? `<span class="drawer-meta">${meta}</span>` : ''}</summary>
+      <div class="drawer-body">${body}</div>
+    </details>`;
+}
+
+function attachDrawers() {
+  document.querySelectorAll('details.drawer').forEach(d =>
+    d.addEventListener('toggle', () => { DRAWERS[d.dataset.drawer] = d.open; }));
 }
 
 // Segment worklist: 'unset' is the job, 'all' is for revisiting a call already
@@ -5942,64 +5995,15 @@ function renderQuality() {
 
   return `
     <h1>Data quality</h1>
-    <p class="subtitle">Everything waiting on a human decision, computed live from the current data.</p>
+    <p class="subtitle">Everything waiting on a human decision, computed live from the current data.
+      Each list opens on its heading, so the page stays a page.</p>
 
     <div class="stat-row">
-      <div class="stat-tile"><div class="v">${fams.length}</div><div class="l">Naming families to confirm</div></div>
+      <div class="stat-tile"><div class="v">${DATA.regattas.filter(r => !segmentOf(r)).length}</div><div class="l">Regattas with no segment</div></div>
       <div class="stat-tile"><div class="v">${dupCount}</div><div class="l">Duplicate candidates</div></div>
       <div class="stat-tile"><div class="v">${flagged.length}</div><div class="l">Flagged sailmaker findings</div></div>
       <div class="stat-tile"><div class="v">${noSm.length}</div><div class="l">Active boats, no sailmaker</div></div>
     </div>
-
-    <div class="card" style="padding:0;overflow:auto;">
-      <h2 style="padding:18px 20px 0;">Missing data — active fleet (${active.length} boats)</h2>
-      <p class="muted" style="font-size:12px;padding:0 20px;margin:4px 0 0;">Most-raced boats shown first, since those matter commercially.</p>
-      <table>
-        <thead><tr><th>Field</th><th class="num">Missing</th><th>Busiest boats missing it</th><th>Why it matters</th></tr></thead>
-        <tbody>
-          ${missRow('Sailmaker', noSm, 'The core gap. Race results almost never publish sails.')}
-          ${missRow('Owner', noOwner, 'Beware: results often record the boat captain here.')}
-          ${missRow('Boat type', noType, 'Needed for duplicate detection and class analysis.')}
-          ${missRow('IRC TCC', noTcc, 'Also the IRC-eligibility signal for the fleet filter.')}
-        </tbody>
-      </table>
-    </div>
-
-    <div class="card" style="padding:0;overflow:auto;">
-      <h2 style="padding:18px 20px 0;">Naming — is each row the same boat as its siblings?</h2>
-      <p class="muted" style="font-size:12px;padding:0 20px;margin:4px 0 0;">
-        These differ only by a variant suffix. A suffix often means a genuinely different boat — deeper keel,
-        different designer, different generation — so none of them have been merged.
-        ${fams.length > 40 ? `Showing the 40 largest of ${fams.length}.` : ''}</p>
-      <table>
-        <thead><tr><th>Family</th><th>Variants on file</th><th class="num">Boats</th></tr></thead>
-        <tbody>${famRows || '<tr><td colspan="3" class="muted">Nothing ambiguous.</td></tr>'}</tbody>
-      </table>
-    </div>
-
-    ${flagged.length ? `<div class="card" style="padding:0;overflow:auto;">
-      <h2 style="padding:18px 20px 0;">Sailmaker findings worth checking</h2>
-      <p class="muted" style="font-size:12px;padding:0 20px;margin:4px 0 0;">
-        Researched from published sources, not asserted. <strong>low</strong> means the match itself is
-        doubtful; <strong>medium</strong> usually means the evidence is sound but dated.</p>
-      <table>
-        <thead><tr><th>Boat</th><th>Sail No</th><th>Sailmaker</th><th>Confidence</th><th>Source</th></tr></thead>
-        <tbody>${flagRows}</tbody>
-      </table>
-    </div>` : ''}
-
-    ${charterRows ? `<div class="card" style="padding:0;overflow:auto;">
-      <h2 style="padding:18px 20px 0;">Charter or owner?</h2>
-      <p class="muted" style="font-size:12px;padding:0 20px;margin:4px 0 0;">
-        These names appear on several boats, which usually means a charter company, club or school entering
-        rather than owning — but not always: Peter Morton and Niklas Zennström genuinely own several. Ones
-        already marked as charter are excluded. Tell me which of these are charterers and I'll flag them, so
-        they stop reading as changes of ownership.</p>
-      <table>
-        <thead><tr><th>Name</th><th class="num">Boats</th><th>Boats it appears on</th></tr></thead>
-        <tbody>${charterRows}</tbody>
-      </table>
-    </div>` : ''}
 
     ${(() => {
       const unset = DATA.regattas.filter(r => !segmentOf(r));
@@ -6008,7 +6012,7 @@ function renderQuality() {
       // just chosen.
       const list  = (SEGWORK === 'all'
           ? DATA.regattas.slice()
-          : DATA.regattas.filter(r => !r.segment || PENDING_SEG[r.id]))
+          : DATA.regattas.filter(r => !segmentOf(r) || PENDING_SEG[r.id]))
         .map(r => ({ r, n: regattaBoatCount(r) }))
         .sort((a, b) => b.n - a.n || a.r.name.localeCompare(b.r.name));
       const rows = list.slice(0, 150).map(({ r, n }) => {
@@ -6021,20 +6025,19 @@ function renderQuality() {
           <td class="num">${n}</td>
           <td>
             <select class="segwork-pick" data-regatta="${r.id}">
-              <option value=""${cur ? '' : ' selected'}>— not set —</option>
+              <option value=""${cur ? '' : ' selected'}>&mdash; not set &mdash;</option>
               ${SEGMENTS_ALL.map(x =>
                 `<option value="${esc(x)}"${x === cur ? ' selected' : ''}>${esc(x)}</option>`
               ).join('')}
             </select>
           </td></tr>`;
       }).join('');
-      return `<div class="card" style="padding:0;overflow:auto;">
-        <h2 style="padding:18px 20px 0;">Market segment</h2>
-        <p class="muted" style="font-size:12.5px;padding:0 20px;margin:6px 0 0;max-width:76ch;">
-          ${unset.length} regatta${unset.length === 1 ? '' : 's'} carry no segment, so they appear
-          nowhere on the Market tab and in no segment filter. Set one here and it stages like any
-          other edit — nothing reaches the database until it is exported from
-          <a href="#/changes" data-route="#/changes">Pending changes</a>.
+      return drawer('q-segment', 'Market segment',
+        `${unset.length} regatta${unset.length === 1 ? '' : 's'} without one`, `
+        <p class="muted" style="font-size:12.5px;max-width:76ch;">
+          A regatta with no segment appears nowhere on the Market tab and in no segment filter.
+          Set one here and it stages like any other edit &mdash; nothing reaches the database until it
+          is exported from <a href="#/changes" data-route="#/changes">Pending changes</a>.
           Biggest first, since that is the order worth working in.</p>
         <div class="ex-controls" style="padding:12px 20px 0;">
           <label class="ex-pick">Show
@@ -6050,9 +6053,52 @@ function renderQuality() {
           <thead><tr><th>Regatta</th><th>Where</th><th class="num">Boats</th>
             <th style="width:220px;">Segment</th></tr></thead>
           <tbody>${rows}</tbody>
-        </table>
-      </div>`;
+        </table>`, true);
     })()}
+
+    ${drawer('q-missing', 'Missing data', `active fleet, ${active.length} boats`, `
+      <p class="muted" style="font-size:12px;">Most-raced boats shown first, since those matter commercially.</p>
+      <table>
+        <thead><tr><th>Field</th><th class="num">Missing</th><th>Busiest boats missing it</th><th>Why it matters</th></tr></thead>
+        <tbody>
+          ${missRow('Sailmaker', noSm, 'The core gap. Race results almost never publish sails.')}
+          ${missRow('Owner', noOwner, 'Beware: results often record the boat captain here.')}
+          ${missRow('Boat type', noType, 'Needed for duplicate detection and class analysis.')}
+          ${missRow('IRC TCC', noTcc, 'Also the IRC-eligibility signal for the fleet filter.')}
+        </tbody>
+      </table>`)}
+
+    ${drawer('q-naming', 'Naming &mdash; is each row the same boat as its siblings?',
+      `${fams.length} famil${fams.length === 1 ? 'y' : 'ies'}`, `
+      <p class="muted" style="font-size:12px;">
+        These differ only by a variant suffix. A suffix often means a genuinely different boat &mdash; deeper keel,
+        different designer, different generation &mdash; so none of them have been merged.
+        ${fams.length > 40 ? `Showing the 40 largest of ${fams.length}.` : ''}</p>
+      <table>
+        <thead><tr><th>Family</th><th>Variants on file</th><th class="num">Boats</th></tr></thead>
+        <tbody>${famRows || '<tr><td colspan="3" class="muted">Nothing ambiguous.</td></tr>'}</tbody>
+      </table>`)}
+
+    ${flagged.length ? drawer('q-flagged', 'Sailmaker findings worth checking',
+      `${flagged.length} flagged`, `
+      <p class="muted" style="font-size:12px;">
+        Researched from published sources, not asserted. <strong>low</strong> means the match itself is
+        doubtful; <strong>medium</strong> usually means the evidence is sound but dated.</p>
+      <table>
+        <thead><tr><th>Boat</th><th>Sail No</th><th>Sailmaker</th><th>Confidence</th><th>Source</th></tr></thead>
+        <tbody>${flagRows}</tbody>
+      </table>`) : ''}
+
+    ${charterRows ? drawer('q-charter', 'Charter or owner?', '', `
+      <p class="muted" style="font-size:12px;">
+        These names appear on several boats, which usually means a charter company, club or school entering
+        rather than owning &mdash; but not always: Peter Morton and Niklas Zennström genuinely own several. Ones
+        already marked as charter are excluded. Tell me which of these are charterers and I'll flag them, so
+        they stop reading as changes of ownership.</p>
+      <table>
+        <thead><tr><th>Name</th><th class="num">Boats</th><th>Boats it appears on</th></tr></thead>
+        <tbody>${charterRows}</tbody>
+      </table>`) : ''}
 
     <div class="card">
       <h2>Duplicates</h2>
@@ -6704,28 +6750,32 @@ function renderMarketAnalysis() {
       </div>
     </div>
 
-    <div class="card" style="padding:0;overflow:auto;">
+    <div class="card" style="padding:0;">
       <h2 style="padding:18px 20px 0;">Fleet by boat type</h2>
       <p class="muted" style="font-size:12px;padding:0 20px;margin:4px 0 0;">
         Types with 3+ active boats. Click a row to see those boats. "Measured" is the confidence
         column: it is the proportion of that fleet whose sailmaker we actually know.</p>
-      <table>
-        <thead><tr><th>Boat type</th><th class="num">Active</th><th class="num">North</th>
-          <th class="num">Competitor</th><th class="num">Unknown</th><th class="num">Our share</th><th>Measured</th></tr></thead>
-        <tbody>${typeRows}</tbody>
-      </table>
+      <div class="scroll-box">
+        <table>
+          <thead><tr><th>Boat type</th><th class="num">Active</th><th class="num">North</th>
+            <th class="num">Competitor</th><th class="num">Unknown</th><th class="num">Our share</th><th>Measured</th></tr></thead>
+          <tbody>${typeRows}</tbody>
+        </table>
+      </div>
     </div>
 
-    <div class="card" style="padding:0;overflow:auto;">
+    <div class="card" style="padding:0;">
       <h2 style="padding:18px 20px 0;">Top targets</h2>
       <p class="muted" style="font-size:12px;padding:0 20px;margin:4px 0 0;">
         Active, not on North Sails, and we know the owner — so they can actually be approached.
         Busiest first. ${contactable.length} in total; ${targets.length - contactable.length} more
         are active but have no owner on file.</p>
-      <table>
-        <thead><tr><th>Boat</th><th>Sail No</th><th>Type</th><th>Owner</th><th>Sailmaker</th><th class="num">Races</th></tr></thead>
-        <tbody>${topTargets}</tbody>
-      </table>
+      <div class="scroll-box">
+        <table>
+          <thead><tr><th>Boat</th><th>Sail No</th><th>Type</th><th>Owner</th><th>Sailmaker</th><th class="num">Races</th></tr></thead>
+          <tbody>${topTargets}</tbody>
+        </table>
+      </div>
       <div style="padding:14px 20px;">
         <button class="btn" id="copy-targets" type="button">Copy all ${contactable.length} targets as CSV</button>
         <span class="muted" style="font-size:12px;margin-left:10px;">Paste straight into a spreadsheet.</span>
