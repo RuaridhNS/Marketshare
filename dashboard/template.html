@@ -2380,7 +2380,8 @@ function pendingApplied(b, p) {
 // Staged segment changes, rendered as rows you can paste straight into
 // data/segment_overrides.csv. The regatta NAME is used as the pattern, escaped,
 // so a paste matches exactly one regatta rather than everything sharing a word.
-function renderPendingSegments() {
+// `bare` drops the card and heading, for when this is already inside one.
+function renderPendingSegments(bare) {
   const ids = Object.keys(PENDING_SEG);
   if (!ids.length) return '';
   const esc_re = s => String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -2400,9 +2401,9 @@ function renderPendingSegments() {
               ? show(r.segments || r.segment) : '— not set —'}</td>
             <td><strong>${show(PENDING_SEG[id])}</strong></td></tr>`;
   }).join('');
-  return `<div class="card">
-    <h2 style="margin-top:0;">Segment changes <span class="muted"
-      style="font-weight:400;font-size:13px;">${ids.length} staged</span></h2>
+  return `<div class="${bare ? 'pending-seg-bare' : 'card'}"${bare ? ' style="padding:0 20px 16px;"' : ''}>
+    ${bare ? '' : `<h2 style="margin-top:0;">Segment changes <span class="muted"
+      style="font-weight:400;font-size:13px;">${ids.length} staged</span></h2>`}
     <table><thead><tr><th>Regatta</th><th>Now</th><th>Change to</th></tr></thead>
       <tbody>${rows}</tbody></table>
     <p class="muted" style="font-size:13px;margin:14px 0 6px;">Append these to
@@ -5987,9 +5988,33 @@ function drawer(id, title, meta, body, openByDefault) {
     </details>`;
 }
 
+// A box that scrolls inside itself needs its own memory. window.scrollY does
+// not describe it, so staging an edit - which re-renders the whole page - put
+// you back at the top of the list you were working down.
+const INNER_SCROLL = {};
+
+function restoreInnerScroll(el) {
+  if (!el) return;
+  const want = INNER_SCROLL[el.dataset.scrollKey];
+  if (want) el.scrollTop = want;      // a hidden box ignores this; its toggle restores it
+}
+
 function attachDrawers() {
   document.querySelectorAll('details.drawer').forEach(d =>
-    d.addEventListener('toggle', () => { DRAWERS[d.dataset.drawer] = d.open; }));
+    d.addEventListener('toggle', () => {
+      DRAWERS[d.dataset.drawer] = d.open;
+      if (d.open) restoreInnerScroll(d.querySelector('.drawer-body'));
+    }));
+  document.querySelectorAll('.drawer-body, .scroll-box').forEach((el, i) => {
+    const owner = el.closest('details.drawer');
+    // Keyed by route AND by which box: two pages both have scroll boxes, and
+    // position alone would hand one page's offset to another's.
+    el.dataset.scrollKey = (CURRENT_ROUTE || '') + '|' +
+      (owner ? owner.dataset.drawer : 'box' + i);
+    restoreInnerScroll(el);
+    el.addEventListener('scroll',
+      () => { INNER_SCROLL[el.dataset.scrollKey] = el.scrollTop; }, {passive: true});
+  });
 }
 
 // Segment worklist: 'unset' is the job, 'all' is for revisiting a call already
@@ -6105,15 +6130,25 @@ function renderQuality() {
       // drawer body scrolls inside its own box, so anything at the top of it
       // disappears the moment you work down the list - which is exactly when
       // you want to see what you have chosen.
+      // Always rendered, open or not, so the page does not shift under you: a
+      // panel that appeared on the first pick and grew by a row on every pick
+      // after it pushed the list you were reading further down each time.
       const chosen = Object.keys(PENDING_SEG).length;
-      const confirmPanel = chosen ? `<div class="card" style="border-left:3px solid var(--accent);">
-        <h2 style="margin-top:0;">Confirm ${chosen} segment choice${chosen === 1 ? '' : 's'}</h2>
-        <p class="muted" style="font-size:12.5px;margin:0 0 4px;max-width:76ch;">
-          Nothing below has happened yet. Check the list, copy the rows into
-          <code>data/segment_overrides.csv</code> and run the one command underneath them.
-          That file is re-applied on every refresh, so a choice confirmed there is permanent;
-          one left here is lost the next time this page is rebuilt.</p>
-      </div>${renderPendingSegments()}` : '';
+      const confirmPanel = drawer('q-confirm',
+        chosen ? `Confirm ${chosen} segment choice${chosen === 1 ? '' : 's'}`
+               : 'Confirm segment choices',
+        chosen ? 'not in the database yet' : 'nothing chosen yet',
+        chosen ? `<p class="muted" style="font-size:12.5px;max-width:76ch;">
+            Nothing here has happened yet. Check the list, copy the rows into
+            <code>data/segment_overrides.csv</code> and run the one command underneath them.
+            That file is re-applied on every refresh, so a choice confirmed there is permanent;
+            one left here is lost the next time this page is rebuilt.</p>
+          ${renderPendingSegments(true)}`
+          : `<p class="muted" style="font-size:12.5px;max-width:76ch;padding-bottom:14px;">
+            Segments you choose below collect here, with the rows to paste into
+            <code>data/segment_overrides.csv</code> and the command that applies them.
+            Nothing reaches the database until you run it.</p>`,
+        false);
 
       return confirmPanel + drawer('q-segment', 'Market segment',
         `${unset.length} without a segment${chosen
