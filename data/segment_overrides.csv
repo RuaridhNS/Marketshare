@@ -5,7 +5,19 @@ Pattern,Segment,Notes
 # an edit here is permanent; an edit made in the dashboard is not until it
 # lands in this file.
 #
-# Segments: Grand Prix | Premier Race | Race | One-Design | Classic | Cruise | Premier Cruise
+# The segments are: Grand Prix, Premier Race, Race, One-Design, Classic,
+# Cruise, Premier Cruise.
+#
+# A regatta may carry SEVERAL, separated by a pipe and written most important
+# first - a regatta is not a fleet, and Cowes Week runs IRC classes, one-design
+# classes and a classics division under one entry:
+#
+#     ^Cowes Week$,Premier Race|One-Design,"IRC and one-design, one entry list."
+#
+# THE FIRST ONE COUNTS. It is what the Market tab, the globe and the segment
+# totals group on, so the boats are counted once and the segments still sum to
+# the fleet. The rest make the regatta appear under those headings too, marked
+# as counted elsewhere.
 
 cape ?31,Grand Prix,"Grand prix one-design, not club one-design. Confirmed by the owner."
 52 ?super ?series|tp ?52,Grand Prix,TP52 circuit
@@ -38,3 +50,4 @@ jog osmotech uk alderney,Race,"Club, regional and series handicap racing - the R
 royal southern june regatta,Race,"Club, regional and series handicap racing - the Race definition, applied to the Solent fleet that carried no segment at all."
 jog offshore series,Race,"Club, regional and series handicap racing - the Race definition, applied to the Solent fleet that carried no segment at all."
 rorc la trinite.cowes race,Race,"Club, regional and series handicap racing - the Race definition, applied to the Solent fleet that carried no segment at all."
+^Cowes Week$,Premier Race|One-Design,"The first regatta here carrying two segments, and the reason the column takes more than one: Cowes Week is a regatta, not a fleet - IRC classes and one-design classes race the same week under one entry list. Counted under Premier Race, listed under both."

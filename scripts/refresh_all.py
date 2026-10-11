@@ -226,6 +226,14 @@ def main():
         # to carry one, so the ledger has to be the last word.
         ("Apply published fixture dates",
          ["apply_event_dates.py", "--file", "data/event_dates.csv"], "event dates"),
+
+        # Last, so it gets the last word. Every segment in the database is
+        # either an importer's guess from the regatta's name or a human
+        # decision in data/segment_overrides.csv, and this step is what makes
+        # the second kind survive the first. It was missing from this list
+        # entirely, which meant a correction lasted exactly until the next
+        # rebuild - the one failure the whole ledger pattern exists to prevent.
+        ("Apply segment overrides", ["apply_segment_overrides.py", "--apply"], "segments"),
     ]
     for label, argv, tag in PIPELINE:
         ok, _ = run(label, argv, args.db, args.timeout)

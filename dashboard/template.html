@@ -863,16 +863,34 @@ function loadPendingSegments() {
   catch (e) { return {}; }
 }
 let PENDING_SEG = loadPendingSegments();
-function setPendingSegment(regattaId, segment) {
-  if (!segment) delete PENDING_SEG[regattaId];
-  else PENDING_SEG[regattaId] = segment;
+// Stored as one pipe-joined string, which is also how the ledger writes it, so
+// a value staged before this existed - a bare 'Race' - still reads correctly.
+function setPendingSegment(regattaId, segs) {
+  const list = (Array.isArray(segs) ? segs : String(segs || '').split('|'))
+    .map(x => x.trim()).filter(Boolean);
+  const uniq = list.filter((x, i) => list.indexOf(x) === i);
+  if (!uniq.length) delete PENDING_SEG[regattaId];
+  else PENDING_SEG[regattaId] = uniq.join('|');
   lsSet(PENDING_SEG_KEY, JSON.stringify(PENDING_SEG));
   updatePendingBadge();
 }
 function clearPendingSegments() {
   PENDING_SEG = {}; lsSet(PENDING_SEG_KEY, '{}'); updatePendingBadge();
 }
-function segmentOf(r) { return PENDING_SEG[r.id] || r.segment || ''; }
+// A regatta is not a fleet. Cowes Week runs IRC classes, one-design classes and
+// a classics division under one entry list, so it belongs to several segments.
+// The FIRST is the primary and is the only one anything counts on - the Market
+// tab, the globe, the segment totals - so the boats are counted once and the
+// segments still sum to the fleet. The rest make it appear under those headings
+// as well, marked as counted elsewhere.
+function segmentsOf(r) {
+  const staged = PENDING_SEG[r.id];
+  const raw = (staged != null && staged !== '') ? staged : (r.segments || r.segment || '');
+  const list = String(raw).split('|').map(x => x.trim()).filter(Boolean);
+  return list.filter((x, i) => list.indexOf(x) === i);
+}
+function segmentOf(r)     { return segmentsOf(r)[0] || ''; }
+function alsoSegmentsOf(r) { return segmentsOf(r).slice(1); }
 
 const PENDING_KEY = 'marketshare_pending_edits_v1';
 function loadPendingEdits() {
@@ -906,7 +924,7 @@ function updatePendingBadge() {
   const outstandingTimelines = Object.keys(OWNER_TIMELINES || {}).length;
   const outstandingSegs = Object.keys(PENDING_SEG || {}).filter(id => {
     const r = regattasById[id];
-    return !r || (r.segment || '') !== PENDING_SEG[id];
+    return !r || (r.segments || r.segment || '') !== PENDING_SEG[id];
   }).length;
   const n = outstandingEdits + outstandingMerges + outstandingTimelines + outstandingSegs;
   const badge = document.getElementById('pending-badge');
@@ -2369,13 +2387,18 @@ function renderPendingSegments() {
   const lines = ids.map(id => {
     const r = regattasById[id];
     if (!r) return '';
+    // The pipe is the ledger's own separator for a regatta in more than one
+    // segment, and it needs no CSV quoting because it is not a comma.
     return `^${esc_re(r.name)}$,${PENDING_SEG[id]},"Set from the dashboard."`;
   }).filter(Boolean).join('\n');
   const rows = ids.map(id => {
     const r = regattasById[id];
     if (!r) return '';
-    return `<tr><td>${esc(r.name)}</td><td class="muted">${esc(r.segment || '— not set —')}</td>
-            <td><strong>${esc(PENDING_SEG[id])}</strong></td></tr>`;
+    const show = v => esc(String(v).split('|').join(' + '));
+    return `<tr><td>${esc(r.name)}</td>
+            <td class="muted">${r.segments || r.segment
+              ? show(r.segments || r.segment) : '— not set —'}</td>
+            <td><strong>${show(PENDING_SEG[id])}</strong></td></tr>`;
   }).join('');
   return `<div class="card">
     <h2 style="margin-top:0;">Segment changes <span class="muted"
@@ -2981,7 +3004,7 @@ function renderRegattasList() {
     } else if (cov.status === 'blocked' || cov.status === 'todo' || cov.status === 'partial') {
       why = 'No named boats for any season of this event. ' + cov.note;
     } else {
-      why = 'No named boats for any season of this event \u2014 only entry counts ' +
+      why = 'No named boats for any season of this event — only entry counts ' +
             'were ever loaded for it.';
     }
     return '<p class="tree-empty">' + head +
@@ -3138,7 +3161,7 @@ function fillTreeLeaf(det) {
   box.innerHTML = rows.map(r => {
     const b = r.b, g = r.g, sm = liveSailmaker(b);
     return '<a class="tree-leaf" href="#/boat/' + b.id + '">' +
-      '<span class="tree-leaf-name">' + esc(b.boat_name || '\u2014') + '</span>' +
+      '<span class="tree-leaf-name">' + esc(b.boat_name || '—') + '</span>' +
       '<span class="tree-leaf-meta">' + esc(b.sail_no || '') +
       (b.boat_type ? ' &middot; ' + esc(b.boat_type) : '') + '</span>' +
       '<span class="tree-leaf-meta">' +
@@ -5691,10 +5714,16 @@ function renderSegments() {
     No segmented events yet. Run the Marketshare workbook import.</p></div>`;
 
   const byName = {}; totals.forEach(t => byName[t.segment] = t);
-  const ordered = SEGMENT_ORDER.filter(s => byName[s]);
+  // A segment can be on this page with no regatta of its own: every regatta
+  // that carries it may carry it second, and dropping the heading would hide
+  // them all.
+  const alsoBySeg = {};
+  (DATA.regattas || []).forEach(r =>
+    alsoSegmentsOf(r).forEach(x => (alsoBySeg[x] ||= []).push(r)));
+  const ordered = SEGMENT_ORDER.filter(s => byName[s] || (alsoBySeg[s] || []).length);
   const maxBoats = Math.max(...totals.map(t => t.boats));
 
-  const cards = ordered.map(name => {
+  const cards = ordered.filter(n => byName[n]).map(name => {
     const t = byName[name];
     const share = t.known ? (100 * t.north / t.known) : null;
     return `<div class="card" style="padding:16px 18px;">
@@ -5732,14 +5761,37 @@ function renderSegments() {
         </tr>`;
       }).join('');
     const n = evs.filter(e => e.segment === name).length;
+
+    // Regattas carrying this segment second. Their boats are counted under
+    // their FIRST segment, so they are listed here and deliberately left out
+    // of the count above: adding them in would make the segments sum to more
+    // than the fleet, which is the one thing this page must not do.
+    const alsoRegs = alsoBySeg[name] || [];
+    const alsoRows = alsoRegs.map(r => {
+      const mine  = evs.filter(e => e.regatta_id === r.id);
+      const boats = mine.length ? Math.max(...mine.map(e => e.boats)) : 0;
+      return `<tr class="clickable" data-route="#/regatta/${r.id}">
+        <td>${esc(r.name)}</td>
+        <td class="muted">—</td>
+        <td class="muted" style="text-align:right;">${boats ? boats.toLocaleString() : '—'}</td>
+        <td class="muted" style="text-align:right;">—</td>
+        <td class="muted" style="font-size:12px;">counted under ${esc(segmentOf(r))}</td>
+      </tr>`;
+    }).join('');
+    const alsoBlock = alsoRows ? `<tr><td colspan="5" class="muted"
+        style="font-size:12px;background:var(--surface-2);">Also in ${esc(name)}:
+        ${alsoRegs.length} regatta${alsoRegs.length === 1 ? '' : 's'} that runs this alongside
+        something else. Counted under its first segment, so not in the
+        ${n} event-year${n === 1 ? '' : 's'} above.</td></tr>${alsoRows}` : '';
     // Open when you have picked one segment, closed when every segment is on
     // screen: all of them expanded is 559 event-years and 26,000 pixels.
     return drawer('seg-' + name, esc(name),
-      `${n} event-year${n === 1 ? '' : 's'}`, `
+      `${n} event-year${n === 1 ? '' : 's'}${alsoRegs.length
+        ? ` &middot; ${alsoRegs.length} also` : ''}`, `
       <table>
         <thead><tr><th>Regatta</th><th>Year</th><th style="text-align:right;">Boats</th>
           <th style="text-align:right;">North</th><th>Region</th></tr></thead>
-        <tbody>${rows}</tbody>
+        <tbody>${rows}${alsoBlock}</tbody>
       </table>`, shown.length === 1);
   }).join('');
 
@@ -5747,7 +5799,9 @@ function renderSegments() {
   <p class="muted" style="max-width:76ch;margin:-6px 0 18px;">
     Every event carrying a segment, including the non-Solent events imported from
     the Marketshare workbooks. Counts here bypass the IRC filter used elsewhere,
-    because one-design, classic and superyacht boats are not IRC-rated.</p>
+    because one-design, classic and superyacht boats are not IRC-rated.
+    A regatta that runs two kinds of fleet is counted under the first of its segments
+    and listed under the second, so these figures still add up to the fleet.</p>
   <div class="card" style="border-left:3px solid var(--accent);margin-bottom:18px;">
     <p style="margin:0;font-size:13.5px;">
       <b>Read the North percentages with care.</b> They are the share of boats whose
@@ -5777,7 +5831,13 @@ function attachSegWorkHandlers() {
   if (show) show.addEventListener('change', () => { SEGWORK = show.value; navigate(); });
   document.querySelectorAll('.segwork-pick').forEach(sel =>
     sel.addEventListener('change', () => {
-      setPendingSegment(sel.dataset.regatta, sel.value);
+      const row  = sel.closest('tr');
+      const prim = row.querySelector('[data-role="primary"]').value;
+      const also = row.querySelector('[data-role="also"]').value;
+      // Clearing the primary clears the row: there is no "also" without a
+      // first segment, and silently promoting the second would assign a
+      // segment nobody chose.
+      setPendingSegment(sel.dataset.regatta, prim ? [prim, also] : []);
       navigate();          // re-render so the staged flag and the count follow
     }));
 }
@@ -6016,7 +6076,8 @@ function renderQuality() {
         .map(r => ({ r, n: regattaBoatCount(r) }))
         .sort((a, b) => b.n - a.n || a.r.name.localeCompare(b.r.name));
       const rows = list.slice(0, 150).map(({ r, n }) => {
-        const cur = segmentOf(r);
+        const cur  = segmentOf(r);
+        const also = alsoSegmentsOf(r)[0] || '';
         const staged = !!PENDING_SEG[r.id];
         return `<tr${staged ? ' class="sales-dirty"' : ''}>
           <td><a href="#/regatta/${r.id}" data-route="#/regatta/${r.id}">${esc(r.name)}</a>
@@ -6024,10 +6085,18 @@ function renderQuality() {
           <td class="muted" style="font-size:12px;">${esc(r.venue || r.country || '')}</td>
           <td class="num">${n}</td>
           <td>
-            <select class="segwork-pick" data-regatta="${r.id}">
+            <select class="segwork-pick" data-role="primary" data-regatta="${r.id}">
               <option value=""${cur ? '' : ' selected'}>&mdash; not set &mdash;</option>
               ${SEGMENTS_ALL.map(x =>
                 `<option value="${esc(x)}"${x === cur ? ' selected' : ''}>${esc(x)}</option>`
+              ).join('')}
+            </select>
+          </td>
+          <td>
+            <select class="segwork-pick" data-role="also" data-regatta="${r.id}"${cur ? '' : ' disabled'}>
+              <option value=""${also ? '' : ' selected'}>&mdash; none &mdash;</option>
+              ${SEGMENTS_ALL.filter(x => x !== cur).map(x =>
+                `<option value="${esc(x)}"${x === also ? ' selected' : ''}>${esc(x)}</option>`
               ).join('')}
             </select>
           </td></tr>`;
@@ -6038,7 +6107,11 @@ function renderQuality() {
           A regatta with no segment appears nowhere on the Market tab and in no segment filter.
           Set one here and it stages like any other edit &mdash; nothing reaches the database until it
           is exported from <a href="#/changes" data-route="#/changes">Pending changes</a>.
-          Biggest first, since that is the order worth working in.</p>
+          Biggest first, since that is the order worth working in.
+          <b>Also in</b> is for a regatta that is genuinely two things &mdash; a week that runs IRC
+          classes and a one-design fleet. Its boats are counted once, under the first segment, so
+          the segments still add up to the fleet; the second makes it show up under that heading
+          too, marked as counted elsewhere.</p>
         <div class="ex-controls" style="padding:12px 20px 0;">
           <label class="ex-pick">Show
             <select id="segwork-show">
@@ -6051,7 +6124,8 @@ function renderQuality() {
         </div>
         <table>
           <thead><tr><th>Regatta</th><th>Where</th><th class="num">Boats</th>
-            <th style="width:220px;">Segment</th></tr></thead>
+            <th style="width:180px;">Segment</th>
+            <th style="width:170px;" title="Counted under the first one, listed under both">Also in</th></tr></thead>
           <tbody>${rows}</tbody>
         </table>`, true);
     })()}
@@ -6218,12 +6292,18 @@ function attachPendingSegmentHandlers() {
 }
 
 function attachSegmentHandler() {
-  const sel = document.getElementById('seg-pick');
-  if (!sel) return;
-  sel.addEventListener('change', () => {
-    setPendingSegment(sel.dataset.regatta, sel.value);
+  const prim = document.getElementById('seg-pick');
+  // The Segments page has a #seg-pick too - its segment FILTER. That one
+  // carries no regatta, which is what tells the two apart.
+  if (!prim || !prim.dataset.regatta) return;
+  const also = document.getElementById('seg-also');
+  const push = () => {
+    const p = prim.value, a = also ? also.value : '';
+    setPendingSegment(prim.dataset.regatta, p ? [p, a] : []);
     navigate();
-  });
+  };
+  prim.addEventListener('change', push);
+  if (also) also.addEventListener('change', push);
 }
 
 function attachCompareHandlers() {
@@ -6503,9 +6583,18 @@ function renderRegattaProfile(id, year, cls) {
         <option value="">— not set —</option>
         ${SEGMENTS_ALL.map(x => `<option value="${esc(x)}"${x === segmentOf(r) ? ' selected' : ''}>${esc(x)}</option>`).join('')}
       </select>
+      <label class="field-label" for="seg-also" style="margin-left:14px;">Also in</label>
+      <select id="seg-also" data-regatta="${r.id}"${segmentOf(r) ? '' : ' disabled'}>
+        <option value="">— none —</option>
+        ${SEGMENTS_ALL.filter(x => x !== segmentOf(r)).map(x =>
+          `<option value="${esc(x)}"${x === (alsoSegmentsOf(r)[0] || '') ? ' selected' : ''}>${esc(x)}</option>`).join('')}
+      </select>
       ${PENDING_SEG[r.id] ? `<span class="edited-flag">staged</span>` : ''}
-      <p class="muted" style="font-size:12px;margin:8px 0 0;">Drives the Market tab and the
-        globe. Staged here and exported from
+      <p class="muted" style="font-size:12px;margin:8px 0 0;">The first segment is the one
+        everything counts on — the Market tab, the globe, the segment totals — so a regatta's
+        boats are counted once. <b>Also in</b> lists it under a second heading as well, marked as
+        counted elsewhere: a week that runs IRC classes and a one-design fleet is genuinely both.
+        Staged here and exported from
         <a href="#/changes" data-route="#/changes">Pending changes</a> into
         <code>data/segment_overrides.csv</code> &mdash; this page cannot write to the
         database, so an edit is not permanent until it lands in that file.</p>

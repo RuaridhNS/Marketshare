@@ -29,9 +29,18 @@ def main():
     # filter the event finder by it, and facts carries only the regattas that have
     # entries in a season.
     regattas = [dict(r) for r in cur.execute(
-        "SELECT id, name, category, region, segment, country, venue FROM regattas ORDER BY name")]
+        """SELECT id, name, category, region, segment, country, venue,
+                  segments
+             FROM regattas ORDER BY name""")]
 
     # --- Segments -------------------------------------------------------------
+    # Keyed on r.segment, the PRIMARY segment, never on r.segments. A regatta
+    # may carry several - Cowes Week is IRC classes, one-design classes and a
+    # classics division under one entry - but counting its boats under each of
+    # them would make the segments sum to more than the fleet. The extra ones
+    # ride along on the regatta row above, and the dashboard lists the regatta
+    # under those headings marked as counted elsewhere.
+    #
     # Computed straight off the database, BEFORE the IRC filter further down.
     # That filter exists to keep the Solent views honest, but One-Design,
     # Classic and Premier Cruise boats are not IRC-rated by nature, so running
