@@ -234,6 +234,14 @@ def main():
         # the same way owners are re-derived above.
         ("Refresh IRC TCCs", ["refresh_tcc.py", "--apply"], "tcc"),
 
+        # Strictly AFTER the TCC refresh above. Both can set a boat's rating
+        # and only one of them is a person: a TCC typed into the dashboard is
+        # a decision, the derived one is an inference from the last result,
+        # and the decision has to be able to overrule it. Run the other way
+        # round, every manual rating is silently undone each week.
+        ("Apply boat corrections",
+         ["apply_boat_updates.py", "data/boat_updates.csv"], "boat updates"),
+
         # Last, so it gets the last word. Every segment in the database is
         # either an importer's guess from the regatta's name or a human
         # decision in data/segment_overrides.csv, and this step is what makes

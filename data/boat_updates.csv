@@ -1,0 +1,22 @@
+# Boat-level corrections made in the dashboard: sailmaker, partial inventory,
+# owner, IRC TCC, lead rep, contacted by. One row per boat, matched on SailNo.
+# Any New* column left blank means "no change to that field".
+#
+# This file is the ledger, not the export. scripts/apply_boat_updates.py reads
+# it on every refresh, so a correction made here survives a rebuild; a CSV
+# copied out of the dashboard and applied once does not, and that is the whole
+# reason this file exists.
+#
+# Re-applying is safe. The sailmaker history carries a unique index on
+# (boat_id, sailmaker_id, source, confidence) and the inserts are OR REPLACE,
+# so a second run restates the same fact rather than stacking a second copy
+# of it.
+#
+# NewPartialSailmaker is a SECOND inventory alongside the main one - some sails
+# from another maker. It is recorded with confidence 'partial' so it never
+# counts as that maker owning the boat. A boat already flying some of your
+# sails is the shortest conquest there is, which is why it is worth recording
+# separately rather than rounding to one maker.
+SailNo,BoatName,NewSailmaker,NewPartialSailmaker,NewOwner,NewTCC,NewLeadRep,NewContactedBy,Notes
+GBR8809R,MOJO RISIN',One,North Sails,,,Ruaridh Wright,,"A swap, not a new fact: the record had North Sails as the main inventory and One as the partial. It is the other way round - the J/109 is on OneSails with some North sails aboard. The earlier reading came from the JOG fleet spreadsheet and the NS market-share sheet, both of which record only one maker per boat and so cannot express a split inventory."
+GBR3153,RIOT,North Sails,,,,Ben S,,"First sailmaker recorded for this boat - it had none. Note there are two boats called RIOT; this is the one on GBR3153, Cowes Week IRC Class 7, not F695."
