@@ -5780,8 +5780,8 @@ function renderSegments() {
     }).join('');
     const alsoBlock = alsoRows ? `<tr><td colspan="5" class="muted"
         style="font-size:12px;background:var(--surface-2);">Also in ${esc(name)}:
-        ${alsoRegs.length} regatta${alsoRegs.length === 1 ? '' : 's'} that runs this alongside
-        something else. Counted under its first segment, so not in the
+        ${alsoRegs.length} regatta${alsoRegs.length === 1 ? '' : 's'} that run${alsoRegs.length === 1 ? 's' : ''}
+        this alongside something else. Counted under its first segment, so not in the
         ${n} event-year${n === 1 ? '' : 's'} above.</td></tr>${alsoRows}` : '';
     // Open when you have picked one segment, closed when every segment is on
     // screen: all of them expanded is 559 event-years and 26,000 pixels.
@@ -6101,8 +6101,23 @@ function renderQuality() {
             </select>
           </td></tr>`;
       }).join('');
-      return drawer('q-segment', 'Market segment',
-        `${unset.length} regatta${unset.length === 1 ? '' : 's'} without one`, `
+      // The confirm panel sits OUTSIDE the drawer, not at the top of it: the
+      // drawer body scrolls inside its own box, so anything at the top of it
+      // disappears the moment you work down the list - which is exactly when
+      // you want to see what you have chosen.
+      const chosen = Object.keys(PENDING_SEG).length;
+      const confirmPanel = chosen ? `<div class="card" style="border-left:3px solid var(--accent);">
+        <h2 style="margin-top:0;">Confirm ${chosen} segment choice${chosen === 1 ? '' : 's'}</h2>
+        <p class="muted" style="font-size:12.5px;margin:0 0 4px;max-width:76ch;">
+          Nothing below has happened yet. Check the list, copy the rows into
+          <code>data/segment_overrides.csv</code> and run the one command underneath them.
+          That file is re-applied on every refresh, so a choice confirmed there is permanent;
+          one left here is lost the next time this page is rebuilt.</p>
+      </div>${renderPendingSegments()}` : '';
+
+      return confirmPanel + drawer('q-segment', 'Market segment',
+        `${unset.length} without a segment${chosen
+          ? ` &middot; ${chosen} chosen, not yet confirmed` : ''}`, `
         <p class="muted" style="font-size:12.5px;max-width:76ch;">
           A regatta with no segment appears nowhere on the Market tab and in no segment filter.
           Set one here and it stages like any other edit &mdash; nothing reaches the database until it

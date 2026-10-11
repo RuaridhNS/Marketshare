@@ -18,36 +18,43 @@ Pattern,Segment,Notes
 # totals group on, so the boats are counted once and the segments still sum to
 # the fleet. The rest make the regatta appear under those headings too, marked
 # as counted elsewhere.
-
 cape ?31,Grand Prix,"Grand prix one-design, not club one-design. Confirmed by the owner."
 52 ?super ?series|tp ?52,Grand Prix,TP52 circuit
 \bgl ?52\b,Grand Prix,GL52 circuit
 rc ?44|\b44 ?cup\b,Grand Prix,RC44 circuit
 clubswan 50|swan 50,Grand Prix,ClubSwan 50 circuit
-sardinia cup,Grand Prix,"Not in the database yet - no results captured. Kept here so it lands in the right segment the day it is."
+sardinia cup,Grand Prix,Not in the database yet - no results captured. Kept here so it lands in the right segment the day it is.
 (?<!vice )admiral's cup,Grand Prix,"The RORC Admiral's Cup. NOT the Vice Admiral's Cup, which is a different Solent inshore regatta. A \b guard does NOT separate the two - 'Vice Admiral's Cup' contains 'Admiral's Cup' at a word boundary - so this needs the negative lookbehind."
 rorc caribbean 600,Premier Race,"Carried over from the '2026 RORC Caribbean 600' record folded into this one in data/regatta_merges.csv. That record held the segment and the surviving one held none, so without this line the fold would have quietly dropped it."
 rorc (& ima )?transatlantic,Premier Race,"Carried over from the 2026 'RORC & IMA Transatlantic Race' record folded into the plain name. The survivor held no segment, so without this the fold would have dropped it."
+rorc round ireland,Premier Race,"A 704-mile offshore classic, run every other year."
+rorc round britain,Premier Race,"A 1,805-mile circumnavigation of Britain and Ireland. It held Premier Race only because the importer guessed it; named here so the blanket ^rorc rule below cannot demote it."
+rorc.*middle sea,Premier Race,"The Rolex Middle Sea Race. Same reason as Round Britain above: it carried Premier Race on a guess, and a guess is not protected from the blanket rule."
 irc european championship,Premier Race,"Carried over from 'IRC European Championships 2025', folded into the 2018 record, which held no segment of its own."
 irc two.handed national championship,Premier Race,"A national championship of the rating rule, so Premier Race for the same reason as the IRC Nationals below. It has to be named before the plain two-handed rule, which would otherwise swallow it: first match wins."
 irc national championship,Premier Race,The national championship of the rating rule this whole tool is about - marquee by definition.
-rorc round ireland,Premier Race,"A 704-mile offshore classic, run every other year."
 vice admiral'?s cup,Premier Race,RORC's marquee Solent inshore regatta. Note the existing admiral's cup rule above deliberately excludes this one with a negative lookbehind - they are different events.
-rorc season points championship,Race,"The season standings across RORC's races rather than an event in itself. Segmented so it stops being invisible, but it is the largest single entry in this segment by some way and worth watching on the Market tab."
+^Cowes Week$,Premier Race|One-Design,"The first regatta here carrying two segments, and the reason the column takes more than one: Cowes Week is a regatta, not a fleet - IRC classes and one-design classes race the same week under one entry list. Counted under Premier Race, listed under both."
+les voiles d.antibes,Classic,A classic yacht regatta - the opening event of the Panerai Classic Yacht Challenge - carrying Premier Race on the importer's guess. The dot matches the curly apostrophe in the stored name.
+les voiles de saint.tropez,Premier Race|Classic,"A marquee modern fleet and a large classics fleet in the same week. Counted under Premier Race, listed under Classic as well."
+rolex swan cup,Grand Prix|Premier Cruise,"The ClubSwan classes are grand-prix one-design, which is how RC44 and Cape 31 are treated above; the big cruising Swans are why Premier Cruise stays on it as the second. It was Premier Cruise alone, which hid a racing regatta in the cruising segment."
+^jog\b,Race,"EVERY JOG event is Race. This one rule replaces twelve that named individual races and all said the same thing. Above the RORC rules below on purpose: 'JOG RORC Cowes-St Malo' and 'JOG TeamO Cherbourg with RORC' are JOG events, and first match wins."
+rorc season points championship,Race|Premier Race,"The season standings across RORC's Solent programme rather than an event in itself. The largest single entry in this segment by some way, and worth watching on the Market tab."
+rorc cowes dinard st malo,Race|Premier Race,"A local Solent race. Race and Premier Race both: the fleet spans the two, and it is counted under Race so the segments still add up to the fleet."
+rorc myth of malham,Race|Premier Race,"A local Solent race. Race and Premier Race both: the fleet spans the two, and it is counted under Race so the segments still add up to the fleet."
+rorc cervantes trophy,Race|Premier Race,"A local Solent race. Race and Premier Race both: the fleet spans the two, and it is counted under Race so the segments still add up to the fleet."
+rorc morgan cup,Race|Premier Race,"A local Solent race. Race and Premier Race both: the fleet spans the two, and it is counted under Race so the segments still add up to the fleet."
+rorc channel race,Race|Premier Race,"A local Solent race. Race and Premier Race both: the fleet spans the two, and it is counted under Race so the segments still add up to the fleet."
+rorc de guingand bowl,Race|Premier Race,"A local Solent race. Race and Premier Race both: the fleet spans the two, and it is counted under Race so the segments still add up to the fleet."
+rorc cherbourg race,Race|Premier Race,"A local Solent race. Race and Premier Race both: the fleet spans the two, and it is counted under Race so the segments still add up to the fleet."
+rorc easter challenge,Race|Premier Race,"A local Solent race. Race and Premier Race both: the fleet spans the two, and it is counted under Race so the segments still add up to the fleet."
+rorc spring series,Race|Premier Race,"A local Solent race. Race and Premier Race both: the fleet spans the two, and it is counted under Race so the segments still add up to the fleet."
+rorc castle rock,Race|Premier Race,"A local Solent race. Race and Premier Race both: the fleet spans the two, and it is counted under Race so the segments still add up to the fleet."
+rorc 2h offshore,Race|Premier Race,"A local Solent race. Race and Premier Race both: the fleet spans the two, and it is counted under Race so the segments still add up to the fleet."
+^royal southern,Race|Premier Race,"Every Royal Southern event, replacing two rows that named the May and June regattas. The Cape 31 Nationals it also runs keeps Grand Prix: the cape ?31 rule at the top of this file is matched first."
+^rorc\b,Race,"The rest of the RORC programme - North Sea, East Coast, Drheam, the Irish Sea races, Nelson's Cup. Race, not Premier Race: they are RORC season racing but they are not Solent, which is the distinction the two rules above draw. Everything marquee is named further up, where this rule cannot reach it."
 ^irc two.handed$,Race,"Club, regional and series handicap racing - the Race definition, applied to the Solent fleet that carried no segment at all."
 ^summer series$,Race,"Anchored: this is the RORC 2020 series, and the words are common."
 taittinger royal solent,Race,"Club, regional and series handicap racing - the Race definition, applied to the Solent fleet that carried no segment at all."
-jog lewmar lonely tower,Race,"Club, regional and series handicap racing - the Race definition, applied to the Solent fleet that carried no segment at all."
 ^race the wight$,Race,"Club, regional and series handicap racing - the Race definition, applied to the Solent fleet that carried no segment at all."
-jog raymarine lonely tower,Race,"Club, regional and series handicap racing - the Race definition, applied to the Solent fleet that carried no segment at all."
 warsash spring championships,Race,"Club, regional and series handicap racing - the Race definition, applied to the Solent fleet that carried no segment at all."
-royal southern may regatta,Race,"Club, regional and series handicap racing - the Race definition, applied to the Solent fleet that carried no segment at all."
-rorc east coast race,Race,"Club, regional and series handicap racing - the Race definition, applied to the Solent fleet that carried no segment at all."
-jog one sails yarmouth,Race,"Club, regional and series handicap racing - the Race definition, applied to the Solent fleet that carried no segment at all."
-jog stoneways marine insurance cowes to poole,Race,"Club, regional and series handicap racing - the Race definition, applied to the Solent fleet that carried no segment at all."
-jog stoneways marine insurance lonely tower,Race,"Club, regional and series handicap racing - the Race definition, applied to the Solent fleet that carried no segment at all."
-jog osmotech uk alderney,Race,"Club, regional and series handicap racing - the Race definition, applied to the Solent fleet that carried no segment at all."
-royal southern june regatta,Race,"Club, regional and series handicap racing - the Race definition, applied to the Solent fleet that carried no segment at all."
-jog offshore series,Race,"Club, regional and series handicap racing - the Race definition, applied to the Solent fleet that carried no segment at all."
-rorc la trinite.cowes race,Race,"Club, regional and series handicap racing - the Race definition, applied to the Solent fleet that carried no segment at all."
-^Cowes Week$,Premier Race|One-Design,"The first regatta here carrying two segments, and the reason the column takes more than one: Cowes Week is a regatta, not a fleet - IRC classes and one-design classes race the same week under one entry list. Counted under Premier Race, listed under both."
