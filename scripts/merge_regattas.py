@@ -17,6 +17,12 @@ describe the event rather than the record it was filed under.
 Nothing is thrown away. If both records hold the same boat in the same race,
 the entry-level UNIQUE constraint keeps one; everything else survives the move.
 
+A fourth CSV column, Class, is optional: where the folded record was named
+for a division rather than an event - "North Sea Race - ORC 2" - put the
+division there and it is stamped onto that record's entries before they move.
+Without it the division is lost with the name, and an ORC coefficient ends up
+in a column called tcc with nothing to say it is not an IRC rating.
+
 Usage:
   python3 merge_regattas.py <db.sqlite> --keep "<name>" --fold "<name>" [--dry-run]
   python3 merge_regattas.py <db.sqlite> --file data/regatta_merges.csv [--dry-run]
@@ -27,7 +33,7 @@ import sqlite3
 import pathlib
 
 
-def merge(cur, keep_name, fold_name, dry_run):
+def merge(cur, keep_name, fold_name, dry_run, stamp=None):
     keep = cur.execute("SELECT id FROM regattas WHERE name = ?", (keep_name,)).fetchone()
     fold = cur.execute("SELECT id FROM regattas WHERE name = ?", (fold_name,)).fetchone()
     if not keep or not fold:
@@ -37,6 +43,21 @@ def merge(cur, keep_name, fold_name, dry_run):
     keep_id, fold_id = keep[0], fold[0]
     if keep_id == fold_id:
         return 0
+
+    # A record named for a division carries the division in its NAME and
+    # nowhere else, and the fold is about to delete the name. Stamp it on the
+    # entries first, or an ORC coefficient arrives in the IRC column with
+    # nothing left to say what it is.
+    stamped = 0
+    if stamp:
+        in_fold = ("race_id IN (SELECT ra.id FROM races ra JOIN events e ON e.id = ra.event_id "
+                   "WHERE e.regatta_id = ?)")
+        stamped = cur.execute(
+            f"SELECT COUNT(*) FROM race_entries WHERE class IS NULL AND {in_fold}",
+            (fold_id,)).fetchone()[0]
+        if stamped and not dry_run:
+            cur.execute(f"UPDATE race_entries SET class = ? WHERE class IS NULL AND {in_fold}",
+                        (stamp, fold_id))
 
     moved_events = merged_events = moved_races = moved_counts = 0
     rows = cur.execute("SELECT id, season_year FROM events WHERE regatta_id = ?",
@@ -70,7 +91,8 @@ def merge(cur, keep_name, fold_name, dry_run):
         cur.execute("DELETE FROM regattas WHERE id = ?", (fold_id,))
     print(f"  {fold_name!r} -> {keep_name!r}: {moved_events} season(s) moved, "
           f"{merged_events} merged into an existing season "
-          f"({moved_races} races, {moved_counts} class counts)")
+          f"({moved_races} races, {moved_counts} class counts"
+          f"{f', {stamped} entries stamped {stamp!r}' if stamp else ''})")
     return 1
 
 
@@ -91,16 +113,16 @@ def main():
                 for row in csv.DictReader(f):
                     k, d = (row.get("Keep") or "").strip(), (row.get("Fold") or "").strip()
                     if k and d:
-                        pairs.append((k, d))
+                        pairs.append((k, d, (row.get("Class") or "").strip() or None))
     if args.keep and args.fold:
-        pairs.append((args.keep, args.fold))
+        pairs.append((args.keep, args.fold, None))
     if not pairs:
         print("nothing to merge")
         return
 
     conn = sqlite3.connect(args.db)
     cur = conn.cursor()
-    n = sum(merge(cur, k, d, args.dry_run) for k, d in pairs)
+    n = sum(merge(cur, k, d, args.dry_run, cls) for k, d, cls in pairs)
     print(f"\n{n} regatta(s) folded")
     if args.dry_run:
         conn.rollback()

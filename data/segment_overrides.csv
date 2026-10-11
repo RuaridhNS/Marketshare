@@ -64,3 +64,5 @@ warsash spring championships,Race,"Club, regional and series handicap racing - t
 ^Warsash Spring Series$,Race,"The series, 2018-2024. Anchored so it stays separate from Warsash Spring Championships, which is a different event with its own row."
 ^Hamble IRC Autumn Championship$,Race,Club racing in the Solent.
 ^Hamble Winter Series$,Race,Club racing in the Solent.
+^XOD Telegraph Trophy$,One-Design,"The X One-Design class. A class trophy, so the segment is the class."
+^Telegraph Bowl \(XOD\)$,One-Design,"The other XOD trophy. The parentheses are escaped: this column is a regular expression, and unescaped brackets would make a group that matches the bare words."

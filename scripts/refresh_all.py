@@ -227,6 +227,13 @@ def main():
         ("Apply published fixture dates",
          ["apply_event_dates.py", "--file", "data/event_dates.csv"], "event dates"),
 
+        # After every loader and every merge, so the entries it reads are
+        # final. A boat's IRC rating is a fact about the boat IN A SEASON -
+        # new sails move it every year - so the boat record has to be
+        # re-derived from the last rating the boat actually raced under,
+        # the same way owners are re-derived above.
+        ("Refresh IRC TCCs", ["refresh_tcc.py", "--apply"], "tcc"),
+
         # Last, so it gets the last word. Every segment in the database is
         # either an importer's guess from the regatta's name or a human
         # decision in data/segment_overrides.csv, and this step is what makes
