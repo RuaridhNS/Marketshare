@@ -38,6 +38,8 @@ vice admiral'?s cup,Premier Race,RORC's marquee Solent inshore regatta. Note the
 les voiles d.antibes,Classic,A classic yacht regatta - the opening event of the Panerai Classic Yacht Challenge - carrying Premier Race on the importer's guess. The dot matches the curly apostrophe in the stored name.
 les voiles de saint.tropez,Premier Race|Classic,"A marquee modern fleet and a large classics fleet in the same week. Counted under Premier Race, listed under Classic as well."
 rolex swan cup,Grand Prix|Premier Cruise,"The ClubSwan classes are grand-prix one-design, which is how RC44 and Cape 31 are treated above; the big cruising Swans are why Premier Cruise stays on it as the second. It was Premier Cruise alone, which hid a racing regatta in the cruising segment."
+^ORC Worlds$,Premier Race|Grand Prix,"The world championship of the ORC rule. Premier Race first, Grand Prix second. No results are loaded against it yet - it holds seasons 2018-2025 and no entries - so it contributes nothing to the counts until they are."
+^ORC Europeans$,Premier Race|Grand Prix,"Same as the Worlds above. Seasons 2021-2025, no entries loaded yet."
 ^jog\b,Race,"EVERY JOG event is Race. This one rule replaces twelve that named individual races and all said the same thing. Above the RORC rules below on purpose: 'JOG RORC Cowes-St Malo' and 'JOG TeamO Cherbourg with RORC' are JOG events, and first match wins."
 rorc season points championship,Race|Premier Race,"The season standings across RORC's Solent programme rather than an event in itself. The largest single entry in this segment by some way, and worth watching on the Market tab."
 rorc cowes dinard st malo,Race|Premier Race,"A local Solent race. Race and Premier Race both: the fleet spans the two, and it is counted under Race so the segments still add up to the fleet."
@@ -52,9 +54,13 @@ rorc spring series,Race|Premier Race,"A local Solent race. Race and Premier Race
 rorc castle rock,Race|Premier Race,"A local Solent race. Race and Premier Race both: the fleet spans the two, and it is counted under Race so the segments still add up to the fleet."
 rorc 2h offshore,Race|Premier Race,"A local Solent race. Race and Premier Race both: the fleet spans the two, and it is counted under Race so the segments still add up to the fleet."
 ^royal southern,Race|Premier Race,"Every Royal Southern event, replacing two rows that named the May and June regattas. The Cape 31 Nationals it also runs keeps Grand Prix: the cape ?31 rule at the top of this file is matched first."
+^Autumn Series$,Race|Premier Race,RORC's Solent autumn series - the category says RORC and the one season it holds is 2020. The same pair as the other local Solent races above. Anchored because the name is two common words.
 ^rorc\b,Race,"The rest of the RORC programme - North Sea, East Coast, Drheam, the Irish Sea races, Nelson's Cup. Race, not Premier Race: they are RORC season racing but they are not Solent, which is the distinction the two rules above draw. Everything marquee is named further up, where this rule cannot reach it."
 ^irc two.handed$,Race,"Club, regional and series handicap racing - the Race definition, applied to the Solent fleet that carried no segment at all."
 ^summer series$,Race,"Anchored: this is the RORC 2020 series, and the words are common."
 taittinger royal solent,Race,"Club, regional and series handicap racing - the Race definition, applied to the Solent fleet that carried no segment at all."
 ^race the wight$,Race,"Club, regional and series handicap racing - the Race definition, applied to the Solent fleet that carried no segment at all."
 warsash spring championships,Race,"Club, regional and series handicap racing - the Race definition, applied to the Solent fleet that carried no segment at all."
+^Warsash Spring Series$,Race,"The series, 2018-2024. Anchored so it stays separate from Warsash Spring Championships, which is a different event with its own row."
+^Hamble IRC Autumn Championship$,Race,Club racing in the Solent.
+^Hamble Winter Series$,Race,Club racing in the Solent.

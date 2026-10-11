@@ -890,6 +890,16 @@ function segmentsOf(r) {
   return list.filter((x, i) => list.indexOf(x) === i);
 }
 function segmentOf(r)     { return segmentsOf(r)[0] || ''; }
+
+// Staged choices the database has NOT caught up with. One definition, because
+// the sidebar badge, the confirm drawer and the ledger rows all have to agree
+// about what is still to do - and a choice that has landed is not.
+function outstandingSegmentIds() {
+  return Object.keys(PENDING_SEG || {}).filter(id => {
+    const r = regattasById[id];
+    return !r || (r.segments || r.segment || '') !== PENDING_SEG[id];
+  });
+}
 function alsoSegmentsOf(r) { return segmentsOf(r).slice(1); }
 
 const PENDING_KEY = 'marketshare_pending_edits_v1';
@@ -922,10 +932,7 @@ function updatePendingBadge() {
   // a merge is done once the merged-away boat is gone from the data
   const outstandingMerges = PENDING_MERGES.filter(m => boatsById[m.mergeId]).length;
   const outstandingTimelines = Object.keys(OWNER_TIMELINES || {}).length;
-  const outstandingSegs = Object.keys(PENDING_SEG || {}).filter(id => {
-    const r = regattasById[id];
-    return !r || (r.segments || r.segment || '') !== PENDING_SEG[id];
-  }).length;
+  const outstandingSegs = outstandingSegmentIds().length;
   const n = outstandingEdits + outstandingMerges + outstandingTimelines + outstandingSegs;
   const badge = document.getElementById('pending-badge');
   if (badge) { badge.style.display = n ? '' : 'none'; badge.textContent = n; }
@@ -2382,8 +2389,10 @@ function pendingApplied(b, p) {
 // so a paste matches exactly one regatta rather than everything sharing a word.
 // `bare` drops the card and heading, for when this is already inside one.
 function renderPendingSegments(bare) {
-  const ids = Object.keys(PENDING_SEG);
-  if (!ids.length) return '';
+  const all = Object.keys(PENDING_SEG);
+  if (!all.length) return '';
+  const ids = outstandingSegmentIds();
+  const landed = all.length - ids.length;
   const esc_re = s => String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const lines = ids.map(id => {
     const r = regattasById[id];
@@ -2401,10 +2410,17 @@ function renderPendingSegments(bare) {
               ? show(r.segments || r.segment) : '— not set —'}</td>
             <td><strong>${show(PENDING_SEG[id])}</strong></td></tr>`;
   }).join('');
+  const landedNote = landed ? `<p class="muted" style="font-size:12.5px;margin:12px 0 0;">
+      ${landed} other choice${landed === 1 ? ' is' : 's are'} already in the database and
+      ${landed === 1 ? 'is' : 'are'} left out of the rows above &mdash; pasting
+      ${landed === 1 ? 'it' : 'them'} again would only add a rule that changes nothing.
+      <button class="btn secondary" id="seg-clear-applied" type="button"
+        style="margin-left:6px;">Clear ${landed} already applied</button></p>` : '';
+
   return `<div class="${bare ? 'pending-seg-bare' : 'card'}"${bare ? ' style="padding:0 20px 16px;"' : ''}>
     ${bare ? '' : `<h2 style="margin-top:0;">Segment changes <span class="muted"
       style="font-weight:400;font-size:13px;">${ids.length} staged</span></h2>`}
-    <table><thead><tr><th>Regatta</th><th>Now</th><th>Change to</th></tr></thead>
+    ${ids.length ? `<table><thead><tr><th>Regatta</th><th>Now</th><th>Change to</th></tr></thead>
       <tbody>${rows}</tbody></table>
     <p class="muted" style="font-size:13px;margin:14px 0 6px;">Append these to
       <code>data/segment_overrides.csv</code>, then run:</p>
@@ -2413,7 +2429,8 @@ function renderPendingSegments(bare) {
     <div class="btn-row">
       <button class="btn" id="seg-copy" type="button">Copy rows</button>
       <button class="btn secondary" id="seg-clear" type="button">Discard staged segments</button>
-    </div>
+    </div>` : `<p style="margin:0;">Every choice staged here is already in the database.</p>`}
+    ${landedNote}
   </div>`;
 }
 
@@ -6133,21 +6150,27 @@ function renderQuality() {
       // Always rendered, open or not, so the page does not shift under you: a
       // panel that appeared on the first pick and grew by a row on every pick
       // after it pushed the list you were reading further down each time.
-      const chosen = Object.keys(PENDING_SEG).length;
+      const chosen = outstandingSegmentIds().length;
+      // Rendered whenever ANYTHING is staged, not only when something is
+      // outstanding: a list holding nothing but choices the database has
+      // already caught up with still needs the button that clears them.
+      const anyStaged = Object.keys(PENDING_SEG).length;
       const confirmPanel = drawer('q-confirm',
         chosen ? `Confirm ${chosen} segment choice${chosen === 1 ? '' : 's'}`
                : 'Confirm segment choices',
-        chosen ? 'not in the database yet' : 'nothing chosen yet',
+        chosen ? 'not in the database yet'
+               : (anyStaged ? 'all of them already applied' : 'nothing chosen yet'),
         chosen ? `<p class="muted" style="font-size:12.5px;max-width:76ch;">
             Nothing here has happened yet. Check the list, copy the rows into
             <code>data/segment_overrides.csv</code> and run the one command underneath them.
             That file is re-applied on every refresh, so a choice confirmed there is permanent;
             one left here is lost the next time this page is rebuilt.</p>
           ${renderPendingSegments(true)}`
-          : `<p class="muted" style="font-size:12.5px;max-width:76ch;padding-bottom:14px;">
+          : (anyStaged ? renderPendingSegments(true)
+            : `<p class="muted" style="font-size:12.5px;max-width:76ch;padding-bottom:14px;">
             Segments you choose below collect here, with the rows to paste into
             <code>data/segment_overrides.csv</code> and the command that applies them.
-            Nothing reaches the database until you run it.</p>`,
+            Nothing reaches the database until you run it.</p>`),
         false);
 
       return confirmPanel + drawer('q-segment', 'Market segment',
@@ -6334,6 +6357,14 @@ function attachPendingSegmentHandlers() {
     navigator.clipboard?.writeText(box.value).then(
       () => { copy.textContent = 'Copied'; setTimeout(() => copy.textContent = 'Copy rows', 1400); },
       () => {});
+  });
+  const done = document.getElementById('seg-clear-applied');
+  if (done) done.addEventListener('click', () => {
+    const keep = new Set(outstandingSegmentIds());
+    Object.keys(PENDING_SEG).forEach(id => { if (!keep.has(id)) delete PENDING_SEG[id]; });
+    lsSet(PENDING_SEG_KEY, JSON.stringify(PENDING_SEG));
+    updatePendingBadge();
+    navigate();
   });
   const clr = document.getElementById('seg-clear');
   if (clr) clr.addEventListener('click', () => {
