@@ -251,6 +251,52 @@ def main():
     if len(changed) > 25:
         print(f"  ... and {len(changed)-25} more mappings")
 
+    # ---- separator-only variants
+    # The rules above know particular builders and tidy everything else's case
+    # and spacing. What they cannot see is two spellings of the SAME design
+    # that differ by nothing but a separator - "Class 40" against "Class40",
+    # "TP 52" against "TP-52" against "TP52". Those are not different boats
+    # under any reading, so unlike the suffix families below they need no
+    # human: strip every non-alphanumeric character and compare what is left.
+    #
+    # Deliberately narrow. A suffix like Sport, Mod or Mk II survives this
+    # because it leaves letters behind, so it still goes to the report rather
+    # than being collapsed on a guess.
+    #
+    # The surviving spelling is the one most boats already use. Where that
+    # ties - usually an ALL-CAPS row against a Title Case row with one boat
+    # each - prefer the one that is neither all upper nor all lower, which is
+    # how the rest of the table is written.
+    sep_groups = defaultdict(list)
+    for name, cnt in canon_counts.items():
+        sep_groups[re.sub(r"[^a-z0-9]", "", name.lower())].append((name, cnt))
+
+    def pick(variants):
+        def score(t):
+            name, cnt = t
+            mixed = not name.isupper() and not name.islower()
+            return (cnt, mixed, -len(name))
+        return max(variants, key=score)[0]
+
+    sep_fixed = sep_labels = 0
+    for key, variants in sep_groups.items():
+        if len(variants) < 2 or not key:
+            continue
+        keep = pick(variants)
+        for name, cnt in variants:
+            if name == keep:
+                continue
+            if not args.dry_run:
+                cur.execute("UPDATE boats SET boat_type = ? WHERE boat_type = ?", (keep, name))
+            sep_fixed += cnt
+            sep_labels += 1
+            canon_counts[keep] += cnt
+            canon_counts[name] = 0
+    canon_counts = {k: v for k, v in canon_counts.items() if v}
+    if sep_labels:
+        print(f"\nseparator-only variants: {sep_labels} spelling(s) folded away, "
+              f"{sep_fixed} boat(s) re-labelled")
+
     # ---- uncertainties: canonical names that differ only by a variant suffix
     families = defaultdict(list)
     for name, cnt in canon_counts.items():
