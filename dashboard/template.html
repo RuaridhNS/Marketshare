@@ -880,7 +880,11 @@ function updatePendingBadge() {
   // a merge is done once the merged-away boat is gone from the data
   const outstandingMerges = PENDING_MERGES.filter(m => boatsById[m.mergeId]).length;
   const outstandingTimelines = Object.keys(OWNER_TIMELINES || {}).length;
-  const n = outstandingEdits + outstandingMerges + outstandingTimelines;
+  const outstandingSegs = Object.keys(PENDING_SEG || {}).filter(id => {
+    const r = regattasById[id];
+    return !r || (r.segment || '') !== PENDING_SEG[id];
+  }).length;
+  const n = outstandingEdits + outstandingMerges + outstandingTimelines + outstandingSegs;
   const badge = document.getElementById('pending-badge');
   if (badge) { badge.style.display = n ? '' : 'none'; badge.textContent = n; }
   const dupBadge = document.getElementById('duplicates-badge');
@@ -1359,7 +1363,7 @@ function navigate(hashOverride) {
     else if (route === 'globe') { main.innerHTML = renderGlobe(); attachGlobeHandlers(); }
     else if (route === 'segments') { main.innerHTML = renderSegments(); attachSegmentHandlers(); }
     else if (route === 'coverage') main.innerHTML = renderCoverage();
-    else if (route === 'quality') main.innerHTML = renderQuality();
+    else if (route === 'quality') { main.innerHTML = renderQuality(); attachSegWorkHandlers(); }
     else if (route === 'compare') main.innerHTML = renderCompare((query.get('r')||'').split(',').filter(Boolean));
     else if (route === 'duplicates') main.innerHTML = renderDuplicates();
     else if (route === 'changes') main.innerHTML = renderPendingChanges();
@@ -5738,6 +5742,27 @@ function renderSegments() {
   ${groups}`;
 }
 
+function attachSegWorkHandlers() {
+  const show = document.getElementById('segwork-show');
+  if (show) show.addEventListener('change', () => { SEGWORK = show.value; navigate(); });
+  document.querySelectorAll('.segwork-pick').forEach(sel =>
+    sel.addEventListener('change', () => {
+      setPendingSegment(sel.dataset.regatta, sel.value);
+      navigate();          // re-render so the staged flag and the count follow
+    }));
+}
+
+// Distinct boats behind a regatta, for ordering the worklist. Falls back to the
+// organiser's reported total where we hold no named boats, so a regatta that is
+// only an entry count still sorts somewhere sensible rather than at zero.
+function regattaBoatCount(r) {
+  const s = regattaSummary(r);
+  const real = s.pts.filter(p => p.real).map(p => p.y);
+  if (real.length) return Math.max(...real);
+  const rep = s.pts.map(p => p.y).filter(n => n != null);
+  return rep.length ? Math.max(...rep) : 0;
+}
+
 function attachSegmentHandlers() {
   const sel = document.getElementById('seg-pick');
   if (sel) sel.addEventListener('change', () => { SEGPICK = sel.value; navigate(); });
@@ -5853,6 +5878,10 @@ function typeFamilies() {
                           total: v.reduce((s, x) => s + x.n, 0)}))
     .sort((a, b) => b.total - a.total);
 }
+
+// Segment worklist: 'unset' is the job, 'all' is for revisiting a call already
+// made. Module level so the choice survives the re-render each edit triggers.
+let SEGWORK = 'unset';
 
 function renderQuality() {
   const active = DATA.boats.filter(b => b.active);
@@ -5971,6 +6000,59 @@ function renderQuality() {
         <tbody>${charterRows}</tbody>
       </table>
     </div>` : ''}
+
+    ${(() => {
+      const unset = DATA.regattas.filter(r => !segmentOf(r));
+      // Staged rows stay in view: setting a segment used to make the row
+      // disappear mid-edit, which left no way to check or undo what you had
+      // just chosen.
+      const list  = (SEGWORK === 'all'
+          ? DATA.regattas.slice()
+          : DATA.regattas.filter(r => !r.segment || PENDING_SEG[r.id]))
+        .map(r => ({ r, n: regattaBoatCount(r) }))
+        .sort((a, b) => b.n - a.n || a.r.name.localeCompare(b.r.name));
+      const rows = list.slice(0, 150).map(({ r, n }) => {
+        const cur = segmentOf(r);
+        const staged = !!PENDING_SEG[r.id];
+        return `<tr${staged ? ' class="sales-dirty"' : ''}>
+          <td><a href="#/regatta/${r.id}" data-route="#/regatta/${r.id}">${esc(r.name)}</a>
+            ${staged ? '<span class="edited-flag">staged</span>' : ''}</td>
+          <td class="muted" style="font-size:12px;">${esc(r.venue || r.country || '')}</td>
+          <td class="num">${n}</td>
+          <td>
+            <select class="segwork-pick" data-regatta="${r.id}">
+              <option value=""${cur ? '' : ' selected'}>— not set —</option>
+              ${SEGMENTS_ALL.map(x =>
+                `<option value="${esc(x)}"${x === cur ? ' selected' : ''}>${esc(x)}</option>`
+              ).join('')}
+            </select>
+          </td></tr>`;
+      }).join('');
+      return `<div class="card" style="padding:0;overflow:auto;">
+        <h2 style="padding:18px 20px 0;">Market segment</h2>
+        <p class="muted" style="font-size:12.5px;padding:0 20px;margin:6px 0 0;max-width:76ch;">
+          ${unset.length} regatta${unset.length === 1 ? '' : 's'} carry no segment, so they appear
+          nowhere on the Market tab and in no segment filter. Set one here and it stages like any
+          other edit — nothing reaches the database until it is exported from
+          <a href="#/changes" data-route="#/changes">Pending changes</a>.
+          Biggest first, since that is the order worth working in.</p>
+        <div class="ex-controls" style="padding:12px 20px 0;">
+          <label class="ex-pick">Show
+            <select id="segwork-show">
+              <option value="unset"${SEGWORK === 'unset' ? ' selected' : ''}>Needs a segment (${unset.length})</option>
+              <option value="all"${SEGWORK === 'all' ? ' selected' : ''}>Every regatta (${DATA.regattas.length})</option>
+            </select>
+          </label>
+          ${list.length > 150 ? `<span class="muted" style="font-size:12px;">showing the
+            largest 150 of ${list.length}</span>` : ''}
+        </div>
+        <table>
+          <thead><tr><th>Regatta</th><th>Where</th><th class="num">Boats</th>
+            <th style="width:220px;">Segment</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>`;
+    })()}
 
     <div class="card">
       <h2>Duplicates</h2>
