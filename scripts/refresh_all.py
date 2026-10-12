@@ -234,6 +234,13 @@ def main():
         # the same way owners are re-derived above.
         ("Refresh IRC TCCs", ["refresh_tcc.py", "--apply"], "tcc"),
 
+        # After the derived ratings above, because a certificate beats a
+        # results page: one is what the Rating Office issued, the other is
+        # whatever the organiser typed. refresh_tcc exists to fill the gap
+        # where no certificate is held, not to compete with one.
+        ("Load IRC certificates",
+         ["load_irc_tcc_listing.py", "data/irc_tcc_certificates.csv", "--apply"], "irc certs"),
+
         # Strictly AFTER the TCC refresh above. Both can set a boat's rating
         # and only one of them is a person: a TCC typed into the dashboard is
         # a decision, the derived one is an inference from the last result,
