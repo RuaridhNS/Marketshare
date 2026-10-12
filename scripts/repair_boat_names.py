@@ -44,6 +44,15 @@ import argparse
 import sqlite3
 
 
+
+def sail_of(row):
+    """A boat can have no sail number. split_shared_sail_numbers.py leaves one
+    null on every record it creates, because the number those entries arrived
+    on turned out to be shared and we do not know the real one. Formatting None
+    with a width is a TypeError, which took the whole weekly refresh down."""
+    return row["sail"] or "(no sail no)"
+
+
 def main():
     p = argparse.ArgumentParser()
     p.add_argument("db")
@@ -83,14 +92,14 @@ def main():
             ambiguous += 1
             raced = ", ".join(f"{v['raw']} ({v['year']})" for v in
                               sorted(variants.values(), key=lambda v: v["year"]))
-            print(f"  {r['sail']:12} {r['name']!r} LEFT ALONE - raced under more "
+            print(f"  {sail_of(r):12} {r['name']!r} LEFT ALONE - raced under more "
                   f"than one name, so this is a decision: {raced}")
             continue
         only = next(iter(variants.values()))
         if not args.dry_run:
             cur.execute("UPDATE boats SET boat_name = ?, updated_at = datetime('now') "
                         "WHERE id = ?", (only["raw"].upper(), bid))
-        print(f"  {r['sail']:12} {r['name']!r} -> {only['raw'].upper()!r}  "
+        print(f"  {sail_of(r):12} {r['name']!r} -> {only['raw'].upper()!r}  "
               f"(its only raced name, {only['n']} entr"
               f"{'y' if only['n'] == 1 else 'ies'}, latest {only['year']})")
         fixed += 1
