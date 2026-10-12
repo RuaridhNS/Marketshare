@@ -53,8 +53,22 @@ CREATE INDEX IF NOT EXISTS idx_birc_boat ON boat_irc_certs(boat_id);
 
 
 def key(s):
-    """Sail number reduced to letters and digits: 'GBR 8809R' -> 'GBR8809R'."""
-    return re.sub(r"[^A-Z0-9]", "", (s or "").upper())
+    """Sail number reduced to letters, digits, and the hyphens that are part of
+    the number.
+
+    'GBR 8809R' -> 'GBR8809R' and 'ITA-15202' -> 'ITA15202': a hyphen after the
+    country prefix is punctuation and two sources spell it differently.
+
+    'GBR24-2' stays 'GBR24-2'. A hyphen BETWEEN TWO DIGITS is structural - it
+    is the metre and class rule's own notation, GBR17-6M being boat 17 in the
+    6-Metre class - and closing it up invents a different number. Stripping it
+    is what gave TEAM MAVERICK SSR, a Diam 24 trimaran on GBR24-2, the four
+    certificates belonging to SCENARIO ENCORE on GBR242, and made two
+    unrelated boats look like one hull renamed."""
+    s = (s or "").upper()
+    s = re.sub(r"(?<=\d)-(?=\d)", "\x00", s)      # hold the structural hyphen
+    s = re.sub(r"[^A-Z0-9\x00]", "", s)
+    return s.replace("\x00", "-")
 
 
 # A national sail number: a country prefix, digits, an optional class letter.
@@ -63,7 +77,7 @@ def key(s):
 # an identity: two of ours sit on '45', BELLA MENTE and GOSLING. The cost of
 # being wrong here is a wrong rating carrying the Rating Office's authority,
 # which is worse than no rating at all.
-PLAUSIBLE = re.compile(r"^[A-Z]{2,4}\d+[A-Z]?$")
+PLAUSIBLE = re.compile(r"^[A-Z]{2,4}\d+(-\d+)?[A-Z]{0,2}$")
 
 
 def iso(d):
