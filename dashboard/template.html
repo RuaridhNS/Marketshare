@@ -2027,6 +2027,64 @@ function renderBoatProfile(id) {
   const b = boatsById[id];
   if (!b) return `<div class="card">Boat not found.</div>`;
   const bucket = bucketOf(b.current_sailmaker);
+
+  // IRC certificates, newest first. The year-on-year change is computed down
+  // the PRIMARY series only: a secondary certificate is a second
+  // configuration of the same boat, so differencing it against the primary
+  // would print a change that never happened.
+  const certs = (b.irc_certs || []).slice()
+    .sort((x, y) => (y.cert_year || 0) - (x.cert_year || 0)
+                 || (x.secondary ? 1 : 0) - (y.secondary ? 1 : 0)
+                 || String(x.cert_no).localeCompare(String(y.cert_no)));
+  const primaries = certs.filter(c => !c.secondary);
+  const prevTcc = {};
+  primaries.forEach((c, i) => { prevTcc[c.cert_year + '|' + c.cert_no] =
+    primaries[i + 1] ? primaries[i + 1].tcc : null; });
+  const certCard = !certs.length ? '' : (() => {
+    const latest = primaries[0] || certs[0];
+    const rows = certs.map(c => {
+      const was = c.secondary ? null : prevTcc[c.cert_year + '|' + c.cert_no];
+      const d = (was == null) ? null : c.tcc - was;
+      const chg = d == null ? '<span class="muted">&mdash;</span>'
+        : Math.abs(d) < 0.0005 ? '<span class="muted">no change</span>'
+        // The sign carries the information; colouring one direction would be an
+        // opinion about whether a rating going up is bad news.
+        : `${d > 0 ? '+' : '\u2212'}${Math.abs(d).toFixed(3)}`;
+      return `<tr${c.secondary ? ' class="muted"' : ''}>
+        <td>${c.cert_year || '&mdash;'}${c.secondary
+            ? ' <span class="pill" style="background:var(--surface-2);color:var(--text-secondary);'
+              + 'border:1px solid var(--border);">secondary</span>' : ''}</td>
+        <td class="num">${c.tcc.toFixed(3)}</td>
+        <td class="num">${chg}</td>
+        <td class="num">${c.non_spi_tcc != null ? c.non_spi_tcc.toFixed(3) : '&mdash;'}</td>
+        <td>${c.endorsed ? 'endorsed' : '<span class="muted">standard</span>'}</td>
+        <td class="muted" style="font-size:12px;">${esc(c.issue_date || '')}</td>
+        <td class="muted" style="font-size:12px;">${esc(String(c.cert_no || ''))}</td>
+      </tr>`;
+    }).join('');
+    return `<div class="card" style="padding:0;overflow:auto;">
+      <h2 style="padding:18px 20px 0;">IRC certificates (${certs.length})</h2>
+      <p class="muted" style="font-size:12px;padding:0 20px;margin:4px 0 0;max-width:80ch;">
+        Issued by the RORC Rating Office, newest first. The rating at the top of this page is
+        the most recent <strong>primary</strong> certificate &mdash; ${latest.cert_year || ''}
+        at ${latest.tcc.toFixed(3)}. A <strong>secondary</strong> is a second configuration of
+        the same boat, short-handed or a different sail plan, and never becomes the headline.
+        <strong>Endorsed</strong> means measured rather than declared.</p>
+      <table>
+        <thead><tr><th>Season</th><th class="num">TCC</th><th class="num">Change</th>
+          <th class="num" title="Rating without a spinnaker">Non-spi</th>
+          <th>Certificate</th><th>Issued</th><th>No.</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>`;
+  })();
+
+  // Where the number in the subtitle came from. A certificate is the Rating
+  // Office's answer; anything else is the last rating a results page printed,
+  // which is a good guess and not the same thing.
+  const certForTcc = b.tcc == null ? null
+    : primaries.find(c => Math.abs(c.tcc - b.tcc) < 0.0005)
+      || certs.find(c => Math.abs(c.tcc - b.tcc) < 0.0005);
   const smHistoryRows = b.sailmaker_history.map(h => `
     <tr><td>${esc(h.sailmaker_name||'—')}</td><td>${esc(h.source||'')}</td><td>${esc(h.confidence||'')}</td></tr>
   `).join('') || `<tr><td colspan="3" class="muted">No sailmaker history recorded.</td></tr>`;
@@ -2261,7 +2319,9 @@ function renderBoatProfile(id) {
         ? `<span class="pill" style="background:var(--accent);color:var(--accent-ink);">Active</span>`
         : `<span class="pill" style="background:var(--surface-2);color:var(--text-muted);border:1px solid var(--border);">Inactive</span>`
       }${pending?'<span class="edited-flag">Edited</span>':''}</h1>
-    <p class="subtitle">${esc(b.sail_no||'')} · ${esc(b.boat_type||'')}${b.tcc ? ' · TCC '+b.tcc : ''}${b.lastActiveYear ? ' · last raced '+b.lastActiveYear : ' · no dated race entries on file'}</p>
+    <p class="subtitle">${esc(b.sail_no||'')} · ${esc(b.boat_type||'')}${b.tcc ? ' \u00b7 TCC ' + b.tcc + (certForTcc
+        ? ` <span class="muted" style="font-size:12px;">(${certForTcc.cert_year} certificate)</span>`
+        : ` <span class="muted" style="font-size:12px;">(from results, no certificate held)</span>`) : ''}${b.lastActiveYear ? ' · last raced '+b.lastActiveYear : ' · no dated race entries on file'}</p>
     ${pendingBanner}
     ${mergeBanner}
     <div class="card-row">
@@ -2285,6 +2345,7 @@ function renderBoatProfile(id) {
       <h2>Sailmaker history</h2>
       <table><thead><tr><th>Sailmaker</th><th>Source</th><th>Confidence</th></tr></thead><tbody>${smHistoryRows}</tbody></table>
     </div>
+    ${certCard}
     ${nameTimeline}
     <div class="card" id="owner-tl-card" data-boat-id="${b.id}">
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">

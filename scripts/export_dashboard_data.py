@@ -628,6 +628,17 @@ def main():
         FROM boat_owner_history ORDER BY boat_id, id
     """).fetchall()
 
+    # IRC certificates. Guarded because a database built before
+    # load_irc_tcc_listing.py existed has no such table, and an export that
+    # dies on a missing table is worse than one that ships without a column.
+    has_certs = cur.execute(
+        "SELECT 1 FROM sqlite_master WHERE type='table' AND name='boat_irc_certs'").fetchone()
+    cert_rows = cur.execute("""
+        SELECT boat_id, cert_year, cert_no, tcc, non_spi_tcc, endorsed, secondary,
+               issue_date, boat_name
+          FROM boat_irc_certs ORDER BY boat_id, cert_year DESC, secondary, cert_no
+    """).fetchall() if has_certs else []
+
     # ---- assemble boats with nested entries + sailmaker history ----
     races_by_id = {r["id"]: r for r in races}
     events_by_id = {e["id"]: e for e in events}
@@ -678,6 +689,10 @@ def main():
                            or None)
         ownerhist_by_boat.setdefault(d["boat_id"], []).append(d)
 
+    certs_by_boat = {}
+    for r in cert_rows:
+        certs_by_boat.setdefault(r["boat_id"], []).append(dict(r))
+
     boats = []
     for b in boats_rows:
         d = dict(b)
@@ -686,6 +701,7 @@ def main():
         d["sailmaker_history"] = smhist_by_boat.get(d["id"], [])
         d["owner_history"] = ownerhist_by_boat.get(d["id"], [])
         d["name_history"] = namehist_by_boat.get(d["id"], [])
+        d["irc_certs"] = certs_by_boat.get(d["id"], [])
         # "current" sailmaker = most recent history row, else most recent entry's sailmaker
         current_sm = None
         # A PARTIAL inventory is not the boat's sailmaker. GLADIATOR is a
@@ -819,6 +835,10 @@ def main():
         b["sailmaker_history"] = [strip_nulls(h) for h in b["sailmaker_history"]]
         b["owner_history"] = [strip_nulls(h) for h in b["owner_history"]]
         b["name_history"] = [strip_nulls(h) for h in b.get("name_history", [])]
+        # boat_id is already the key this sits under, and most certificates
+        # carry no secondary flag: dropping both saves a tenth of the page.
+        b["irc_certs"] = [strip_nulls({k: v for k, v in c.items() if k != "boat_id"})
+                          for c in b.get("irc_certs", [])]
 
     with open(out_path, "w") as f:
         json.dump(data, f, default=str)
