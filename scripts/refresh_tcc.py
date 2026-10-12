@@ -62,14 +62,25 @@ def main():
     con = sqlite3.connect(dbp)
     cur = con.cursor()
 
+    has_certs = bool(cur.execute("SELECT 1 FROM sqlite_master WHERE type='table' "
+                                 "AND name='boat_irc_certs'").fetchone())
+
     # ---- 1. values that are not TCCs ------------------------------------
     bad = "(tcc < ? OR tcc > ? OR tcc IN (%s))" % ",".join("?" * len(SENTINELS))
     bad_args = (LO, HI, *SENTINELS)
+    # A sentinel is only a sentinel on a results page. Exactly 1.000 off the
+    # Rating Office is a rating: BLUE JAY ran 1.010, 1.005, 1.003, 1.002 and
+    # then 1.000, and eighteen boats like it were being cleared here and
+    # restored by the certificate loader on every run. A value a certificate
+    # states is never "not a TCC".
+    certified = (" AND NOT EXISTS (SELECT 1 FROM boat_irc_certs ic "
+                 "WHERE ic.boat_id = boats.id AND ABS(ic.tcc - boats.tcc) <= 0.0005)"
+                 if has_certs else "")
     bad_entries = cur.execute(
         f"SELECT COUNT(*) FROM race_entries WHERE tcc IS NOT NULL AND {bad}",
         bad_args).fetchone()[0]
     bad_boats = cur.execute(
-        f"SELECT COUNT(*) FROM boats WHERE tcc IS NOT NULL AND {bad}",
+        f"SELECT COUNT(*) FROM boats WHERE tcc IS NOT NULL AND {bad}{certified}",
         bad_args).fetchone()[0]
     print(f"not a TCC: {bad_entries} entr(y/ies), {bad_boats} boat record(s)")
     for tcc, n, cls in cur.execute(
@@ -79,7 +90,15 @@ def main():
         print(f"   {tcc:<10} {n:4} entr(y/ies)   class: {str(cls)[:40]}")
 
     # ---- 2. the rating each boat last raced under -----------------------
-    rows = cur.execute("""
+    # A boat holding a certificate is not this script's business: it fills the
+    # gap where the Rating Office has told us nothing. Left to compete, it
+    # overwrote 1,023 certificate ratings on every run and
+    # load_irc_tcc_listing.py put every one of them back. Guarded on the
+    # table's existence so a database built before the certificates arrived
+    # still runs.
+    cert_guard = ("AND NOT EXISTS (SELECT 1 FROM boat_irc_certs ic WHERE ic.boat_id = b.id)"
+                  if has_certs else "")
+    rows = cur.execute(f"""
         WITH latest AS (
           SELECT re.boat_id, re.tcc, e.season_year,
                  ROW_NUMBER() OVER (PARTITION BY re.boat_id
@@ -95,6 +114,7 @@ def main():
           FROM latest l JOIN boats b ON b.id = l.boat_id
          WHERE l.rn = 1
            AND (b.tcc IS NULL OR ABS(b.tcc - l.tcc) > 0.0005)
+           {cert_guard}
          ORDER BY l.season_year DESC, ABS(COALESCE(b.tcc, 0) - l.tcc) DESC
     """, (LO, HI, *SENTINELS)).fetchall()
 
@@ -127,7 +147,8 @@ def main():
         return
 
     cur.execute(f"UPDATE race_entries SET tcc = NULL WHERE tcc IS NOT NULL AND {bad}", bad_args)
-    cur.execute(f"UPDATE boats SET tcc = NULL WHERE tcc IS NOT NULL AND {bad}", bad_args)
+    cur.execute(f"UPDATE boats SET tcc = NULL WHERE tcc IS NOT NULL AND {bad}{certified}",
+                bad_args)
     cur.executemany("UPDATE boats SET tcc = ? WHERE id = ?",
                     [(r[4], r[0]) for r in rows])
     cur.executemany("UPDATE boats SET tcc = NULL WHERE id = ?",

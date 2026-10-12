@@ -82,6 +82,41 @@ def main():
         key = (boat_id, cat or rg_name, yr)
         (superseded if key in have_result else kept).append((rid, name, rg_name, yr))
 
+    # ---- second pass: the same boat, the same EVENT, entered and scored ----
+    # The rule above is deliberately loose - season and organiser - because a
+    # hand-loaded entry list usually cannot be tied to the event whose results
+    # replaced it. This one is the opposite: it asks only whether the boat has
+    # a RESULT under the very same event, which is unambiguous however the row
+    # was loaded. That is what makes it safe to apply to the Marketshare
+    # workbook's entry lists too, which the pass above leaves alone: for the
+    # events those lists are the ONLY record of, no result exists and nothing
+    # is dropped.
+    #
+    # The two halves of a fold meet here. data/regatta_merges.csv puts the
+    # entry list and the results under one event; this stops the boats in both
+    # being counted twice inside it.
+    in_event = cur.execute("""
+        SELECT re.id, re.boat_name_used, rg.name, e.season_year
+          FROM race_entries re
+          JOIN races ra ON ra.id = re.race_id
+          JOIN events e ON e.id = ra.event_id
+          JOIN regattas rg ON rg.id = e.regatta_id
+         WHERE ra.status = 'entry-list'
+           AND EXISTS (SELECT 1 FROM race_entries r2
+                         JOIN races a2 ON a2.id = r2.race_id
+                        WHERE a2.event_id = ra.event_id AND a2.id <> ra.id
+                          AND r2.boat_id = re.boat_id
+                          AND (IFNULL(r2.position, '') <> ''
+                               OR IFNULL(r2.corrected_time, '') <> ''
+                               OR r2.status IN ('finished', 'retired', 'disqualified')))
+    """).fetchall()
+    already = {r[0] for r in superseded}
+    in_event = [r for r in in_event if r[0] not in already]
+    kept = [k for k in kept if k[0] not in {r[0] for r in in_event}]
+    superseded.extend(in_event)
+    print(f"  {len(in_event)} of them found by the same-event rule "
+          f"- entered and scored under one event")
+
     if superseded and not args.dry_run:
         cur.executemany("DELETE FROM race_entries WHERE id = ?",
                         [(r[0],) for r in superseded])
