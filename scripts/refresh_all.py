@@ -177,6 +177,20 @@ def main():
         ("Merge boats", ["merge_boats.py", "--file", "data/boat_merges.csv"], "boat merges"),
         ("Split wrongly-merged boats", ["split_boat.py", "data/boat_splits.csv"], "boat splits"),
 
+        # Before the split below, which reads boat_type_used as evidence of
+        # what a boat IS. One import slipped a column and wrote the owner's
+        # home town there, and a town that looks like a type is a town that
+        # proves two boats are different when they are the same one.
+        ("Drop column-shifted entries", ["drop_column_shifted_entries.py", "--apply"], "shifted"),
+
+        # A bare sail number is not an identity, so every boat that ever raced
+        # under "45" anywhere became one record. This takes them apart, and it
+        # belongs here: after the merges have settled which records exist, and
+        # before repair_boat_names, backfill_owners, backfill_boat_names,
+        # normalise_boat_types and refresh_tcc, which between them re-derive
+        # the name, owner, type and rating of every record it creates.
+        ("Split shared sail numbers", ["split_shared_sail_numbers.py", "--apply"], "sail splits"),
+
         # Straight after those two, because both can leave a record wearing a
         # name whose entry has just moved to another boat. merge_boats repairs
         # the pairs in its own ledger; this catches every other case, including
