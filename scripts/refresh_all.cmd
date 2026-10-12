@@ -9,7 +9,11 @@ REM Writes a timestamped log per run and keeps the last 30.
 REM ---------------------------------------------------------------------------
 setlocal
 
-set REPO=C:\Solent Marketshare\marketshare_project\marketshare
+REM The repo moved into OneDrive and this did not follow it. The old path -
+REM C:\Solent Marketshare\marketshare_project\marketshare - has not existed for
+REM some time, so the `cd /d` below failed and the scheduled task exited 1 every
+REM Monday without writing a log to say so. Nothing has been refreshing itself.
+set REPO=C:\Users\ruari\OneDrive - North Technology Group\NS_ISSP - General\Marketshare\project
 set PY=C:\Users\ruari\AppData\Local\Python\bin\python.exe
 set LOGDIR=%REPO%\logs
 
