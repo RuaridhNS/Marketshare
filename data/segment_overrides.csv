@@ -54,6 +54,8 @@ rorc spring series,Race|Premier Race,"A local Solent race. Race and Premier Race
 rorc castle rock,Race|Premier Race,"A local Solent race. Race and Premier Race both: the fleet spans the two, and it is counted under Race so the segments still add up to the fleet."
 rorc 2h offshore,Race|Premier Race,"A local Solent race. Race and Premier Race both: the fleet spans the two, and it is counted under Race so the segments still add up to the fleet."
 ^royal southern,Race|Premier Race,"Every Royal Southern event, replacing two rows that named the May and June regattas. The Cape 31 Nationals it also runs keeps Grand Prix: the cape ?31 rule at the top of this file is matched first."
+^2H Championships$,Race|Premier Race,"RORC's Solent two-handed championship - one season on file, 2026, class 'IRC Double Handed', 18 Sun Fasts. The same pair as the other local Solent races above. Anchored because '2H' is short enough to turn up inside another name."
+^Offshore Double Handed World Championship$,Race|Premier Race,"Solent, 2025, 21 boats and every one of them an SF30 - it is sailed in a supplied one-design fleet. Classed on what the event IS rather than on the hull, the way RC44 and Cape 31 are treated at the top of this file. NOT the same event as 'ORC Double Handed World Championship' (Non-UK, 2026, 32 boats, mixed J-99 and JPK): the two records share no boats at all, so they are two championships, not one duplicated."
 ^Autumn Series$,Race|Premier Race,RORC's Solent autumn series - the category says RORC and the one season it holds is 2020. The same pair as the other local Solent races above. Anchored because the name is two common words.
 ^rorc\b,Race,"The rest of the RORC programme - North Sea, East Coast, Drheam, the Irish Sea races, Nelson's Cup. Race, not Premier Race: they are RORC season racing but they are not Solent, which is the distinction the two rules above draw. Everything marquee is named further up, where this rule cannot reach it."
 ^irc two.handed$,Race,"Club, regional and series handicap racing - the Race definition, applied to the Solent fleet that carried no segment at all."
@@ -66,3 +68,4 @@ warsash spring championships,Race,"Club, regional and series handicap racing - t
 ^Hamble Winter Series$,Race,Club racing in the Solent.
 ^XOD Telegraph Trophy$,One-Design,"The X One-Design class. A class trophy, so the segment is the class."
 ^Telegraph Bowl \(XOD\)$,One-Design,"The other XOD trophy. The parentheses are escaped: this column is a regular expression, and unescaped brackets would make a group that matches the bare words."
+^Stug Perry Trophy$,One-Design,"A Daring class trophy: one season on file, class 'Darings', and all nine boats are typed Daring. The segment is the class."
