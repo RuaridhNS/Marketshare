@@ -88,11 +88,23 @@ python scripts/build_dashboard.py            # dashboard/dashboard.html, one fil
 python scripts/build_dashboard.py --split    # dist/index.html + dist/data.json.gz
 ```
 
-- **Single file** (3.0MB) — routes 1 and 4. Opens from disk.
-- **Split** (300KB page + 2.0MB data) — routes 2 and 3. Both files must sit in
-  the same folder and be served over http(s); the page fetches the data at
-  load with a cache-buster, so a replaced data file is picked up immediately.
-  It will *not* work opened straight off disk, and says so plainly if you try.
+- **Single file** (3.8MB) — routes 1 and 4. Opens from disk.
+- **Split** (685KB page + 2.3MB gzipped data) — routes 2 and 3. Both files must
+  sit in the same folder and be served over http(s); the page fetches the data
+  at load with a cache-buster, so a replaced data file is picked up
+  immediately. It will *not* work opened straight off disk, and says so plainly
+  if you try.
+
+The page grew from 300KB to 685KB when Proxima Nova was embedded as three
+base64 `@font-face` blocks, to match the IRC TCC Dashboard without a webfont
+request. That is a deliberate trade: a fifth of a megabyte against a dependency
+on fonts.googleapis.com, which the same argument against the xlsx CDN rules
+out.
+
+**Verified 13 Oct 2026**, which matters because nothing had exercised `--split`
+since this document was written and the page has changed a great deal since:
+served over http, all routes render, the certificate history and the data
+drawers work, and the build stamp reads through. Route 2 is not theoretical.
 
 ---
 
