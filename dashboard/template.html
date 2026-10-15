@@ -501,6 +501,9 @@ tr.enrich-miss > td:first-child { box-shadow: inset 3px 0 0 var(--series-doyle);
 .sb-north   { background: var(--series-north); }
 .sb-other   { background: var(--series-doyle); }
 .sb-unknown { background: var(--border); }
+.share-meas { font-size: 11px; color: var(--text-secondary); white-space: nowrap;
+  margin-left: 6px; font-variant-numeric: tabular-nums; }
+.share-meas.thin { color: var(--warn-text, #8a6d1f); font-weight: 600; }
 .share-text { font-size: 11.5px; color: var(--text-secondary);
   font-variant-numeric: tabular-nums; }
 .share-unknown { color: var(--text-muted); }
@@ -5137,17 +5140,22 @@ const COVERAGE_BADGE = {
 // different way round, so this is one view rather than three near-copies - and
 // it replaces scrolling a flat list of 462 events.
 const DIMS = {
-  seg: { label: 'Market',   plural: 'markets'   },
-  rg:  { label: 'Event',    plural: 'events'    },
-  v:   { label: 'Location', plural: 'locations' }
+  seg:  { label: 'Market',   plural: 'markets'   },
+  rg:   { label: 'Event',    plural: 'events'    },
+  v:    { label: 'Location', plural: 'locations' },
+  area: { label: 'Area',     plural: 'areas'     }
 };
-const DIM_KEYS = ['seg', 'rg', 'v'];
-const EXPLORE = { order: ['seg', 'v', 'rg'], y0: null, y1: null };
+const DIM_KEYS = ['area', 'seg', 'rg', 'v'];
+// Area leads by default. Ninety-five locations is too fine a grain to ask "how
+// are we doing on the South Coast" of, which is the question this tab exists
+// for; the location is still one level down.
+const EXPLORE = { order: ['area', 'seg', 'v', 'rg'], y0: null, y1: null, area: null };
 
 function exploreFacts() {
   return (DATA.facts || []).filter(f =>
     (EXPLORE.y0 == null || f.y >= EXPLORE.y0) &&
-    (EXPLORE.y1 == null || f.y <= EXPLORE.y1));
+    (EXPLORE.y1 == null || f.y <= EXPLORE.y1) &&
+    (!EXPLORE.area || f.area === EXPLORE.area));
 }
 
 // Boats are counted per event per season, so a boat racing three events in a
@@ -5174,13 +5182,23 @@ function groupRows(rows, key) {
     .sort((a, b) => b.s.b - a.s.b || String(a.name).localeCompare(String(b.name)));
 }
 
+// The share and the size of the sample it rests on, together, always. Across
+// the areas the share runs 67-86% and the measured fraction runs 14-50% - the
+// spread in how much we have counted is wider than the spread in the answer,
+// and the boats that got counted are disproportionately the ones we already
+// sell to. A percentage shown on its own here would be read as a market share
+// and is not one.
 function shareStrip(s) {
   if (!s.k) return '<span class="share-none" title="no sailmaker recorded">—</span>';
   const pct = Math.round(100 * s.n / s.k);
-  return `<span class="share-wrap" title="${s.n} North of ${s.k} with a sailmaker recorded">
+  const meas = s.b ? Math.round(100 * s.k / s.b) : 0;
+  const warn = meas < 25 ? ' thin' : '';
+  return `<span class="share-wrap" title="${s.n} North of ${s.k} boat-seasons with a sailmaker
+recorded, out of ${s.b.toLocaleString()} sailed — ${meas}% measured">
     <span class="share-bar"><i class="sb-north" style="width:${pct}%"></i>
       <i class="sb-other" style="width:${100 - pct}%"></i></span>
-    <span class="share-text">${pct}%</span></span>`;
+    <span class="share-text">${pct}%</span>
+    <span class="share-meas${warn}">${meas}% measured</span></span>`;
 }
 
 function exploreNode(node, dims, depth) {
@@ -5240,7 +5258,14 @@ function renderExplore() {
   // exactly the "no change when I select" that was reported.
   const hierarchy = dims.map(d => DIMS[d].label).join(' → ');
   const lead = dims[0];
-  const toggle = [['seg', 'Market first'], ['v', 'Location first']].map(([k, label]) =>
+  const areas = [...new Set((DATA.facts || []).map(f => f.area))].sort((a, b) =>
+    a === 'Area not set' ? 1 : b === 'Area not set' ? -1 : a.localeCompare(b));
+  const areaPick = `<label class="ex-pick">Area
+    <select id="ex-area">
+      <option value=""${EXPLORE.area ? '' : ' selected'}>Everywhere (${areas.length})</option>
+      ${areas.map(a => `<option value="${esc(a)}"${EXPLORE.area === a ? ' selected' : ''}>${esc(a)}</option>`).join('')}
+    </select></label>`;
+  const toggle = [['area', 'Area first'], ['seg', 'Market first'], ['v', 'Location first']].map(([k, label]) =>
     `<button type="button" class="ex-lead${k === lead ? ' on' : ''}" data-lead="${k}">${label}</button>`
   ).join('');
 
@@ -5263,6 +5288,7 @@ function renderExplore() {
     <label class="ex-pick"><span>to</span>
       <select id="ex-y1">${years.map(y => `<option value="${y}"${y === EXPLORE.y1 ? ' selected' : ''}>${y}</option>`).join('')}</select>
     </label>
+    ${areaPick}
     <span class="muted" style="margin-left:auto;font-size:12.5px;">
       ${all.b.toLocaleString()} boat-seasons shown</span>
   </div>
@@ -5273,6 +5299,11 @@ function renderExplore() {
 }
 
 function attachExploreHandlers() {
+  const ea = document.getElementById('ex-area');
+  if (ea) ea.addEventListener('change', () => {
+    EXPLORE.area = ea.value || null;
+    navigate();
+  });
   document.querySelectorAll('.ex-lead').forEach(btn =>
     btn.addEventListener('click', () => {
       const want = btn.dataset.lead, o = EXPLORE.order.slice();

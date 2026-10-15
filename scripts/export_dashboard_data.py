@@ -30,7 +30,7 @@ def main():
     # entries in a season.
     regattas = [dict(r) for r in cur.execute(
         """SELECT id, name, category, region, segment, country, venue,
-                  segments
+                  segments, area
              FROM regattas ORDER BY name""")]
 
     # --- Segments -------------------------------------------------------------
@@ -78,6 +78,7 @@ def main():
                r.name                                  AS rg,
                r.id                                    AS rid,
                COALESCE(r.venue, 'Location not set')   AS v,
+               COALESCE(r.area,  'Area not set')        AS area,
                r.country AS c, r.lat, r.lon, r.region AS reg,
                e.season_year AS y,
                COUNT(DISTINCT re.boat_id) AS b,

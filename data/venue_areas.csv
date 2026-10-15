@@ -1,0 +1,111 @@
+# The area each venue belongs to. One row per venue, matched exactly on
+# regattas.venue, which data/venues.csv sets. Edit the Area column freely:
+# this file is the only thing that decides how the Market tab groups places,
+# and it is re-applied on every refresh.
+#
+# THE CONVENTION, and the one worth arguing with: the area is where the
+# RACING happens and where the fleet comes from, not where the finish line
+# is. That is why Fastnet Rock, Eddystone, Saint-Malo and Cherbourg are
+# 'Solent offshore' - those are Solent races with somewhere else written in
+# the venue column, and the boats sailing them buy their sails here. Move
+# them to a French or Irish area and the Solent gets smaller by about 3,500
+# boats, which may be what you want; it is one edit per row.
+#
+# A blank Area is not an error - it groups under 'Area not set' and shows up
+# on the Data quality page until someone decides.
+Venue,Area,Why
+Solent,Solent,
+Fastnet Rock,Solent offshore,"The Rolex Fastnet Race. A turning mark, not a venue - the race starts and the fleet lives in the Solent."
+Saint-Malo,Solent offshore,Cowes-Dinard-St Malo and RORC Cowes-St Malo: a Solent fleet with a French finish.
+Palma de Mallorca,Mediterranean,
+Valletta,Mediterranean,"The Rolex Middle Sea Race. RORC runs it, but the fleet and the racing are Mediterranean."
+Kiel,Baltic & Nordic,
+Naples,Mediterranean,
+Eddystone,Solent offshore,"RORC Myth of Malham, Solent out and back round the lighthouse."
+Svendborg,Baltic & Nordic,
+La Trinite-sur-Mer,Brittany & Atlantic France,"Spi Ouest-France and the Drheam Cup - a French fleet at a French base, not a Solent race with a French finish."
+Cherbourg,Solent offshore,"RORC and JOG cross-Channel races, all starting in the Solent."
+Chicago,Great Lakes,
+Antigua,Caribbean,
+Scheveningen,North Sea,"The North Sea Regatta and Stellendam are Dutch events; the RORC North Sea Race starts at Harwich, not Cowes."
+Saint-Tropez,Mediterranean,
+Strait of Juan de Fuca,Pacific Northwest,
+Newport RI,US East Coast,
+Mackinac Island,Great Lakes,
+Hamilton Island,Australia,
+Chester NS,Canada East,
+Porto Cervo,Mediterranean,
+Barcelona,Mediterranean,
+Stockholm,Baltic & Nordic,
+Kingston ON,Great Lakes,
+Miami,US East Coast,
+Lake Constance,Inland Europe,"Inland Germany, and nothing else in the data is near it."
+Marblehead,US East Coast,
+Camden ME,US East Coast,
+Larchmont,US East Coast,
+Wicklow,Ireland,"The Round Ireland Race, run by Wicklow SC with RORC."
+Sydney,Australia,
+Lake Erie,Great Lakes,
+Bermuda,Bermuda,Its own area rather than Caribbean or US: the Newport and Antigua races finish here and it belongs to neither.
+West Mersea,East Coast,
+Athens,Mediterranean,
+Vancouver,Pacific Northwest,
+Detroit,Great Lakes,
+Charleston,US East Coast,
+San Juan Islands,Pacific Northwest,
+Lanzarote,Iberia & Atlantic Islands,The RORC Transatlantic Race starts here.
+Valencia,Mediterranean,
+Milwaukee,Great Lakes,
+San Francisco,US West Coast,
+Cannes,Mediterranean,
+Edgartown,US East Coast,
+Livorno,Mediterranean,
+Chesapeake Bay,US East Coast,
+Cow Bay,Canada East,
+San Diego,US West Coast,
+Antibes,Mediterranean,
+Hong Kong,Asia,
+Alderney,Solent offshore,
+Cartagena,Mediterranean,
+Deauville,Solent offshore,
+Helsinki,Baltic & Nordic,
+Weymouth,South Coast,
+White Bear Lake,Great Lakes,
+Saint-Vaast-la-Hougue,Solent offshore,
+Le Havre,Solent offshore,
+Palermo,Mediterranean,
+Nantucket,US East Coast,
+Tortola,Caribbean,
+Poole,South Coast,
+Liverpool,North West,
+Los Angeles,US West Coast,
+Saint Peter Port,Solent offshore,
+Monaco,Mediterranean,
+Saint-Barthelemy,Caribbean,
+Tallinn,Baltic & Nordic,
+Sheboygan,Great Lakes,
+Helgoland,North Sea,
+Caen,Solent offshore,
+Dun Laoghaire,Ireland,
+Les Sables-d'Olonne,Brittany & Atlantic France,
+Cascais,Iberia & Atlantic Islands,
+Marstrand,Baltic & Nordic,
+Auckland,New Zealand,
+Southport QLD,Australia,
+Lake Geneva WI,Great Lakes,
+Fort Lauderdale,US East Coast,
+Long Beach,US West Coast,
+Oslo,Baltic & Nordic,
+Alicante,Mediterranean,
+Brest,Brittany & Atlantic France,
+Lake Garda,Mediterranean,"Inland, but it races as part of the Mediterranean circuit."
+Lorient,Brittany & Atlantic France,
+Lake Macatawa,Great Lakes,
+Imperia,Mediterranean,
+Portsmouth,Solent,
+Gdynia,Baltic & Nordic,
+Barbados,Caribbean,
+Grenada,Caribbean,
+Las Palmas de Gran Canaria,Iberia & Atlantic Islands,
+Sint Maarten,Caribbean,
+St Thomas,Caribbean,

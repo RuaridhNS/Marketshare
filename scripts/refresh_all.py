@@ -270,6 +270,14 @@ def main():
         # entirely, which meant a correction lasted exactly until the next
         # rebuild - the one failure the whole ledger pattern exists to prevent.
         ("Apply segment overrides", ["apply_segment_overrides.py", "--apply"], "segments"),
+
+        # After the segments, and after anything that can set a venue: the
+        # area is read off the venue, so it has to be the last word on
+        # where a regatta is. Ninety-five venues is too fine to ask "how
+        # are we doing on the South Coast" of, which is what the area is
+        # for - and regattas.region cannot answer it, because it records
+        # whose race it is rather than where.
+        ("Apply venue areas", ["apply_venue_areas.py", "--apply"], "areas"),
     ]
     for label, argv, tag in PIPELINE:
         ok, _ = run(label, argv, args.db, args.timeout)
