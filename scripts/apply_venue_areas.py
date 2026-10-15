@@ -19,9 +19,11 @@ regatta with no venue, or a venue with no area, gets NULL and groups under
     python scripts/apply_venue_areas.py db/marketshare.db
     python scripts/apply_venue_areas.py db/marketshare.db --apply
 """
-import argparse, csv, datetime, pathlib, shutil, sqlite3
+import argparse, csv, datetime, pathlib, re, shutil, sqlite3
 
-LEDGER = pathlib.Path(__file__).resolve().parents[1] / "data" / "venue_areas.csv"
+ROOT = pathlib.Path(__file__).resolve().parents[1]
+LEDGER = ROOT / "data" / "venue_areas.csv"
+OVERRIDES = ROOT / "data" / "regatta_areas.csv"
 
 
 def load():
@@ -37,6 +39,24 @@ def load():
     return out
 
 
+def load_overrides():
+    """Regattas the venue cannot place - an international offshore race is not a
+    local market, however local the port it starts from."""
+    if not OVERRIDES.exists():
+        return []
+    out = []
+    with OVERRIDES.open(encoding="utf-8-sig") as fh:
+        for row in csv.DictReader(l for l in fh if not l.startswith("#")):
+            pat, area = (row.get("Pattern") or "").strip(), (row.get("Area") or "").strip()
+            if not pat or not area:
+                continue
+            try:
+                out.append((re.compile(pat, re.I), area, pat))
+            except re.error as ex:
+                print(f"  skipping bad pattern {pat!r}: {ex}")
+    return out
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("db")
@@ -44,8 +64,10 @@ def main():
     a = ap.parse_args()
 
     areas = load()
+    overrides = load_overrides()
     print(f"{len(areas)} venue(s) in the ledger, "
-          f"{sum(1 for v in areas.values() if v)} with an area")
+          f"{sum(1 for v in areas.values() if v)} with an area; "
+          f"{len(overrides)} regatta override(s)")
 
     dbp = pathlib.Path(a.db)
     con = sqlite3.connect(dbp)
@@ -67,6 +89,9 @@ def main():
     changes, unknown = [], {}
     for rid, name, venue, cur_area in rows:
         want = areas.get((venue or "").strip()) if venue else None
+        hit = next((o for o in overrides if o[0].search(name or "")), None)
+        if hit:
+            want = hit[1]            # the override is the last word, venue or not
         if venue and (venue or "").strip() and (venue or "").strip() not in areas:
             unknown.setdefault(venue, []).append(name)
         if (cur_area or None) != want:

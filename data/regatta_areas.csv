@@ -1,0 +1,24 @@
+# Area overrides for regattas the VENUE cannot place. Matched case-insensitively
+# against the regatta NAME, FIRST MATCH WINS, applied after data/venue_areas.csv.
+#
+# This exists because an international offshore race is not a local market. The
+# Caribbean 600 starts in Antigua and its biggest nationality is British; the
+# Fastnet starts in the Solent and half its fleet is not. Filed under the place
+# they sail from, each one inflates a local market with boats that will never
+# buy from that loft.
+#
+# The test used was the share held by the LARGEST single nationality of sail
+# number. Below about 45% the fleet has no home: Fastnet 44, Round Britain 37,
+# Caribbean 600 32, Transatlantic 29, Middle Sea 19. Above it, it does: Cherbourg
+# GBR 68, North Sea NED 52, Normandy Channel FRA 79 - those stay where they are.
+#
+# Sail-number nationality is weak evidence on its own - Cowes Week is only 59%
+# GBR across twenty years and nobody would call it international - so it is used
+# here to separate OFFSHORE races, where it tracks the fleet, and nowhere else.
+Pattern,Area,Why
+^Rolex Fastnet Race$,International offshore,"1,447 boats and no nationality above 44%. It starts in the Solent and 91% of its boats race there, but half the fleet is not British and it is not a Solent market - it is the race the whole of offshore racing turns up to."
+^RORC Round Britain and Ireland Race$,International offshore,"118 boats, GBR 37%, 31 of them American. Its venue says Solent because it starts and finishes at Cowes, which is exactly why the venue cannot decide this one."
+^RORC Caribbean 600 Race$,International offshore,454 boats and the largest single nationality is GBR at 32% - in Antigua. Leaving it in the Caribbean inflates the Antiguan market the same way the Fastnet would inflate the Solent.
+^RORC Transatlantic Race$,International offshore,"127 boats, GBR 29%. An ocean crossing is nobody's local market."
+^(Rolex )?RORC ?-? ?Middle Sea( Race)?$|^Rolex Middle Sea Race$,International offshore,"Both records of it. 622 and 76 boats, top nationality ITA at 19% - the most evenly international fleet in the database."
+^RORC La Trinite.Cowes Race$,Brittany & Atlantic France,"FRA 82% of 78 boats. It finishes in Cowes, which put its venue in the Solent, but it is a French fleet sailing from a French port."
