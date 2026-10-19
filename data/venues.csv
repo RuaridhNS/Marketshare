@@ -4,6 +4,13 @@ Pattern,Venue,Country,Lat,Lon
 # globe gets its coordinates from. Lat/Lon are the racing area, not the town hall.
 cowes dinard|dinard st malo|cowes-dinard,Saint-Malo,FRA,48.649,-2.026
 cowes-st malo|rorc cowes-st malo,Saint-Malo,FRA,48.649,-2.026
+# Third of the Cowes-to-a-French-port races and the one that was missed, so it
+# fell through to the generic "cowes" rule below and was filed in the Solent,
+# GBR. 64 of its 78 boats are on French sail numbers and 11 on British ones.
+# data/regatta_areas.csv had already moved its AREA to Brittany, which left it
+# reading as a French area inside the United Kingdom - which is what it looked
+# like from the outside, and it was the venue that was wrong all along.
+la trinite.cowes|cowes.la trinite,La Trinite-sur-Mer,FRA,47.586,-3.030
 cowes week|round the island|taittinger|vice admiral|rorc easter|race the wight,Solent,GBR,50.740,-1.310
 cowes|solent|royal southern|hamble|warsash|lymington|yarmouth|\bxod\b|half ton|one ton|stug perry|telegraph,Solent,GBR,50.740,-1.310
 fastnet,Fastnet Rock,IRL,51.385,-9.600

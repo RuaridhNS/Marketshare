@@ -120,7 +120,16 @@ def main():
     if not a.apply:
         print("\nDRY RUN - nothing written (pass --apply)")
         return
-    cur.executemany("update regattas set venue=?, country=coalesce(country,?),"
+    # country=? and not coalesce(country,?). The venue is the curated field -
+    # one line in data/venues.csv - and the country has to follow it, or a
+    # corrected venue leaves the old country behind and the regatta shows up
+    # in the wrong country's scope wearing the right area. That is exactly
+    # what RORC La Trinite-Cowes did: venue fixed to France, country still GBR.
+    # Safe to assert rather than fill: every one of the placed regattas already
+    # carried the country its venue implies, so this changes nothing that was
+    # not already wrong. Regattas with NO venue are not in this list at all,
+    # so an imported country with no venue to check it against is left alone.
+    cur.executemany("update regattas set venue=?, country=?,"
                     " lat=?, lon=? where id=?", updates)
     con.commit()
     print(f"\ncommitted {len(updates)} regatta placements")
