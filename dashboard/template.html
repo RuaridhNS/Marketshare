@@ -3129,9 +3129,19 @@ function areaOf(r) { return (r && r.area) || 'Area not set'; }
 // are in France" is a fair question, so country is a FILTER across the tree
 // rather than a branch of it. Written off the regatta's own country, falling
 // back to the venue's when the import recorded only a place.
+// market_country, not country. A regatta's country is the country of its
+// VENUE, and for a point-to-point race the venue is the port it FINISHES in -
+// so Cowes to Cherbourg was France, and eleven races, 1,090 boats and 6,213
+// entries of a 55%-British fleet dropped out of the United Kingdom. The area
+// already knew they were Solent offshore; data/area_countries.csv gives each
+// area its home market and apply_area_countries.py writes it here. Falls back
+// to the venue's country for an area that genuinely spans several - the
+// Mediterranean is one market made of five countries - and for a regatta with
+// no area at all.
 function countryOf(r) {
   if (!r) return '';
-  return COUNTRY_NAMES[r.country] || r.country || '';
+  const c = r.market_country || r.country;
+  return COUNTRY_NAMES[c] || c || '';
 }
 
 function seriesOf(r) {
@@ -4187,7 +4197,10 @@ function calendarEvents() {
 // Where an event is, for the calendar filter. Country first because that is
 // the question a rep asks; venue when it is all we hold.
 function calArea(rg) {
-  return COUNTRY_NAMES[rg.country] || rg.country || rg.venue || '';
+  // countryOf, so the Calendar's country filter agrees with the site's country
+  // scope. A rep asking what is on in the UK wants the Cherbourg race in that
+  // list; before this it was filed under France, same as the scope was.
+  return countryOf(rg) || rg.venue || '';
 }
 
 function calendarFacets(rows) {

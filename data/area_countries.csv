@@ -1,0 +1,46 @@
+# Which country's MARKET an area belongs to. Read by scripts/apply_area_countries.py,
+# which writes regattas.market_country; the dashboard's country scope and country
+# filters use that, not regattas.country.
+#
+# Why this file exists. A regatta's country is read off its venue, and for a
+# point-to-point race the venue is the port it FINISHES in. So Cowes to
+# Cherbourg was France, Cowes to St Malo was France, Cowes to Alderney was
+# Guernsey - eleven races, 1,090 boats and 6,213 entries, a fleet 55% British
+# against 31% French, none of it visible when the site was scoped to the United
+# Kingdom. The area already said "Solent offshore". Only the country disagreed,
+# and only because of where the fleet stopped for dinner.
+#
+# A country left BLANK means the area genuinely spans several and each regatta
+# keeps the country of its own venue. That is the honest answer for the
+# Mediterranean and the Caribbean: they are one sailing market made of many
+# countries, which is exactly why they are areas.
+#
+# Of the rows below, ONE changes anything: Solent offshore. Every other area
+# already carries the country named here, on every regatta in it. They are
+# written down anyway, because the next Cowes-to-somewhere race should land in
+# the right market without anyone having to notice it did not.
+Area,Country,Why
+Solent,GBR,
+Solent offshore,GBR,"The reason this file exists. Cherbourg, St Malo, Deauville, St Vaast, Alderney and St Peter Port are where these races FINISH; the fleet is British and sails from the Solent. 9 regattas filed FRA and 2 GGY, against 1 that was already GBR."
+South Coast,GBR,
+East Coast,GBR,
+North West,GBR,
+Ireland,IRL,
+Brittany & Atlantic France,FRA,
+North France,FRA,
+US East Coast,USA,
+US West Coast,USA,
+Canada East,CAN,
+Australia,AUS,
+New Zealand,NZL,
+Bermuda,BMU,
+Asia,HKG,"One regatta, the Rolex China Sea Race out of Hong Kong. Narrow enough that the area name is the only thing that is vague."
+Inland Europe,DEU,"One regatta. Widen this if the area ever holds more than Germany."
+Mediterranean,,"Spain 21, Italy 17, France 4, Greece 2, Monaco 1. One market, five countries, and the whole point of the area."
+Caribbean,,"Antigua 8, St Barths 2, Sint Maarten 2, BVI 2, Barbados, Grenada, US Virgin Islands."
+Baltic & Nordic,,"Germany 9, Sweden 3, Finland 2, Denmark, Estonia, Norway, Poland."
+Great Lakes,,"USA 24, Canada 6 - the lakes are the border."
+Pacific Northwest,,"Canada 15, USA 1 - so is the Salish Sea."
+North Sea,,"Netherlands 3, Germany 1."
+Iberia & Atlantic Islands,,"Spain 1, Portugal 1."
+International offshore,,"No home market by definition - that is what the area means. Each race keeps its own country, so the Fastnet is British and the Caribbean 600 Antiguan, while neither counts as a LOCAL market anywhere."

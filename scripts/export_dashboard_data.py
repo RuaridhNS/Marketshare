@@ -29,8 +29,13 @@ def main():
     # filter the event finder by it, and facts carries only the regattas that have
     # entries in a season.
     regattas = [dict(r) for r in cur.execute(
+        # market_country is which country's MARKET the regatta belongs to, set
+        # by apply_area_countries.py off the area. It differs from country only
+        # for a race that finishes abroad - Cowes to Cherbourg is a British
+        # market event at a French venue - and it is what the dashboard scopes
+        # and filters on. country stays, because the venue really is in France.
         """SELECT id, name, category, region, segment, country, venue,
-                  segments, area
+                  segments, area, market_country
              FROM regattas ORDER BY name""")]
 
     # --- Segments -------------------------------------------------------------

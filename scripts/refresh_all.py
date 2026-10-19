@@ -279,6 +279,15 @@ def main():
         # whose race it is rather than where.
         ("Apply venue areas", ["apply_venue_areas.py", "--apply"], "areas"),
 
+        # Straight after the areas, because it reads them. A regatta's country
+        # is the country of its VENUE, and for a point-to-point race the venue
+        # is the port it FINISHES in - so Cowes to Cherbourg was France and
+        # fell out of the United Kingdom altogether, eleven races and 6,213
+        # entries of a mostly British fleet. This writes the area's home market
+        # onto the regatta as market_country, which is what the dashboard
+        # scopes and filters on.
+        ("Apply area countries", ["apply_area_countries.py", "--apply"], "market countries"),
+
         # Researched sailmaker findings, each with the page it came from. They go to
         # boat_sailmaker_history, not onto the boat, so the dashboard derives the
         # current maker from them and deleting a row undoes it. Last, because a
