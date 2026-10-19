@@ -16,6 +16,22 @@ import argparse, csv, datetime, pathlib, re, shutil, sqlite3
 
 VENUES = pathlib.Path(__file__).resolve().parents[1] / "data" / "venues.csv"
 
+# Scrapers emit the TYPOGRAPHIC apostrophe; the patterns in venues.csv are
+# typed with a plain one. So "nelson's cup" never matched "RORC Nelson's Cup
+# Inshore Series" and the race sat with no venue, no area and no dot on the
+# globe - looking for all the world like a gap in the gazetteer rather than a
+# character that renders identically to the one beside it.
+#
+# Normalised on BOTH sides rather than fixing the four patterns that happen to
+# contain one today, because the next scraped name with a curly quote should
+# just work. In a pattern an apostrophe is a literal, so rewriting it is safe.
+QUOTES = str.maketrans({"‘": "'", "’": "'",
+                        "ʼ": "'", "´": "'", "`": "'"})
+
+
+def unquote(s):
+    return (s or "").translate(QUOTES)
+
 
 def load_venues():
     """-> [(compiled pattern, venue, country, lat, lon)] in file order."""
@@ -30,7 +46,7 @@ def load_venues():
                 continue
             pat, venue, country, lat, lon = (c.strip() for c in row[:5])
             try:
-                out.append((re.compile(pat, re.I), venue, country,
+                out.append((re.compile(unquote(pat), re.I), venue, country,
                             float(lat), float(lon)))
             except (re.error, ValueError) as ex:
                 print(f"  skipping bad venue row {pat!r}: {ex}")
@@ -77,7 +93,7 @@ def main():
 
     placed, unplaced, updates, by_region = [], [], [], 0
     for rid, name, boats in rows:
-        hit = next((v for v in venues if v[0].search(name or "")), None)
+        hit = next((v for v in venues if v[0].search(unquote(name))), None)
         if hit:
             _, venue, country, lat, lon = hit
         elif region.get(rid) in FALLBACK:

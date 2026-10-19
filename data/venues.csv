@@ -135,6 +135,15 @@ ocean race,Alicante,ESP,38.340,-0.480
 52 super series|puerto portals,Palma de Mallorca,ESP,39.560,2.640
 \b44 ?cup\b|rc ?44,Porto Cervo,ITA,41.135,9.535
 irc national|irc nationals|irc european,Solent,GBR,50.740,-1.310
+# The Cape 31 UK rounds carried no venue, so no area either, and grouped under
+# the COUNTRY instead - a branch reading 'United Kingdom' sitting beside
+# branches reading 'RORC'. Nineteen of the twenty boats across those three
+# events race in the Solent (471 entries) and eighteen of them do Cowes Week;
+# round 5 was sailed on 3 August 2025, inside Cowes Week itself.
+# Deliberately 'cape 31 uk' and not 'cape 31': the Cape 31 European
+# Championships is a different fleet somewhere else, and is better left
+# unplaced than placed wrongly.
+cape 31 uk,Solent,GBR,50.740,-1.310
 orc world|orc european|orc dh|garmin orc,Kiel,DEU,54.400,10.180
 round the county|san juan,San Juan Islands,USA,48.540,-122.980
 ted hood regatta,Marblehead,USA,42.500,-70.845

@@ -2840,6 +2840,17 @@ function attachDuplicatesHandlers() {
 // race is not the market it sails from.
 function areaOf(r) { return (r && r.area) || 'Area not set'; }
 
+// Country is NOT the tree's top level and should not become it: RORC is not a
+// country, and an area like the Mediterranean deliberately spans Spain, Italy,
+// France, Greece and Monaco because that is one market. But "which of these
+// are in France" is a fair question, so country is a FILTER across the tree
+// rather than a branch of it. Written off the regatta's own country, falling
+// back to the venue's when the import recorded only a place.
+function countryOf(r) {
+  if (!r) return '';
+  return COUNTRY_NAMES[r.country] || r.country || '';
+}
+
 function seriesOf(r) {
   // Top level of the tree is the CLUB, so these name the organiser rather
   // than the event it runs. Cowes Week and the IRC/ORC Championships are
@@ -2920,6 +2931,10 @@ const COUNTRY_NAMES = {
   GRD: 'Grenada', BRB: 'Barbados', KNA: 'St Kitts and Nevis',
   ARG: 'Argentina', JPN: 'Japan', HKG: 'Hong Kong', SGP: 'Singapore',
   ZAF: 'South Africa', MEX: 'Mexico', CHN: 'China', POL: 'Poland',
+  // The Channel Islands reach this list through the RORC offshore races that
+  // finish there. Without these two the country picker showed a bare 'GGY'
+  // among thirty spelled-out names.
+  GGY: 'Guernsey', JEY: 'Jersey',
 };
 
 // Per-regatta rollup used by the list: seasons covered and distinct boats,
@@ -3189,8 +3204,12 @@ function renderRegattasList() {
         }).join('');
         clubEvents++;
         const sm = regattaSummary(rg);
+        // The country goes into data-name as well as its own attribute, so
+        // typing "france" in the search box finds French events even though
+        // no branch of the tree is named after a country.
         return '<details class="tree-node regatta-row" data-name="' +
-          esc((rg.name + ' ' + club).toLowerCase()) + '" data-recent="' + sm.nRecent +
+          esc((rg.name + ' ' + club + ' ' + countryOf(rg)).toLowerCase()) +
+          '" data-country="' + esc(countryOf(rg)) + '" data-recent="' + sm.nRecent +
           '" data-boatlevel="' + (sm.hasBoatLevel ? 1 : 0) +
           '" data-seasonboats="' + evBoats.size +
           '" data-seasonreported="' + reportedOver(eventsOf(rg.id, yr)) + '">' +
@@ -3255,6 +3274,31 @@ function renderRegattasList() {
   }).join('');
 
   const nClubs = new Set(DATA.regattas.map(r => seriesOf(r))).size;
+
+  // Only countries that actually have an event here, commonest first, so the
+  // picker is a map of where the data is rather than a list of places the
+  // sport happens to be played.
+  //
+  // Counted off idx, which is one entry per ROW - a (area, club, season,
+  // regatta) - because that is the unit the filter hides and shows and the
+  // unit the subtitle counts. Counting REGATTAS instead put 'United Kingdom
+  // (94)' on a choice that then displayed 317 rows, and a number that
+  // disagrees with itself one click later is worse than no number.
+  const byCountry = {};
+  let nNoCountry = 0;
+  Object.keys(idx).forEach(area =>
+    Object.keys(idx[area]).forEach(club =>
+      Object.keys(idx[area][club]).forEach(yr =>
+        Object.keys(idx[area][club][yr]).forEach(rgId => {
+          const c = countryOf(regattasById[rgId]);
+          if (c) byCountry[c] = (byCountry[c] || 0) + 1; else nNoCountry++;
+        }))));
+  const countryOpts = Object.keys(byCountry)
+    .sort((a, b) => byCountry[b] - byCountry[a] || a.localeCompare(b))
+    .map(c => `<option value="${esc(c)}">${esc(c)} (${byCountry[c]})</option>`)
+    .join('') + (nNoCountry
+      ? `<option value="__none__">Country not recorded (${nNoCountry})</option>` : '');
+
   return `
     <h1>Regattas</h1>
     <p class="subtitle"><span id="regatta-count">${DATA.stats.n_events}</span> event-seasons shown,
@@ -3263,7 +3307,11 @@ function renderRegattasList() {
       The area comes from the venue, so a club that races in two of them appears in both &mdash; RORC under
       Solent and again under International offshore.</p>
     <div class="search-row">
-      <input type="text" id="regatta-search" placeholder="Search event or club&hellip;">
+      <input type="text" id="regatta-search" placeholder="Search event, club or country&hellip;">
+      <select id="regatta-country">
+        <option value="">All countries</option>
+        ${countryOpts}
+      </select>
       <select id="regatta-filter">
         <option value="recent">Active in last 5 seasons</option>
         <option value="boatlevel">Has boat-level results</option>
@@ -6558,6 +6606,7 @@ function attachCompareHandlers() {
 function attachRegattaListHandlers() {
   const search = document.getElementById('regatta-search');
   const filter = document.getElementById('regatta-filter');
+  const country = document.getElementById('regatta-country');
   if (!search) return;
   // Class nodes render their boats only when opened - see fillTreeLeaf.
   const sections = document.getElementById('main');
@@ -6571,9 +6620,18 @@ function attachRegattaListHandlers() {
   const apply = () => {
     const q = search.value.trim().toLowerCase();
     const f = filter.value;
+    const ctry = country ? country.value : '';
     let shown = 0;
     document.querySelectorAll('.regatta-row').forEach(tr => {
       let ok = (!q || tr.dataset.name.includes(q));
+      // '__none__' stands for the regattas with no country, so the gap can be
+      // picked like any other choice. It was a NUL byte, on the reasoning that
+      // no country could collide with one - but an attribute cannot carry NUL:
+      // the parser swaps it for U+FFFD, the comparison here never matched, and
+      // choosing "Country not recorded (118)" showed nothing at all.
+      if (ok && ctry) ok = ctry === '__none__'
+        ? !tr.dataset.country
+        : tr.dataset.country === ctry;
       if (ok && f === 'recent') ok = parseInt(tr.dataset.recent) > 0;
       if (ok && f === 'boatlevel') ok = tr.dataset.boatlevel === '1';
       // the work queue: a season the organiser reported entries for, where we
@@ -6606,6 +6664,7 @@ function attachRegattaListHandlers() {
   };
   search.addEventListener('input', apply);
   filter.addEventListener('change', apply);
+  if (country) country.addEventListener('change', apply);
   apply();
 }
 
