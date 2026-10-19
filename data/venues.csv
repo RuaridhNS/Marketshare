@@ -13,7 +13,14 @@ cowes-st malo|rorc cowes-st malo,Saint-Malo,FRA,48.649,-2.026
 la trinite.cowes|cowes.la trinite,La Trinite-sur-Mer,FRA,47.586,-3.030
 cowes week|round the island|taittinger|vice admiral|rorc easter|race the wight,Solent,GBR,50.740,-1.310
 cowes|solent|royal southern|hamble|warsash|lymington|yarmouth|\bxod\b|half ton|one ton|stug perry|telegraph,Solent,GBR,50.740,-1.310
-fastnet,Fastnet Rock,IRL,51.385,-9.600
+# The Fastnet Rock is a TURNING MARK, not a venue. Filed there, the race
+# carried country IRL, and Ireland's scope became 1,453 boats of Fastnet
+# against 223 in the two races actually sailed in Ireland - 87% of an Irish
+# market that is a rock the fleet goes round and leaves behind. The race
+# starts in Cowes and RORC runs it, so the Solent is where it is from.
+# Its AREA is still International offshore, set in data/regatta_areas.csv,
+# so this puts it in the UK without putting it in the Solent market.
+fastnet,Solent,GBR,50.740,-1.310
 myth of malham|eddystone,Eddystone,GBR,50.183,-4.258
 cervantes|de guingand|morgan cup|rorc channel race|castle rock|rorc spring|season points|rorc 2h|two-handed|2h championships,Solent,GBR,50.740,-1.310
 cherbourg|lonely tower,Cherbourg,FRA,49.640,-1.616
