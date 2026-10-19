@@ -1,0 +1,447 @@
+[
+ {
+  "entries": 140,
+  "name": "LANCELOT II",
+  "sail_no": "GBR6840R",
+  "type": "Beneteau F",
+  "owner": "JAMES FORSTER",
+  "last_year": 2026,
+  "tcc": 1.067,
+  "regattas": [
+   "Cowes Week",
+   "RORC Cowes Dinard St Malo Race",
+   "RORC Myth of Malham Race",
+   "Rolex Fastnet Race"
+  ]
+ },
+ {
+  "entries": 126,
+  "name": "ERIK THE RED",
+  "sail_no": "GBR6896T",
+  "type": "Mustang 30 Mark 2",
+  "owner": "BERNARD PATRICK FYANS",
+  "last_year": 2026,
+  "tcc": 0.906,
+  "regattas": [
+   "Cowes Week",
+   "Warsash Spring Championships",
+   "Hamble Winter Series",
+   "Round the Island Race"
+  ]
+ },
+ {
+  "entries": 125,
+  "name": "MOSTLY HARMLESS",
+  "sail_no": "GBR3111N",
+  "type": "J/105",
+  "owner": "TOM HAYHOE AND NATALIE JOBLING",
+  "last_year": 2026,
+  "tcc": 1.0,
+  "regattas": [
+   "Cowes Week",
+   "Warsash Spring Championships",
+   "Royal Southern May Regatta",
+   "Royal Southern September Regatta"
+  ]
+ },
+ {
+  "entries": 119,
+  "name": "PROSPERO OF HAMBLE",
+  "sail_no": "GBR4589R",
+  "type": "Sigma 33",
+  "owner": "ALLAN FRASER",
+  "last_year": 2026,
+  "tcc": 0.906,
+  "regattas": [
+   "Cowes Week",
+   "Warsash Spring Championships",
+   "Hamble Winter Series",
+   "Hamble IRC Autumn Championship"
+  ]
+ },
+ {
+  "entries": 109,
+  "name": "ARTHUR",
+  "sail_no": "GBR7408R",
+  "type": "Beneteau First 40",
+  "owner": "EDMUND WILSON",
+  "last_year": 2026,
+  "tcc": 1.061,
+  "regattas": [
+   "Cowes Week",
+   "RORC Myth of Malham Race",
+   "RORC Cowes Dinard St Malo Race",
+   "RORC Channel Race"
+  ]
+ },
+ {
+  "entries": 107,
+  "name": "NIGHTJAR",
+  "sail_no": "GBR9202R",
+  "type": "J/92",
+  "owner": "JACK BANKS",
+  "last_year": 2025,
+  "tcc": 0.957,
+  "regattas": [
+   "Cowes Week",
+   "Royal Southern June Regatta",
+   "Royal Southern Women's Open Keelboat Championship",
+   "Royal Southern J-Cup"
+  ]
+ },
+ {
+  "entries": 105,
+  "name": "OLYMPIAS TIGRESS",
+  "sail_no": "GBR8405R",
+  "type": "First 40",
+  "owner": "HUGH TORODE & SUSAN GLENNY",
+  "last_year": 2025,
+  "tcc": 1.073,
+  "regattas": [
+   "Cowes Week",
+   "Rolex Fastnet Race",
+   "RORC Easter Challenge",
+   "RORC Caribbean 600 Race"
+  ]
+ },
+ {
+  "entries": 93,
+  "name": "RED ARROW",
+  "sail_no": "GBR9109T",
+  "type": "J/109",
+  "owner": "ROYAL AIR FORCE SAILING ASSOCIATION",
+  "last_year": 2026,
+  "tcc": 1.001,
+  "regattas": [
+   "Hamble Winter Series",
+   "Royal Southern Women's Open Keelboat Championship",
+   "Warsash Spring Championships",
+   "RORC Myth of Malham Race"
+  ]
+ },
+ {
+  "entries": 90,
+  "name": "CRAKAJAX",
+  "sail_no": "GBR4080T",
+  "type": "X-95",
+  "owner": "RICHARD & URSULA HOLLIS",
+  "last_year": 2026,
+  "tcc": 0.901,
+  "regattas": [
+   "Cowes Week",
+   "Taittinger Royal Solent Regatta",
+   "Summer Series",
+   "Round the Island Race"
+  ]
+ },
+ {
+  "entries": 88,
+  "name": "MINNIE THE MINX",
+  "sail_no": "GBR2993L",
+  "type": "Beneteau F",
+  "owner": "RICHARD CATCHPOLE",
+  "last_year": 2026,
+  "tcc": 1.068,
+  "regattas": [
+   "Cowes Week",
+   "Hamble IRC Autumn Championship",
+   "Rolex Fastnet Race",
+   "RORC Morgan Cup Race"
+  ]
+ },
+ {
+  "entries": 83,
+  "name": "SEARCHER",
+  "sail_no": "FRA4600",
+  "type": "Ker 46",
+  "owner": "PETE SMYTH",
+  "last_year": 2024,
+  "tcc": 1.283,
+  "regattas": [
+   "Cowes Week",
+   "RORC Cowes Dinard St Malo Race",
+   "RORC Channel Race",
+   "RORC Morgan Cup Race"
+  ]
+ },
+ {
+  "entries": 78,
+  "name": "TOUCHPAPER",
+  "sail_no": "GBR9022T",
+  "type": "J/105",
+  "owner": "DAVID MALLETT",
+  "last_year": 2026,
+  "tcc": 0.971,
+  "regattas": [
+   "Cowes Week",
+   "Royal Southern July Regatta",
+   "Royal Southern June Regatta",
+   "Warsash Spring Championships"
+  ]
+ },
+ {
+  "entries": 76,
+  "name": "PUMA",
+  "sail_no": "GBR7383R",
+  "type": "Reflex 38",
+  "owner": "JÉRÔME DESVAUX",
+  "last_year": 2025,
+  "tcc": 1.034,
+  "regattas": [
+   "Cowes Week",
+   "RORC Cowes Dinard St Malo Race",
+   "RORC Cervantes Trophy Race",
+   "Rolex Fastnet Race"
+  ]
+ },
+ {
+  "entries": 73,
+  "name": "SKYLANDER",
+  "sail_no": "GBR7951R",
+  "type": "Beneteau First 40",
+  "owner": "CHRIS BROOKS",
+  "last_year": 2025,
+  "tcc": 1.075,
+  "regattas": [
+   "Cowes Week",
+   "RORC Easter Challenge",
+   "RORC De Guingand Bowl Race",
+   "RORC Myth of Malham Race"
+  ]
+ },
+ {
+  "entries": 73,
+  "name": "WINSTON",
+  "sail_no": "GBR2806L",
+  "type": "Beneteau First 40",
+  "owner": "GEOFF JOHNS",
+  "last_year": 2025,
+  "tcc": 1.065,
+  "regattas": [
+   "Cowes Week",
+   "Rolex Fastnet Race",
+   "RORC Morgan Cup Race",
+   "RORC Cowes Dinard St Malo Race"
+  ]
+ },
+ {
+  "entries": 71,
+  "name": "MAKO",
+  "sail_no": "GBR411",
+  "type": "Fareast 28R",
+  "owner": "IAN WATKINS",
+  "last_year": 2026,
+  "tcc": 1.049,
+  "regattas": [
+   "RORC Easter Challenge",
+   "Royal Southern May Regatta",
+   "Royal Southern September Regatta",
+   "Royal Southern July Regatta"
+  ]
+ },
+ {
+  "entries": 71,
+  "name": "MARDY GRAS",
+  "sail_no": "GBR7732T",
+  "type": "X-332",
+  "owner": "FRED MUNDLE",
+  "last_year": 2026,
+  "tcc": 0.956,
+  "regattas": [
+   "RORC Cowes Dinard St Malo Race",
+   "RORC Cervantes Trophy Race",
+   "RORC Myth of Malham Race",
+   "Rolex Fastnet Race"
+  ]
+ },
+ {
+  "entries": 70,
+  "name": "SCHERZO OF COWES",
+  "sail_no": "GBR73R",
+  "type": "Jnd 35",
+  "owner": "PETER & ALISON MORTON",
+  "last_year": 2026,
+  "tcc": 0.9,
+  "regattas": [
+   "Cowes Week",
+   "Round the Island Race",
+   "RORC Morgan Cup Race",
+   "RORC Myth of Malham Race"
+  ]
+ },
+ {
+  "entries": 70,
+  "name": "WHISKEY JACK",
+  "sail_no": "GBR9922T",
+  "type": "J/122",
+  "owner": "NICK SOUTHWARD",
+  "last_year": 2026,
+  "tcc": 1.08,
+  "regattas": [
+   "Cowes Week",
+   "RORC Myth of Malham Race",
+   "RORC Cowes Dinard St Malo Race",
+   "RORC De Guingand Bowl Race"
+  ]
+ },
+ {
+  "entries": 69,
+  "name": "AEOLUS",
+  "sail_no": "21",
+  "type": "Figaro II",
+  "owner": "RICHARD HARGREAVES",
+  "last_year": 2026,
+  "tcc": 0.951,
+  "regattas": [
+   "Cowes Week",
+   "RORC Cherbourg Race",
+   "RORC Channel Race",
+   "Rolex Fastnet Race"
+  ]
+ },
+ {
+  "entries": 69,
+  "name": "COOL BLUE",
+  "sail_no": "GBR2907R",
+  "type": "Cory 290",
+  "owner": "SIMON CORY",
+  "last_year": 2025,
+  "tcc": 0.939,
+  "regattas": [
+   "Cowes Week"
+  ]
+ },
+ {
+  "entries": 69,
+  "name": "JACANA",
+  "sail_no": "GBR9588R",
+  "type": "J/105",
+  "owner": "CRAIGEN/STEVENS",
+  "last_year": 2023,
+  "tcc": 0.999,
+  "regattas": [
+   "Cowes Week",
+   "Royal Southern May Regatta",
+   "Royal Southern June Regatta",
+   "Royal Southern July Regatta"
+  ]
+ },
+ {
+  "entries": 67,
+  "name": "EH01",
+  "sail_no": "GBR4778R",
+  "type": "First 47.7",
+  "owner": "EH01",
+  "last_year": 2023,
+  "tcc": 1.078,
+  "regattas": [
+   "Cowes Week",
+   "RORC Caribbean 600 Race",
+   "Rolex Fastnet Race",
+   "RORC Cowes Dinard St Malo Race"
+  ]
+ },
+ {
+  "entries": 67,
+  "name": "GARUDA 4",
+  "sail_no": "FRA37310",
+  "type": "JPK 1010",
+  "owner": "MARTIN BIHR",
+  "last_year": 2025,
+  "tcc": 0.994,
+  "regattas": [
+   "RORC Cherbourg Race",
+   "RORC Cervantes Trophy Race",
+   "RORC Myth of Malham Race",
+   "RORC Cowes Dinard St Malo Race"
+  ]
+ },
+ {
+  "entries": 67,
+  "name": "NJOS",
+  "sail_no": "GBR9824",
+  "type": "Corby 35 / Corby 35",
+  "owner": "NICKY & TIM OCTON",
+  "last_year": 2023,
+  "tcc": 1.031,
+  "regattas": [
+   "Cowes Week",
+   "Royal Southern May Regatta",
+   "Royal Southern June Regatta",
+   "Summer Series"
+  ]
+ },
+ {
+  "entries": 67,
+  "name": "REVIVE",
+  "sail_no": "GBR6525N",
+  "type": "Prima 38",
+  "owner": "DR PAUL ARTHUR FARRANDS",
+  "last_year": 2025,
+  "tcc": 1.046,
+  "regattas": [
+   "Cowes Week",
+   "RORC Myth of Malham Race",
+   "Rolex Fastnet Race",
+   "RORC Cervantes Trophy Race"
+  ]
+ },
+ {
+  "entries": 66,
+  "name": "FIREBALL",
+  "sail_no": "GBR9949T",
+  "type": "Beneteau First 40.7",
+  "owner": "CHRIS CLARK",
+  "last_year": 2025,
+  "tcc": 1.036,
+  "regattas": [
+   "Cowes Week",
+   "RORC Myth of Malham Race",
+   "Rolex Fastnet Race",
+   "RORC Cervantes Trophy Race"
+  ]
+ },
+ {
+  "entries": 66,
+  "name": "HASTA LA VISTA",
+  "sail_no": "GBR4069T",
+  "type": "Fun 23",
+  "owner": "RICK WHITE, ROSS EDMUNDS & ROB EDWARDS",
+  "last_year": 2026,
+  "tcc": 0.858,
+  "regattas": [
+   "Cowes Week",
+   "Round the Island Race"
+  ]
+ },
+ {
+  "entries": 66,
+  "name": "JACKDAW",
+  "sail_no": "GBR2947L",
+  "type": "J/92",
+  "owner": "LUCY SALTER",
+  "last_year": 2026,
+  "tcc": 0.958,
+  "regattas": [
+   "Cowes Week",
+   "Hamble Winter Series",
+   "Royal Southern Women's Open Keelboat Championship",
+   "Summer Series"
+  ]
+ },
+ {
+  "entries": 65,
+  "name": "ESCAPADO",
+  "sail_no": "GBR1321L",
+  "type": "Beneteau First 40.7",
+  "owner": "GERMAINE WILLIAMS",
+  "last_year": 2026,
+  "tcc": 1.042,
+  "regattas": [
+   "Cowes Week",
+   "Rolex Middle Sea Race",
+   "RORC Caribbean 600 Race",
+   "RORC Cowes Dinard St Malo Race"
+  ]
+ }
+]

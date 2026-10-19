@@ -1,0 +1,29 @@
+# Sailmaker findings researched from published sources, with the evidence attached.
+# Read by scripts/load_sailmaker_research.py on every refresh, which writes them to
+# boat_sailmaker_history with source "research:<url>" - never onto boats.current_sailmaker -
+# so every one of these is auditable back to a page and reversible by deleting the row.
+#
+# Confidence, from the loader's own ladder:
+#   high    the sailmaker's own site names this boat as a customer, or a regatta report
+#           explicitly credits the sails
+#   medium  a report or listing names the boat and the sailmaker together but not
+#           unambiguously as supplier, or the evidence is a few years old
+#   low     circumstantial - the same owner's other boat, a dated inventory
+#
+# NORTH IS GRADED ONE STEP HARDER THAN ANYONE ELSE. This database belongs to North, and
+# recording a boat as North when it is not inflates our own share. A finding that would read
+# as high for Doyle reads as medium for North. That asymmetry is deliberate and should be
+# kept by whoever adds to this file.
+#
+# What counts as nothing: a boat and a sailmaker appearing on the same page. A results list
+# hosted by a loft, a regatta sponsorship, a loft repairing a torn kite overnight - none of
+# those say who built the wardrobe.
+#
+# Of thirty Solent boats researched in October 2026, three produced a finding that survived
+# having its source opened and re-read by someone trying to refute it. Twenty-one left no
+# public trace at all. The rejected leads and why they died are in the commit that added
+# this file.
+SailNo,Sailmaker,Confidence,Source,AsOf,Note
+GBR9949T,North Sails,medium,https://www.anarchysailing.co.uk/fireball,2026,"The operator's own page for this hull gives GBR 9949T and Beneteau First 40.7 and itemises the wardrobe maker by maker: North 3Di mainsail new for 2026, North 3Di No 3 new for 2026, North 3Di No 3 furling new 2024, North Helix Code Zero, North masthead symmetric and North asymmetric kites, plus one Quantum masthead heavy kite. Itemisation this specific would read as high for a competitor; it is medium because it is North resting on first-party marketing. The boat is charter-operated and the inventory is mixed."
+GBR2993L,Doyle,medium,https://www.doylesails.com/doyle-powered-yachts-part-of-historic-100th-rolex-fastnet-race/,2025,"Doyle's own site lists Minnie the Minx among the teams it says it is honoured to power for the 2025 Rolex Fastnet Race. The name is unique in that 449-boat fleet so the identity is secure, but the claim is made over the group and no sail is itemised, so medium rather than high."
+GBR4778R,Other,low,https://globalyachtracing.com/yachts/beneteau-first-47-7-eh01/,2014,"The operating company's itemised inventory gives both mainsails and the back-up J3 as Hyde, and the J2, A1, A2 and spinnaker staysail as North - a genuinely split wardrobe recorded to the maker of the mainsails. Low because the page carries no sail number, the identity rests on the name EH01 and the First 47.7 type, and nothing on it is dated later than a 2014 jib."

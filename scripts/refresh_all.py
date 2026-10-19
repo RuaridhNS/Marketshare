@@ -278,6 +278,15 @@ def main():
         # for - and regattas.region cannot answer it, because it records
         # whose race it is rather than where.
         ("Apply venue areas", ["apply_venue_areas.py", "--apply"], "areas"),
+
+        # Researched sailmaker findings, each with the page it came from. They go to
+        # boat_sailmaker_history, not onto the boat, so the dashboard derives the
+        # current maker from them and deleting a row undoes it. Last, because a
+        # scrape re-asserts whatever the results pages said and a researched finding
+        # has to outrank that - race results carry a sailmaker on 151 entries out of
+        # 68,553, so almost everything we know came from somewhere else.
+        ("Load sailmaker research",
+         ["load_sailmaker_research.py", "data/sailmaker_research.csv"], "sailmaker research"),
     ]
     for label, argv, tag in PIPELINE:
         ok, _ = run(label, argv, args.db, args.timeout)
