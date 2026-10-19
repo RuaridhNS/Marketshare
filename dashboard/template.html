@@ -109,6 +109,29 @@
   .hdr-stamp { margin-left: auto; font-family: 'Proxima Nova', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-variant-numeric: tabular-nums;
     font-size: 10.5px; letter-spacing: .02em; color: rgba(255,255,255,.72); }
 
+  /* Scope picker. Pushed hard left of the stamp by the stamp's margin-left:auto. */
+  .hdr-scope { display: flex; align-items: center; gap: 8px; margin-left: 20px; }
+  .hdr-scope label { font-size: 11px; letter-spacing: .06em; text-transform: uppercase;
+    color: rgba(255,255,255,.66); font-weight: 600; }
+  .hdr-scope select {
+    background: rgba(255,255,255,.14); color: #fff; font-weight: 600; font-size: 13px;
+    border: 1px solid rgba(255,255,255,.30); border-radius: 6px; padding: 5px 10px;
+    max-width: 260px; cursor: pointer;
+  }
+  .hdr-scope select:hover { background: rgba(255,255,255,.22); }
+  /* The option LIST is drawn by the OS, not by this stylesheet: white-on-brand
+     would be white-on-white there. Give the options their own colours. */
+  .hdr-scope select option { background: #ffffff; color: #11181f; }
+
+  /* A scope is in force, and every number on the page is now a subset. Say so
+     where it cannot be missed: a worldwide figure misread as a UK one is the
+     whole risk this feature introduces. */
+  .scope-tag { display: inline-block; margin-left: 10px; vertical-align: 3px;
+    background: var(--brand); color: #fff; font-size: 11px; font-weight: 700;
+    letter-spacing: .04em; text-transform: uppercase; border-radius: 999px;
+    padding: 3px 10px; }
+  body:not(.scoped) .scope-tag { display: none; }
+
   .sidebar {
     width: 220px; flex: none; background: var(--rail); color: var(--rail-text);
     border-right: 1px solid var(--rail-border); padding: 20px 12px;
@@ -573,6 +596,13 @@ tr.enrich-miss > td:first-child { box-shadow: inset 3px 0 0 var(--series-doyle);
 <header class="topbar">
   <div class="hdr">
     <div class="logo">Marketshare <span>Race entry &amp; sailmaker tracker</span></div>
+    <!-- The one control that changes what every other page means. It sits in
+         the header rather than on a page because it is not a page's filter:
+         leave it on the United Kingdom and the whole site is a UK tool. -->
+    <div class="hdr-scope">
+      <label for="scope-country">Showing</label>
+      <select id="scope-country"><option value="">Worldwide</option></select>
+    </div>
     <div class="hdr-stamp" id="build-stamp"></div>
   </div>
 </header>
@@ -773,6 +803,238 @@ const boatsById = {}; DATA.boats.forEach(b => boatsById[b.id] = b);
 const regattasById = {}; DATA.regattas.forEach(r => regattasById[r.id] = r);
 const eventsById = {}; DATA.events.forEach(e => eventsById[e.id] = e);
 const racesById = {}; DATA.races.forEach(r => racesById[r.id] = r);
+
+// ---------- country scope ----------
+// One control in the header puts the WHOLE site into one country - every page,
+// every total, every list - and leaves it there until it is changed back. The
+// point is to be able to work a market you actually know without the
+// worldwide fleet diluting every number on the way past.
+//
+// It filters on exactly ONE thing, the regatta's country, and everything else
+// cascades by id: the events of those regattas, the races of those events, the
+// entries on those races, and the facts, trends, class counts and crew rows
+// that carry one of those ids. No page matches a country string a second time,
+// so no two pages can disagree about what is in scope.
+//
+// RAW is the payload as loaded and is never mutated. DATA is a projection of
+// it. At Worldwide the projection preserves object IDENTITY - the same boat
+// objects, the same entry arrays - so scoping out costs nothing and cannot
+// quietly disturb the numbers it is meant to leave alone.
+//
+// Boats are not in a country; they race in regattas that are. So a boat is "in
+// the UK" if it has a UK entry, and under UK scope it carries ONLY its UK
+// entries. A boat that did Cowes Week and the Caribbean 600 contributes one
+// boat and its Cowes entries to the UK, which is what makes a scoped market
+// share mean anything.
+const RAW = DATA;
+const SCOPE_KEY = 'marketshare_scope_country_v1';
+let SCOPE = '';
+try { SCOPE = localStorage.getItem(SCOPE_KEY) || ''; } catch (_) { /* sandboxed */ }
+
+// Distinct boats per country, for the picker. Boats, not regattas, because the
+// number that tells you whether a scope is worth working is the size of the
+// fleet in it. They sum to far more than the fleet total, since a boat that
+// races in three countries is in three of these counts - the same boat seen
+// from three markets, which is the honest reading.
+function scopeCountryCounts() {
+  const per = {};
+  RAW.boats.forEach(b => {
+    const seen = new Set();
+    b.entries.forEach(e => {
+      const ra = racesByIdRaw[e.race_id]; if (!ra) return;
+      const ev = eventsByIdRaw[ra.event_id]; if (!ev) return;
+      const rg = regattasByIdRaw[ev.regatta_id]; if (!rg) return;
+      const c = countryOf(rg); if (c) seen.add(c);
+    });
+    seen.forEach(c => per[c] = (per[c] || 0) + 1);
+  });
+  return per;
+}
+
+// Indexes over RAW, which the projection reads and the scoped ones above do
+// not replace. scopeCountryCounts has to see every entry to know which
+// countries exist at all, so it cannot use indexes that are already scoped.
+const regattasByIdRaw = {}; RAW.regattas.forEach(r => regattasByIdRaw[r.id] = r);
+const eventsByIdRaw = {}; RAW.events.forEach(e => eventsByIdRaw[e.id] = e);
+const racesByIdRaw = {}; RAW.races.forEach(r => racesByIdRaw[r.id] = r);
+
+function projectScope(country) {
+  const keepRg = new Set();
+  RAW.regattas.forEach(r => { if (!country || countryOf(r) === country) keepRg.add(r.id); });
+  const regattas = country ? RAW.regattas.filter(r => keepRg.has(r.id)) : RAW.regattas;
+  const events = country ? RAW.events.filter(e => keepRg.has(e.regatta_id)) : RAW.events;
+  const keepEv = new Set(events.map(e => e.id));
+  const races = country ? RAW.races.filter(r => keepEv.has(r.event_id)) : RAW.races;
+  const keepRa = new Set(races.map(r => r.id));
+
+  // A boat keeps its identity when nothing is cut from it, so Worldwide hands
+  // back the very same objects and a scope that happens to contain all of a
+  // boat's racing does not clone it for nothing.
+  const boats = [];
+  RAW.boats.forEach(b => {
+    if (!country) { boats.push(b); return; }
+    const entries = b.entries.filter(e => keepRa.has(e.race_id));
+    if (!entries.length) return;
+    boats.push(entries.length === b.entries.length ? b : { ...b, entries });
+  });
+
+  const evById = {}; events.forEach(e => evById[e.id] = e);
+  const raById = {}; races.forEach(r => raById[r.id] = r);
+  const rgById = {}; regattas.forEach(r => rgById[r.id] = r);
+
+  // ---- aggregates the exporter precomputed over the whole world ----
+  // Rebuilt the same way at EVERY scope, Worldwide included, so the scoped
+  // figures come from code that is checked against the exporter's own rather
+  // than from a second path nobody ever looks at.
+  //
+  // current_sailmaker, not liveSailmaker: this mirrors export_dashboard_data.py
+  // so the Worldwide result can be compared with it line for line. The pages
+  // that should respond to a staged edit already recompute from liveSailmaker
+  // themselves and do not read these.
+  const smE = {}, smB = {};
+  boats.forEach(b => {
+    const sm = b.current_sailmaker; if (!sm) return;
+    smE[sm] = (smE[sm] || 0) + b.entries.length;
+    smB[sm] = (smB[sm] || 0) + 1;
+  });
+  const rank = o => Object.keys(o).sort((a, b) => o[b] - o[a] || a.localeCompare(b));
+
+  // north and known are per-ENTRY sums in the exporter's SQL and the entries in
+  // this payload do not carry a sailmaker, so they are taken from facts, whose
+  // n and k are those same sums rolled up per regatta-year. Verified to the
+  // entry against segment_totals at Worldwide.
+  const seg = {};
+  const segOf = s => (seg[s] ||= { segment: s, regattas: new Set(), events: new Set(),
+                                   boats: new Set(), entries: 0, north: 0, known: 0 });
+  const facts = country ? RAW.facts.filter(f => keepRg.has(f.rid)) : RAW.facts;
+  facts.forEach(f => {
+    const s = segOf(f.seg);
+    s.regattas.add(f.rid); s.north += f.n; s.known += f.k;
+  });
+  boats.forEach(b => b.entries.forEach(e => {
+    const ra = raById[e.race_id]; if (!ra) return;
+    const ev = evById[ra.event_id]; if (!ev) return;
+    const rg = rgById[ev.regatta_id]; if (!rg) return;
+    // rg.segment, NOT segmentOf(rg): north and known on the same card come
+    // from facts, which is static, so reading a staged segment edit here would
+    // move the boat count on a card whose share had not moved with it. The
+    // card stays self-consistent and a staged segment lands when it is applied.
+    const name = rg.segment; if (!name) return;
+    const s = segOf(name);
+    s.events.add(ev.id); s.boats.add(b.id); s.entries++;
+  }));
+  const segment_totals = Object.keys(seg).map(k => {
+    const s = seg[k];
+    return { segment: s.segment, regattas: s.regattas.size, events: s.events.size,
+             boats: s.boats.size, entries: s.entries, north: s.north, known: s.known };
+  }).sort((a, b) => b.boats - a.boats);
+
+  // "Unplaced" is how much of the fleet is missing from the globe: regattas
+  // with no coordinates, and the boats that raced in one. A regatta has
+  // coordinates exactly when it has a venue, since geocode_regattas.py writes
+  // venue, lat and lon in the same statement - and this payload carries the
+  // venue but not the lat, so the venue is what can be tested here.
+  // Boats are those touching ANY unplaced regatta, matching the exporter; a
+  // boat can be in this count and on the globe as well.
+  const unplacedRg = regattas.filter(r => !r.venue);
+  const unplacedIds = new Set(unplacedRg.map(r => r.id));
+  const unplacedBoats = boats.filter(b => b.entries.some(e => {
+    const ra = raById[e.race_id]; const ev = ra && evById[ra.event_id];
+    return ev && unplacedIds.has(ev.regatta_id);
+  })).length;
+
+  return {
+    ...RAW,
+    regattas, events, races, boats,
+    facts,
+    segment_events: country ? RAW.segment_events.filter(s => keepRg.has(s.regatta_id)) : RAW.segment_events,
+    entry_trends: country ? RAW.entry_trends.filter(t => keepRg.has(t.regatta_id)) : RAW.entry_trends,
+    class_counts: country ? RAW.class_counts.filter(c => keepEv.has(c.event_id)) : RAW.class_counts,
+    crew: country ? (RAW.crew || []).filter(c => keepRa.has(c.race_id)) : RAW.crew,
+    globe: { ...(RAW.globe || {}),
+             unplaced_regattas: unplacedRg.length,
+             unplaced_boats: unplacedBoats },
+    market_share_entries: rank(smE).map(k => ({ sailmaker: k, entries: smE[k] })),
+    market_share_boats: rank(smB).map(k => ({ sailmaker: k, boats: smB[k] })),
+    segment_totals,
+    stats: {
+      ...RAW.stats,
+      n_boats: boats.length,
+      n_entries: boats.reduce((a, b) => a + b.entries.length, 0),
+      n_regattas: regattas.length,
+      n_events: events.length,
+      n_races: races.length,
+      n_class_count_rows: (country ? RAW.class_counts.filter(c => keepEv.has(c.event_id))
+                                   : RAW.class_counts).length,
+      // Cannot be rebuilt here: it counts entries whose own row named a
+      // sailmaker, and the entries in this payload do not carry one. Left at
+      // the worldwide figure, and read by nothing on any page.
+      n_entries_with_sailmaker: RAW.stats.n_entries_with_sailmaker,
+    },
+  };
+}
+
+// Swaps DATA for the projection and repopulates the lookup tables IN PLACE,
+// because every helper in this file closes over those objects by reference.
+function applyScope(render) {
+  DATA = projectScope(SCOPE);
+  const refill = (idx, rows) => {
+    Object.keys(idx).forEach(k => delete idx[k]);
+    rows.forEach(r => idx[r.id] = r);
+  };
+  refill(boatsById, DATA.boats);
+  refill(regattasById, DATA.regattas);
+  refill(eventsById, DATA.events);
+  refill(racesById, DATA.races);
+  window.__treeData = {};         // keyed by ids that the new scope may not hold
+  // Everything in this file lives in one closure, so from the console there is
+  // otherwise no way to ask what a scope actually contains. This is the hook
+  // the Worldwide-equals-the-exporter check is run through, and the one to
+  // reach for when a scoped figure looks wrong.
+  window.__scope = { country: SCOPE, data: DATA, raw: RAW };
+  const tag = document.getElementById('scope-tag');
+  if (tag) {
+    tag.textContent = SCOPE || '';
+    tag.style.display = SCOPE ? '' : 'none';
+  }
+  document.body.classList.toggle('scoped', !!SCOPE);
+  if (render) navigate();
+}
+
+// "Boat not found" is a lie when the boat is simply in another country. Follow
+// a bookmark or a shared link while scoped to the UK and the old message said
+// the record did not exist, which would send someone off to re-enter a boat
+// that is already here. Say which it is, and offer the way back.
+function notInScope(raw, what, label) {
+  if (!raw) return `<div class="card">${what} not found.</div>`;
+  return `<div class="card">
+    <h1>${esc(label(raw))}<span class="scope-tag">${esc(SCOPE)}</span></h1>
+    <p>This ${what.toLowerCase()} is in the database, but it has no racing in
+       <strong>${esc(SCOPE)}</strong>, so it is outside the country this site is
+       currently set to.</p>
+    <p><button class="btn" id="scope-clear">Show worldwide and open it</button></p>
+  </div>`;
+}
+
+function initScopePicker() {
+  const sel = document.getElementById('scope-country');
+  if (!sel) return;
+  const counts = scopeCountryCounts();
+  const all = RAW.boats.length;
+  sel.innerHTML = `<option value="">Worldwide (${all.toLocaleString()} boats)</option>` +
+    Object.keys(counts).sort((a, b) => counts[b] - counts[a] || a.localeCompare(b))
+      .map(c => `<option value="${esc(c)}">${esc(c)} (${counts[c].toLocaleString()})</option>`)
+      .join('');
+  // A scope saved last week for a country this build no longer holds would
+  // leave the site showing nothing with the picker claiming Worldwide.
+  if (SCOPE && !(SCOPE in counts)) SCOPE = '';
+  sel.value = SCOPE;
+  sel.addEventListener('change', () => {
+    SCOPE = sel.value;
+    try { localStorage.setItem(SCOPE_KEY, SCOPE); } catch (_) { /* sandboxed */ }
+    applyScope(true);
+  });
+}
 
 // Entries only carry race_id (see export_dashboard_data.py for why) - these
 // derive the regatta/event/season a race_entry belongs to via that FK chain,
@@ -1424,6 +1686,26 @@ function navigate(hashOverride) {
     main.innerHTML = `<div class="card">Something went wrong rendering this page: ${esc(err.message)}</div>`;
     console.error(err);
   }
+  // Stamp the scope onto whatever heading this page rendered, rather than onto
+  // each of the twenty render functions. A page that says "Market share" while
+  // quietly showing one country is the one way this feature could mislead.
+  const clearBtn = document.getElementById('scope-clear');
+  if (clearBtn) clearBtn.addEventListener('click', () => {
+    SCOPE = '';
+    try { localStorage.setItem(SCOPE_KEY, ''); } catch (_) { /* sandboxed */ }
+    const sel = document.getElementById('scope-country');
+    if (sel) sel.value = '';
+    applyScope(true);
+  });
+  if (SCOPE) {
+    const h1 = main.querySelector('h1');
+    if (h1 && !h1.querySelector('.scope-tag')) {
+      const tag = document.createElement('span');
+      tag.className = 'scope-tag';
+      tag.textContent = SCOPE;
+      h1.appendChild(tag);
+    }
+  }
   attachBoatFilterHandlers();
   attachInlineSailmakerHandlers();
   attachBoatEditHandlers();
@@ -2028,7 +2310,8 @@ function renderBoatsList() {
 // ---------- page: boat profile ----------
 function renderBoatProfile(id) {
   const b = boatsById[id];
-  if (!b) return `<div class="card">Boat not found.</div>`;
+  if (!b) return notInScope(RAW.boats.find(x => x.id === id), 'Boat',
+    x => (x.boat_name || x.sail_no || 'This boat'));
   const bucket = bucketOf(b.current_sailmaker);
 
   // IRC certificates, newest first. The year-on-year change is computed down
@@ -3308,10 +3591,10 @@ function renderRegattasList() {
       Solent and again under International offshore.</p>
     <div class="search-row">
       <input type="text" id="regatta-search" placeholder="Search event, club or country&hellip;">
-      <select id="regatta-country">
+      ${Object.keys(byCountry).length > 1 || nNoCountry ? `<select id="regatta-country">
         <option value="">All countries</option>
         ${countryOpts}
-      </select>
+      </select>` : ''}
       <select id="regatta-filter">
         <option value="recent">Active in last 5 seasons</option>
         <option value="boatlevel">Has boat-level results</option>
@@ -5944,7 +6227,7 @@ function renderSegments() {
                     background:var(--accent);"></div></div>
       <div style="font-size:12px;">${share === null ? '<span class="muted">no sailmaker recorded</span>'
         : `North <b>${share.toFixed(0)}%</b> <span class="muted">of ${t.known.toLocaleString()}
-           boats with a sailmaker recorded</span>`}</div>
+           entries with a sailmaker recorded</span>`}</div>
       <div class="muted" style="font-size:11.5px;margin-top:7px;">${esc(SEGMENT_NOTE[name]||'')}</div>
     </div>`;
   }).join('');
@@ -6765,7 +7048,8 @@ function regattaClassesFor(regattaId, year) {
 
 function renderRegattaProfile(id, year, cls) {
   const r = regattasById[id];
-  if (!r) return `<div class="card">Regatta not found.</div>`;
+  if (!r) return notInScope(RAW.regattas.find(x => x.id === regattaId), 'Regatta',
+    x => x.name || 'This regatta');
   const evs = DATA.events.filter(e => e.regatta_id === id).sort((a,b)=>b.season_year-a.season_year);
 
   // per-season summary: how many distinct boats entered, and how many races
@@ -7474,6 +7758,11 @@ document.getElementById('chart-modal').addEventListener('click', (e) => {
   if (e.target.id === 'chart-modal') e.target.close(); // backdrop click
 });
 
+// Before the first render, and not a line earlier: projectScope calls
+// countryOf, which reads COUNTRY_NAMES, and a const is not initialised until
+// its own statement runs. Everything above has been evaluated by now.
+initScopePicker();
+applyScope(false);
 navigate();
 })();
 </script>
