@@ -12,5 +12,17 @@ C:\Users\ruari\OneDrive - North Technology Group\NS_ISSP - General\Marketshare\d
 # The shared copy colleagues have a OneDrive shortcut to.
 C:\Users\ruari\OneDrive - North Technology Group\Microsoft Teams Chat Files\Solent Marketshare dashboard.html
 
-# Local working copy, so the folder never disagrees with what was shipped.
-C:\Solent Marketshare\marketshare\dashboard\dashboard.html
+# There used to be a third target here, C:\Solent Marketshare\marketshare\
+# dashboard\dashboard.html, described as "local working copy so the folder
+# never disagrees with what was shipped". It is gone, for two reasons.
+#
+# The repo now lives at C:\Solent Marketshare\project, OUTSIDE OneDrive, so
+# the build output at dashboard\dashboard.html is already the local working
+# copy. Publishing to a local path as well would have been copying a file
+# onto itself by a longer route.
+#
+# And the folder it pointed at was not this project. It is an abandoned
+# August clone of a DIFFERENT GitHub repository (ruaridhwright-cpu/marketshare,
+# two commits, untouched since 24 August). Every publish for weeks has been
+# dropping a current dashboard into a dead repo, where the only thing it did
+# was show up as an uncommitted change.

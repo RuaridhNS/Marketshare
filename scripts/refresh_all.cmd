@@ -9,11 +9,14 @@ REM Writes a timestamped log per run and keeps the last 30.
 REM ---------------------------------------------------------------------------
 setlocal
 
-REM The repo moved into OneDrive and this did not follow it. The old path -
-REM C:\Solent Marketshare\marketshare_project\marketshare - has not existed for
-REM some time, so the `cd /d` below failed and the scheduled task exited 1 every
-REM Monday without writing a log to say so. Nothing has been refreshing itself.
-set REPO=C:\Users\ruari\OneDrive - North Technology Group\NS_ISSP - General\Marketshare\project
+REM The repo has moved twice and this line has to follow it both times. It was
+REM C:\Solent Marketshare\marketshare_project\marketshare, which stopped
+REM existing and made the scheduled task exit 1 every Monday without writing a
+REM log to say so; then OneDrive; and now back out of OneDrive, because
+REM OneDrive syncs .git and git repacking 241MB of objects is not something a
+REM file-sync client should be carrying. The database still gets copied OUT to
+REM OneDrive below - that is the off-machine backup, and it is a plain file.
+set REPO=C:\Solent Marketshare\project
 set PY=C:\Users\ruari\AppData\Local\Python\bin\python.exe
 set LOGDIR=%REPO%\logs
 
