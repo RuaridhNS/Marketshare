@@ -14,7 +14,13 @@
 # A blank Area is not an error - it groups under 'Area not set' and shows up
 # on the Data quality page until someone decides.
 Venue,Area,Why
-Solent,Solent,
+# "Solent inshore", not "Solent", so it pairs with "Solent offshore" and the
+# two read as one market split the way the racing is. RORC appears in both and
+# that is correct: it runs an inshore programme and an offshore one.
+# Which races are which is NOT decided here - the venue cannot tell, since an
+# offshore race starts in the Solent too. data/regatta_areas.csv moves the
+# ones that score for the RORC Season Points Championship.
+Solent,Solent inshore,
 Fastnet Rock,Solent offshore,"The Rolex Fastnet Race. A turning mark, not a venue - the race starts and the fleet lives in the Solent."
 Saint-Malo,Solent offshore,Cowes-Dinard-St Malo and RORC Cowes-St Malo: a Solent fleet with a French finish.
 Palma de Mallorca,Mediterranean,
@@ -102,7 +108,7 @@ Lake Garda,Mediterranean,"Inland, but it races as part of the Mediterranean circ
 Lorient,Brittany & Atlantic France,
 Lake Macatawa,Great Lakes,
 Imperia,Mediterranean,
-Portsmouth,Solent,
+Portsmouth,Solent inshore,
 Gdynia,Baltic & Nordic,
 Barbados,Caribbean,
 Grenada,Caribbean,

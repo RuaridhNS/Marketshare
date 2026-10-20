@@ -3517,7 +3517,8 @@ function renderRegattasList() {
         // no branch of the tree is named after a country.
         return '<details class="tree-node regatta-row" data-name="' +
           esc((rg.name + ' ' + club + ' ' + countryOf(rg)).toLowerCase()) +
-          '" data-country="' + esc(countryOf(rg)) + '" data-recent="' + sm.nRecent +
+          '" data-country="' + esc(countryOf(rg)) +
+          '" data-club="' + esc(club) + '" data-recent="' + sm.nRecent +
           '" data-boatlevel="' + (sm.hasBoatLevel ? 1 : 0) +
           '" data-seasonboats="' + evBoats.size +
           '" data-seasonreported="' + reportedOver(eventsOf(rg.id, yr)) + '">' +
@@ -3583,6 +3584,35 @@ function renderRegattasList() {
 
   const nClubs = new Set(DATA.regattas.map(r => seriesOf(r))).size;
 
+  // An organiser picker, so a club can be read on its own. The tree groups by
+  // area first, which is right for "how are we doing in the Solent" and wrong
+  // for "show me the Royal Southern" - a club that races in two areas has two
+  // branches and no single place to look. This filters across all of them.
+  // Counted off idx like the country picker, so one entry is one row.
+  const byClub = {};
+  Object.keys(idx).forEach(area =>
+    Object.keys(idx[area]).forEach(club =>
+      Object.keys(idx[area][club]).forEach(yr =>
+        byClub[club] = (byClub[club] || 0) + Object.keys(idx[area][club][yr]).length)));
+
+  // The tree's second level names the PLACE where no club is recorded, so this
+  // list would otherwise offer "Palma de Mallorca" among the yacht clubs -
+  // the same two-taxonomies-in-one-list the area work was done to end. Split
+  // them: a name is a real organiser if any regatta under it came from
+  // somewhere that records one, rather than from the Marketshare import.
+  const realClub = {};
+  DATA.regattas.forEach(r => {
+    const k = seriesOf(r);
+    if (r.category !== 'Marketshare' && r.category !== 'Fixture') realClub[k] = true;
+  });
+  const sortByCount = (a, b) => byClub[b] - byClub[a] || a.localeCompare(b);
+  const opt = c => `<option value="${esc(c)}">${esc(c)} (${byClub[c]})</option>`;
+  const clubs = Object.keys(byClub).filter(c => realClub[c]).sort(sortByCount);
+  const places = Object.keys(byClub).filter(c => !realClub[c]).sort(sortByCount);
+  const clubOpts =
+    (clubs.length ? `<optgroup label="Clubs and classes">${clubs.map(opt).join('')}</optgroup>` : '') +
+    (places.length ? `<optgroup label="No club recorded - by place">${places.map(opt).join('')}</optgroup>` : '');
+
   // Only countries that actually have an event here, commonest first, so the
   // picker is a map of where the data is rather than a list of places the
   // sport happens to be played.
@@ -3620,6 +3650,10 @@ function renderRegattasList() {
         <option value="">All countries</option>
         ${countryOpts}
       </select>` : ''}
+      <select id="regatta-club">
+        <option value="">All organisers</option>
+        ${clubOpts}
+      </select>
       <select id="regatta-filter">
         <option value="recent">Active in last 5 seasons</option>
         <option value="boatlevel">Has boat-level results</option>
@@ -6918,6 +6952,7 @@ function attachRegattaListHandlers() {
   const search = document.getElementById('regatta-search');
   const filter = document.getElementById('regatta-filter');
   const country = document.getElementById('regatta-country');
+  const club = document.getElementById('regatta-club');
   if (!search) return;
   // Class nodes render their boats only when opened - see fillTreeLeaf.
   const sections = document.getElementById('main');
@@ -6932,6 +6967,7 @@ function attachRegattaListHandlers() {
     const q = search.value.trim().toLowerCase();
     const f = filter.value;
     const ctry = country ? country.value : '';
+    const org = club ? club.value : '';
     let shown = 0;
     document.querySelectorAll('.regatta-row').forEach(tr => {
       let ok = (!q || tr.dataset.name.includes(q));
@@ -6943,6 +6979,10 @@ function attachRegattaListHandlers() {
       if (ok && ctry) ok = ctry === '__none__'
         ? !tr.dataset.country
         : tr.dataset.country === ctry;
+      // One organiser across every area it races in - the Royal Southern has
+      // a branch under Solent inshore and could have another elsewhere, and
+      // this is the way to read the club rather than the place.
+      if (ok && org) ok = tr.dataset.club === org;
       if (ok && f === 'recent') ok = parseInt(tr.dataset.recent) > 0;
       if (ok && f === 'boatlevel') ok = tr.dataset.boatlevel === '1';
       // the work queue: a season the organiser reported entries for, where we
@@ -6976,6 +7016,7 @@ function attachRegattaListHandlers() {
   search.addEventListener('input', apply);
   filter.addEventListener('change', apply);
   if (country) country.addEventListener('change', apply);
+  if (club) club.addEventListener('change', apply);
   apply();
 }
 

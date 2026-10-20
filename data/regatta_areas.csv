@@ -22,3 +22,41 @@ Pattern,Area,Why
 ^RORC Transatlantic Race$,International offshore,"127 boats, GBR 29%. An ocean crossing is nobody's local market."
 ^(Rolex )?RORC ?-? ?Middle Sea( Race)?$|^Rolex Middle Sea Race$,International offshore,"Both records of it. 622 and 76 boats, top nationality ITA at 19% - the most evenly international fleet in the database."
 ^RORC La Trinite.Cowes Race$,Brittany & Atlantic France,"FRA 82% of 78 boats. It finishes in Cowes, which put its venue in the Solent, but it is a French fleet sailing from a French port."
+# --- Solent inshore vs Solent offshore -------------------------------------
+# The venue cannot separate these: an offshore race starts in the Solent too,
+# so it carries venue "Solent" and landed in the inshore area with the Easter
+# Challenge. The test used instead is the one RORC uses itself - does the race
+# SCORE for the Season Points Championship.
+#
+# It is measurable here. The Season Points record holds the standings, so for
+# each race you can ask what share of its boats appear in that season's
+# standings. The answer splits the Solent in two with almost nothing in the
+# middle:
+#
+#   scores for the season        does not
+#   Castle Rock        100%      RORC Spring Series        81%
+#   Ile d'Ouessant     100%      JOG Channel Race          55%
+#   IRC Two-Handed     100%      RORC Easter Challenge     36%
+#   Channel Race        96%      IRC National Championship 35%
+#   Morgan Cup          95%      RORC Vice Admiral's Cup   12%
+#   Cervantes Trophy    95%      XOD Telegraph Trophy       0%
+#   De Guingand Bowl    94%
+#   2H Offshore         93%
+#
+# The three at 36, 35 and 12 are the three Ruaridh named as not part of the
+# offshore series, arrived at independently. Myth of Malham, Cherbourg and
+# Cowes-Dinard-St Malo score 94-98% and were already in Solent offshore on
+# their venue, which is the same answer twice.
+#
+# NOT moved, and sitting in the gap: RORC Spring Series at 81% and IRC
+# Two-Handed National Championship at 88%. Both are series or championships
+# rather than races and neither was named; they stay inshore until someone rules.
+^RORC Cervantes Trophy Race$,Solent offshore,95% of its boats scored for the season.
+^RORC Channel Race$,Solent offshore,96%.
+^RORC Morgan Cup Race$,Solent offshore,95%.
+^RORC Castle Rock Race$,Solent offshore,100%.
+^RORC De Guingand Bowl Race$,Solent offshore,94%.
+^RORC Ile d.Ouessant Race$,Solent offshore,"100%. Cowes to Ushant and back - the apostrophe is a curly one in the record, hence the dot."
+^RORC 2H Offshore$,Solent offshore,93%. Named offshore as well.
+^IRC Two-Handed$,Solent offshore,"100%. The two-handed division of the offshore races, carried as a regatta of its own."
+^RORC Season Points Championship$,Solent offshore,"The series itself. Every rule above is 'does it score for this', so the championship belongs with the races that do, not in the inshore area with the Easter Challenge."
