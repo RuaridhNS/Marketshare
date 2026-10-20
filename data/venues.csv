@@ -12,6 +12,12 @@ cowes-st malo|rorc cowes-st malo,Saint-Malo,FRA,48.649,-2.026
 # like from the outside, and it was the venue that was wrong all along.
 la trinite.cowes|cowes.la trinite,La Trinite-sur-Mer,FRA,47.586,-3.030
 cowes week|round the island|taittinger|vice admiral|rorc easter|race the wight,Solent,GBR,50.740,-1.310
+# The Admiral's Cup, revived by RORC in 2025 and sailed out of Cowes. AFTER the
+# line above on purpose: that one claims the Vice Admiral's Cup by name, so by
+# the time this is reached "admiral's cup" can only be the real thing. Both go
+# to the Solent anyway, but the order keeps the two events separable, which is
+# the same care data/segment_overrides.csv takes with its negative lookbehind.
+admiral's cup,Solent,GBR,50.740,-1.310
 cowes|solent|royal southern|hamble|warsash|lymington|yarmouth|\bxod\b|half ton|one ton|stug perry|telegraph,Solent,GBR,50.740,-1.310
 # The Fastnet Rock is a TURNING MARK, not a venue. Filed there, the race
 # carried country IRL, and Ireland's scope became 1,453 boats of Fastnet
