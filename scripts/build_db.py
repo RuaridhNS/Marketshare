@@ -27,6 +27,10 @@ SAILMAKERS = [
     # the next refresh.
     ("Incidence", 0), ("All Purpose", 0), ("Delta Voiles", 0),
     ("Technique Voile", 0),
+    # Dart Sails, Dartmouth. Added on a sighting rather than off a sheet -
+    # J'OUVERT GBR112N is on them. Same reasoning as the French lofts above:
+    # a loft nobody can pick is a loft that gets recorded as "Other".
+    ("Dart Sails", 0),
 ]
 # Normalize raw sailmaker text -> canonical name in SAILMAKERS
 SAILMAKER_ALIASES = {
@@ -50,6 +54,7 @@ SAILMAKER_ALIASES = {
     "delta voiles": "Delta Voiles", "delta": "Delta Voiles",
     "technique voile": "Technique Voile", "techniquevoile": "Technique Voile",
     "technique voiles": "Technique Voile",
+    "dart": "Dart Sails", "dart sails": "Dart Sails", "dartsails": "Dart Sails",
 }
 
 

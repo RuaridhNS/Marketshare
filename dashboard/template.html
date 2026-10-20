@@ -109,6 +109,9 @@
   .hdr-stamp { margin-left: auto; font-family: 'Proxima Nova', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-variant-numeric: tabular-nums;
     font-size: 10.5px; letter-spacing: .02em; color: rgba(255,255,255,.72); }
 
+  /* A word the page is using in a particular sense, with the sense on hover. */
+  .defn { border-bottom: 1px dotted var(--text-secondary); cursor: help; }
+
   /* Scope picker. Pushed hard left of the stamp by the stamp's margin-left:auto. */
   .hdr-scope { display: flex; align-items: center; gap: 8px; margin-left: 20px; }
   .hdr-scope label { font-size: 11px; letter-spacing: .06em; text-transform: uppercase;
@@ -797,6 +800,15 @@ function liveSailmaker(b) {
 
 function esc(s) { return (s===null||s===undefined) ? '' : String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 function fmtDate(iso) { return iso ? iso.slice(0,10) : ''; }
+
+// TCC to a fixed THREE places, so a column of ratings lines up and 1.02 does
+// not read as coarser than 1.024 when it is the same number. Three and not
+// four: IRC publishes TCC to three, and of the 4,491 rated boats here 4,070
+// carry three decimals and none carries four. A fourth place would be a digit
+// this database does not have, printed as though it did.
+function fmtTcc(v) {
+  return (v === null || v === undefined || v === '') ? '' : Number(v).toFixed(3);
+}
 
 // ---------- lookups ----------
 const boatsById = {}; DATA.boats.forEach(b => boatsById[b.id] = b);
@@ -1820,8 +1832,13 @@ function renderOverview() {
     <div class="card-row">
       <div class="card" style="border-left:4px solid var(--accent);">
         <h2 style="margin-top:0;">The known market ${confidenceBadge(smKnown, activeBoats.length, {label: 'active boats measured'})}</h2>
-        <p style="margin:0 0 10px;font-size:15px;">Of the <strong>${smKnown}</strong> active boats whose sailmaker
-          we know, <strong>${northN}</strong> are on North Sails — <strong>${northOfKnown}%</strong>.</p>
+        <p style="margin:0 0 10px;font-size:15px;">Of the <strong>${smKnown}</strong> <span class="defn"
+          title="Raced at least once in ${ACTIVE_CUTOFF_YEAR}–${MAX_SEASON_YEAR}, the last five seasons. A boat with no entry in that window is Inactive and is left out of every figure on this page.">active</span>
+          boats whose sailmaker we know, <strong>${northN}</strong> are on North Sails — <strong>${northOfKnown}%</strong>.</p>
+        <p class="muted" style="font-size:12px;margin:-4px 0 10px;"><strong>Active</strong> means raced at least
+          once in ${ACTIVE_CUTOFF_YEAR}–${MAX_SEASON_YEAR} — the last five seasons. Of ${DATA.boats.length.toLocaleString()}
+          boats in the database, ${activeBoats.length.toLocaleString()} are active; the rest last raced before
+          ${ACTIVE_CUTOFF_YEAR} and are excluded here.</p>
         ${svgBarChart(knownItems, {colorFn: it => BUCKET_COLOR[it.sailmaker], width: 460})}
         <p class="muted" style="font-size:12px;margin-top:10px;">
           The badge is our confidence: ${smKnownPct}% of the active fleet is measured. What we know also leans
@@ -2217,7 +2234,7 @@ function renderBoatsList() {
       <td><strong>${esc(b.boat_name||'—')}</strong>${edited}</td>
       <td>${esc(b.sail_no||'')}</td>
       <td>${esc(b.boat_type||'')}</td>
-      <td class="num">${b.tcc||''}</td>
+      <td class="num">${fmtTcc(b.tcc)}</td>
       <td>${esc(b.owner_name||'')}</td>
       <td class="sm-cell">${smSelect(b, 'sailmaker')}</td>
       <td class="sm-cell">${smSelect(b, 'partialSailmaker')}</td>
@@ -2616,7 +2633,7 @@ function renderBoatProfile(id) {
         <dl class="kv">
           <dt>Owner</dt><dd>${esc(b.owner_name||'—')}</dd>
           <dt>Boat type</dt><dd>${esc(b.boat_type||'—')}</dd>
-          <dt>TCC (IRC rating)</dt><dd>${b.tcc||'—'}</dd>
+          <dt>TCC (IRC rating)</dt><dd>${fmtTcc(b.tcc)||'—'}</dd>
           <dt>Sail No</dt><dd>${esc(b.sail_no||'—')}</dd>
         </dl>
       </div>
@@ -7347,7 +7364,7 @@ function renderRacePage(raceId) {
       <td>${esc(e.boat.boat_name)}</td>
       <td>${esc(e.boat.sail_no)}</td>
       <td>${esc(e.class||'')}</td>
-      <td class="num">${e.tcc!=null ? e.tcc : (e.boat.tcc||'')}</td>
+      <td class="num">${fmtTcc(e.tcc != null ? e.tcc : e.boat.tcc)}</td>
       <td>${esc(e.owner_name_used||e.boat.owner_name||'')}</td>
       <td class="sm-cell">${smSelect(e.boat, 'sailmaker')}${e.sailmaker_name && e.sailmaker_name !== liveSailmaker(e.boat) ? `<small class="sm-recorded" title="recorded on this result">${esc(e.sailmaker_name)}</small>` : ''}</td>
       <td>${esc(e.corrected_time||e.status||'')}</td>
