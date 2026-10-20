@@ -3154,6 +3154,21 @@ function seriesOf(r) {
   // One club, one branch. Splitting the four Summer Series regattas away
   // from the club's other sixteen events put the same organiser in two
   // places, and left a bucket literally called "other".
+  // A class association is an organising authority too. The Cape 31 circuit
+  // was split three ways: the UK National Championship under the Royal
+  // Southern because the record is named after its host, the UK and MED
+  // rounds under "No organising club recorded" because the import gives them
+  // none, and the Europeans off in "Area not set". One class, one branch.
+  //
+  // FIRST, ahead of the host-club rules below, because the championship's
+  // record is called "Royal Southern Cape 31 UK National Championship" and
+  // the next line down would otherwise claim it. The club hosts it; the class
+  // runs it.
+  //
+  // Matched on the NAME, so this catches the class's own regattas and not the
+  // Cape 31s racing inside somebody else's event - 529 Cape 31 entries at
+  // Cowes Week stay at Cowes Week, which is where that fleet was measured.
+  if (/\bcape ?31\b/i.test(n)) return 'Cape 31 Class';
   if (/^Royal Southern/i.test(n)) return 'Royal Southern Yacht Club';
   if (/royal solent|taittinger/i.test(n)) return 'Royal Solent Yacht Club';
   if (/^Warsash/i.test(n)) return 'Warsash Sailing Club';
