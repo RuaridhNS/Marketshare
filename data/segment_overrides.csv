@@ -72,3 +72,4 @@ warsash spring championships,Race,"Club, regional and series handicap racing - t
 ^XOD Telegraph Trophy$,One-Design,"The X One-Design class. A class trophy, so the segment is the class."
 ^Telegraph Bowl \(XOD\)$,One-Design,"The other XOD trophy. The parentheses are escaped: this column is a regular expression, and unescaped brackets would make a group that matches the bare words."
 ^Stug Perry Trophy$,One-Design,"A Daring class trophy: one season on file, class 'Darings', and all nine boats are typed Daring. The segment is the class."
+^Royal Solent Yacht Club$,One-Design,"The club's own archived racing, 2020-2025, scraped from HalSail. XOD, XOD Open and Folkboat Nordic only - the club runs no IRC division in any of the six seasons, which is why this is the one regatta here loaded deliberately outside IRC. One-Design because that is what it is; it is not a handicap fleet with a few one-designs in it."

@@ -795,6 +795,14 @@ def main():
     # reported entry count, is a row in the regatta tree that opens onto
     # nothing. Removed here rather than in the database, because the database
     # is right - it is this export that drops the duplicate standings.
+    # NOT extended to "races the IRC filter emptied", though that was tried.
+    # It reads as the same idea and is not: 51 regattas lose every entry to the
+    # IRC filter while being perfectly real - Copa del Rey with 176 boats, OK
+    # Worlds with 167, Kiel Week with 117 - because their fleets are one-design
+    # or otherwise unrated. Pruning on surviving entries deletes those from the
+    # tree entirely, which hides the fact that the event exists and that we
+    # hold it. An event showing no measured boats is the honest state for a
+    # fleet this tool does not rate; an event that has vanished is not.
     keep_ev = {r["event_id"] for r in races} | {c["event_id"] for c in class_counts}
     dead_ev = [e for e in events if e["id"] not in keep_ev]
     events = [e for e in events if e["id"] in keep_ev]
