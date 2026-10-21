@@ -202,6 +202,8 @@ def main():
     p.add_argument("--year", type=int, help="override the season year")
     p.add_argument("--only-irc", action="store_true", default=True)
     p.add_argument("--all-classes", dest="only_irc", action="store_false")
+    p.add_argument("--classes", help="regex over class names; overrides --only-irc. "
+                                     "e.g. 'xod|folkboat' for a club with no IRC division")
     p.add_argument("--delay", type=float, default=4)
     p.add_argument("--dry-run", action="store_true")
     args = p.parse_args()
@@ -218,7 +220,16 @@ def main():
 
     ref = f"{ARCHIVE}/Result/Public/{args.dskey}/1"
     classes = options(fetch(f"/Result/_CrsClassDropDown/{args.dskey}", referer=ref))
-    if args.only_irc:
+    if args.classes:
+        # An explicit class filter beats --only-irc, because the reason to ask
+        # for named classes is usually that the club has no IRC division at all.
+        # Royal Solent is the case in point: six archived seasons, not one IRC
+        # class in any of them, but real XOD and Folkboat fleets worth having.
+        # Without this the only options were "IRC" (nothing) and "everything"
+        # (thirty-odd classes a season of NHC, VPRS, TCF and dinghies).
+        want = re.compile(args.classes, re.I)
+        classes = [(v, t) for v, t in classes if want.search(t)]
+    elif args.only_irc:
         classes = [(v, t) for v, t in classes if re.search(r"\bIRC", t, re.I)]
     print(f"dsKey {args.dskey}: {len(classes)} class(es) to scrape")
     for v, t in classes:

@@ -1408,6 +1408,33 @@ function normType(t) { return (t||'').toUpperCase().replace(/\s+\d+\.\d+.*$/, ''
 // different Quarter Tonners - spent a while as one record. Naming the clash on
 // the card means the OnlyNamed decision gets made by the person looking at the
 // evidence, instead of being discovered later by a script that says no.
+// Races BOTH boats entered. One hull cannot start the same race twice, so any
+// count above zero is proof of two boats - stronger than the name-and-season
+// test below, which only fires when the names differ.
+//
+// It is not proof of anything on its own when the count is one or two: a race
+// scraped onto two records shows up here as well, and that IS a duplicate. The
+// two cases separate on the NAME. Different names in the same race means two
+// hulls; the same name in the same race means one race loaded twice. Both
+// counts are returned so the page can say which it is looking at.
+//
+// This exists because three pairs kept being exported from this page and all
+// three were wrong the same way: a boat that had INHERITED a name another boat
+// used earlier. GBR744 raced the Royal Thames J/70 as ELIZABETH and RTYC 3 for
+// ten seasons, became SARDONYX in 2026, and met GBR1203 - the other SARDONYX -
+// on the water forty-six times.
+function sharedRaceCounts(a, b) {
+  const mine = new Map();
+  (a.entries || []).forEach(e => mine.set(e.race_id, (e.boat_name_used || '').trim().toUpperCase()));
+  let same = 0, diff = 0;
+  (b.entries || []).forEach(e => {
+    if (!mine.has(e.race_id)) return;
+    const n = (e.boat_name_used || '').trim().toUpperCase();
+    if (n && mine.get(e.race_id) && n !== mine.get(e.race_id)) diff++; else same++;
+  });
+  return { same, diff, total: same + diff };
+}
+
 function nameClashSeasons(a, b) {
   const spanOf = x => (x.name_history||[]).map(h => ({
     name: (h.name||'').toUpperCase(),
@@ -3041,6 +3068,23 @@ function renderDuplicates() {
       for (let j = i+1; j < g.boats.length; j++)
         nameClashSeasons(g.boats[i], g.boats[j]).forEach(c =>
           clashes.push({ ...c, aSail: g.boats[i].sail_no, bSail: g.boats[j].sail_no }));
+    // The hull test, run over every pair before the softer name test below.
+    let raced = { same: 0, diff: 0, total: 0 };
+    for (let i = 0; i < g.boats.length; i++)
+      for (let j = i+1; j < g.boats.length; j++) {
+        const r = sharedRaceCounts(g.boats[i], g.boats[j]);
+        raced = { same: raced.same + r.same, diff: raced.diff + r.diff,
+                  total: raced.total + r.total };
+      }
+    const racedWarning = raced.total ? `
+      <div style="border-left:3px solid var(--bad,#b03030);background:var(--surface-2);padding:10px 12px;margin:10px 0;font-size:13px;">
+        <strong>These two entered the same race ${raced.total} time${raced.total===1?'':'s'}.</strong>
+        One hull cannot start a race twice${raced.diff ? `, and in ${raced.diff} of them they are
+        recorded under <strong>different names</strong> &mdash; so these are two boats, not one record
+        twice. Merging would move one boat's history onto the other.` : `. Where the name is the SAME
+        in those races, it may instead be one race loaded twice, which a merge would correctly
+        collapse &mdash; check before merging.`}
+      </div>` : '';
     const shared = clashes.length ? sharedName(g.boats[0], g.boats[1]) : '';
     const warning = clashes.length ? `
       <div style="border-left:3px solid var(--series-one);background:var(--surface-2);padding:10px 12px;margin:10px 0;font-size:13px;">
@@ -3057,6 +3101,7 @@ function renderDuplicates() {
     <div class="card">
       <h2 style="margin-bottom:4px;">${g.boats.map(b=>esc(b.boat_name||b.sail_no)).join(' / ')}</h2>
       <p class="muted" style="font-size:13px;margin-top:0;">${esc(g.reason)}</p>
+      ${racedWarning}
       ${warning}
       <p style="font-size:13px;margin:10px 0 4px;">Pick which record to keep — the other(s) will be merged into it and removed, with all race history moved over:</p>
       ${boatOptions}
