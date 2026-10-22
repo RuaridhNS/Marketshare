@@ -304,19 +304,27 @@
   dialog#chart-modal .modal-head h2 { margin: 0; }
 
 /* ---- regatta tree: Series > Regatta > Class ---- */
-.regatta-series{padding:0;}
-.regatta-series>summary.tree-series{
+.regatta-series,.regatta-country,.regatta-area,.regatta-split{padding:0;}
+.regatta-series>summary.tree-series,.regatta-country>summary.tree-series,
+.regatta-area>summary.tree-series,.regatta-split>summary.tree-series{
   display:flex;align-items:baseline;gap:12px;cursor:pointer;list-style:none;
   padding:16px 20px;font-size:19px;font-weight:600;
 }
-.regatta-series>summary.tree-series::-webkit-details-marker{display:none;}
-.regatta-series>summary.tree-series::before{
+.regatta-series>summary.tree-series::-webkit-details-marker,
+.regatta-country>summary.tree-series::-webkit-details-marker,
+.regatta-area>summary.tree-series::-webkit-details-marker,
+.regatta-split>summary.tree-series::-webkit-details-marker{display:none;}
+.regatta-series>summary.tree-series::before,.regatta-country>summary.tree-series::before,
+.regatta-area>summary.tree-series::before,.regatta-split>summary.tree-series::before{
   content:"";flex:none;width:0;height:0;
   border-left:6px solid currentColor;
   border-top:4.5px solid transparent;border-bottom:4.5px solid transparent;
   opacity:.5;transition:transform .15s ease;transform-origin:35% 50%;
 }
-.regatta-series[open]>summary.tree-series::before{transform:rotate(90deg);}
+.regatta-series[open]>summary.tree-series::before,
+.regatta-country[open]>summary.tree-series::before,
+.regatta-area[open]>summary.tree-series::before,
+.regatta-split[open]>summary.tree-series::before{transform:rotate(90deg);}
 .tree-body{padding:0 8px 10px;}
 .tree-node{border-top:1px solid var(--border);}
 .tree-node>summary{
@@ -369,6 +377,33 @@ tr.sales-dirty > td { background: var(--surface-2); }
 tr.sales-dirty > td:first-child { box-shadow: inset 3px 0 0 var(--warn); }
 tr.sales-saved > td:first-child { box-shadow: inset 3px 0 0 var(--success); }
 
+/* ---- the trail, and the levels the eight-deep tree added ---- */
+/* Sticky, because the whole point is that it is reachable from the bottom of
+   a long branch without scrolling back to the top. */
+.tree-crumbs{position:sticky;top:0;z-index:20;display:flex;flex-wrap:wrap;
+  align-items:center;gap:6px;padding:9px 12px;margin:0 0 12px;
+  background:var(--surface);border:1px solid var(--border);border-radius:8px;
+  font-size:13px;line-height:1.5;}
+.tree-crumbs .crumb{color:var(--accent,#0063a6);text-decoration:none;font-weight:600;
+  padding:2px 6px;border-radius:5px;}
+.tree-crumbs .crumb:hover{background:var(--surface-2);text-decoration:underline;}
+/* The last step is where you are, so it is not a link anywhere else. */
+.tree-crumbs .crumb:last-child{color:var(--text);cursor:default;}
+.tree-crumbs .crumb:last-child:hover{background:none;text-decoration:none;}
+.tree-crumbs .crumb-root{font-weight:700;}
+.tree-crumbs .crumb-sep{color:var(--text-muted);}
+.tree-crumbs .crumb-hint{color:var(--text-muted);font-style:italic;}
+/* Nesting cards four deep (country > area > split > organiser) stacks four
+   borders and four paddings into a gutter nothing is written in. Inner cards
+   lose the frame and keep only the indent. */
+.regatta-country>.tree-body,.regatta-area>.tree-body,.regatta-split>.tree-body{
+  padding:0 0 10px 14px;}
+.regatta-country>.tree-body>.card,.regatta-area>.tree-body>.card,
+.regatta-split>.tree-body>.card{border-width:0 0 0 2px;border-radius:0;
+  border-left-color:var(--border);box-shadow:none;margin:0;}
+.regatta-split>summary.tree-series{letter-spacing:.02em;}
+.tree-race>summary .tree-name{font-weight:500;}
+.tree-race>.tree-kids{padding-left:18px;}
 /* deeper tree: Club > Year > Event > Class > boat */
 .tree-year > summary .tree-name { font-family: 'Proxima Nova', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-variant-numeric: tabular-nums;
   font-variant-numeric: tabular-nums; letter-spacing: .02em; }
@@ -3245,6 +3280,80 @@ function attachDuplicatesHandlers() {
 // race is not the market it sails from.
 function areaOf(r) { return (r && r.area) || 'Area not set'; }
 
+// The area field stores the SPLIT in its name - "Solent inshore", "Solent
+// offshore" - because one column was all the ledger ever had. The tree wants
+// them as two levels: a place, and the kind of racing inside it. So the name
+// is read apart rather than migrated, which keeps data/venue_areas.csv and
+// data/regatta_areas.csv exactly as they are and means a new split anywhere
+// else costs one word in a CSV, not a schema change.
+//
+// Only the Solent carries one today. East Coast, North West and the rest are
+// a place and nothing more, and areaSplitOf returns '' for them - the renderer
+// then leaves the level out entirely rather than drawing a branch with one
+// child named after its parent. A level that cannot divide anything is not a
+// level, it is a click.
+const AREA_SPLIT_RE = /^(.*?)\s+(inshore|offshore)$/i;
+function areaBaseOf(r) {
+  const m = AREA_SPLIT_RE.exec(areaOf(r));
+  return m ? m[1] : areaOf(r);
+}
+function areaSplitOf(r) {
+  const m = AREA_SPLIT_RE.exec(areaOf(r));
+  return m ? m[2][0].toUpperCase() + m[2].slice(1).toLowerCase() : '';
+}
+
+// seriesOf() names the ORGANISER - it predates there being a series level at
+// all - so this reads as the club/class branch and fixtureOf below is the
+// actual series under it. Renamed here rather than at every call site.
+const organiserOf = seriesOf;
+
+// The recurring fixture: "RORC Cervantes Trophy Race" under the RORC branch is
+// just "Cervantes Trophy Race". The organiser's name is already the heading
+// above it, and repeating it in every child made the tree read as a column of
+// the word RORC. Stripped only where it is genuinely a prefix - "Royal Solent
+// Yacht Club" as a whole regatta name has nothing left after stripping, so it
+// keeps its name.
+function fixtureOf(rg, org) {
+  const n = ((rg && rg.name) || '').trim();
+  if (!org || !n) return n || 'Unnamed';
+  // Try the organiser's name, then successively shorter word-prefixes of it,
+  // longest first: "Royal Southern Yacht Club" does not prefix "Royal
+  // Southern J-Cup" but "Royal Southern" does. A single word is only tried
+  // when it is an acronym - RORC, JOG - because stripping an ordinary first
+  // word turned "Cowes Week" under the Cowes Week branch into "Week".
+  const words = org.split(/\s+/);
+  for (let k = words.length; k >= 1; k--) {
+    if (k === 1 && !/^[A-Z0-9]{2,}$/.test(words[0])) break;
+    const t = words.slice(0, k).join(' ');
+    const re = new RegExp('^' + t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '[\\s:,\\-]+', 'i');
+    if (!re.test(n)) continue;
+    const left = n.replace(re, '').trim();
+    // "Royal Solent Yacht Club" minus "Royal Solent" is "Yacht Club", which
+    // names nothing. A remainder that is only the generic tail of a club name
+    // is no better than the whole name, so keep the whole name.
+    if (left && left.length > 2 && !/^((royal|the)\s+)?((yacht|sailing|boat)\s+)?(club|association|cc|sc|yc)$/i.test(left)) {
+      return left;
+    }
+  }
+  return n;
+}
+
+// Cowes publishes a race as "<class> - Day 6", so under a class node named
+// "IRC 1" the full name reads "IRC 1 - IRC Class 1 - Day 6". Drop the leading
+// part when it IS the class, judged through normClass so "IRC Class 1" and
+// "IRC 1" count as the same answer. Anything that does not match is left
+// whole: "Passage Race to Gins Farm XOD Open - Race 1" is not a class prefix
+// and guessing at it would throw away the only name the race has.
+function raceLabel(ra, cls) {
+  const n = (ra && ra.race_name) || '';
+  const i = n.indexOf(' - ');
+  if (i > 0 && normClass(n.slice(0, i)) === cls) {
+    const left = n.slice(i + 3).trim();
+    if (left) return left;
+  }
+  return n || 'Race';
+}
+
 // Country is NOT the tree's top level and should not become it: RORC is not a
 // country, and an area like the Mediterranean deliberately spans Spain, Italy,
 // France, Greece and Monaco because that is one market. But "which of these
@@ -3447,36 +3556,49 @@ const shareMeta = (ids) => {
 
 
 function renderRegattasList() {
-  // Club > Year > Event > Class > boat. The class layer lives on the entries -
-  // it used to be baked into regatta NAMES, which made one event look like
-  // eighteen - so the tree is built straight from the entry list.
-  const idx = {};           // area -> club -> year -> regattaId -> class -> [entry refs]
+  // Country > Area > Inshore/Offshore > Organiser > Series > Season > Class >
+  // Race > boat. Eight names, but never eight clicks: a level that cannot
+  // divide what is under it is left out (see PATH and the renderer below), so
+  // an offshore race with one start reads Country > Area > Offshore >
+  // Organiser > Series > Season > boats, and only Cowes Week - 46 classes and
+  // 348 races in one season - goes the whole way down.
+  //
+  // Built from a flat list and nested afterwards rather than with eight
+  // hand-written maps. The old five-level version already needed four
+  // `(x = x || {})` lines per entry; at eight that is where the bugs live.
+  const PATH = [
+    { key: 'country',  label: r => countryOf(r.rg) || 'Country not recorded' },
+    { key: 'area',     label: r => areaBaseOf(r.rg) },
+    { key: 'split',    label: r => areaSplitOf(r.rg) },
+    { key: 'org',      label: r => organiserOf(r.rg) },
+    { key: 'fixture',  label: r => String(r.rg.id) },
+    { key: 'season',   label: r => String(r.ev.season_year || 0) },
+    { key: 'class',    label: r => r.cls },
+    { key: 'race',     label: r => String(r.ra ? r.ra.id : '') },
+  ];
+  const idx = {};           // nested, PATH deep
   const meta = {};          // regattaId -> regatta
+  const dig = keys => keys.reduce((m, k) => (m[k] = m[k] || {}), idx);
+
   DATA.boats.forEach(b => b.entries.forEach(e => {
     const ra = racesById[e.race_id]; if (!ra) return;
     const ev = eventsById[ra.event_id]; if (!ev) return;
     const rg = regattasById[ev.regatta_id]; if (!rg) return;
     meta[rg.id] = rg;
-    const club = seriesOf(rg), yr = ev.season_year || 0, area = areaOf(rg);
-    const cls = normClass(e.class) || 'Class unrecorded';
-    const byClub = (idx[area] = idx[area] || {});
-    const byYear = (byClub[club] = byClub[club] || {});
-    const byReg = (byYear[yr] = byYear[yr] || {});
-    const byCls = (byReg[rg.id] = byReg[rg.id] || {});
+    const r = { rg, ev, ra, cls: normClass(e.class) || 'Class unrecorded' };
+    const node = dig(PATH.map(p => p.label(r)));
     // p is dropped for a fleet of one - a 1st against nobody is not a placing
-    (byCls[cls] = byCls[cls] || []).push({ b: b.id, p: e.fleet >= 2 ? e.position : null });
+    (node.$ = node.$ || []).push({ b: b.id, p: e.fleet >= 2 ? e.position : null });
   }));
 
   // Events with no boat-level results still need a place, or the tree silently
-  // loses every aggregate-only season.
+  // loses every aggregate-only season. They stop at the season: there is no
+  // class and no race to put under them, and whyEmpty() says so there.
   DATA.regattas.forEach(rg => {
-    const club = seriesOf(rg), area = areaOf(rg);
     DATA.events.filter(e => e.regatta_id === rg.id).forEach(ev => {
-      const yr = ev.season_year || 0;
-      const byClub = (idx[area] = idx[area] || {});
-      const byYear = (byClub[club] = byClub[club] || {});
-      const byReg = (byYear[yr] = byYear[yr] || {});
-      if (!byReg[rg.id]) { byReg[rg.id] = {}; meta[rg.id] = rg; }
+      const r = { rg, ev, ra: null, cls: '' };
+      dig(PATH.slice(0, 6).map(p => p.label(r)));
+      meta[rg.id] = rg;
     });
   });
 
@@ -3586,123 +3708,267 @@ function renderRegattasList() {
   window.__treeData = {};
   let leafSeq = 0;
 
-  // Area first, organiser under it. 'Area not set' sorts last rather than
-  // alphabetically: it is a gap to fill, not a place.
-  const areas = Object.keys(idx).sort((a, b) =>
-    a === 'Area not set' ? 1 : b === 'Area not set' ? -1 : a.localeCompare(b));
-  const cards = areas.map(area => {
-  const clubs = Object.keys(idx[area]).sort();
-  const clubCards = clubs.map(club => {
-    const years = Object.keys(idx[area][club]).map(Number).sort((a, b) => b - a);
-    const clubBoats = new Set();
-    let clubEvents = 0;
-    const clubReported = reportedOver(DATA.events.filter(ev => {
-      const rg = regattasById[ev.regatta_id];
-      return rg && seriesOf(rg) === club && areaOf(rg) === area;
-    }));
+  // ---------------------------------------------------------------------
+  // The renderer. One recursive function rather than eight nested loops,
+  // because every level asks the same three questions - what is under it,
+  // how many boats that is, and how many of them are ours - and only the
+  // heading changes.
+  //
+  // It returns {html, boats, regs, entries} so a parent totals its children
+  // on the way back up. The five-level version recomputed each area's boats
+  // by walking DATA.boats again per card; at eight levels that would be eight
+  // passes over 54,000 entries every time the page renders.
+  //
+  // A LEVEL THAT CANNOT DIVIDE ANYTHING IS NOT DRAWN. Two cases, both real:
+  // an area with no inshore/offshore split (every area but the Solent), and a
+  // class with a single race (every offshore race, and most of the rest - 422
+  // of 537 events hold exactly one race). Drawing them anyway would put a
+  // branch above a single child named after its parent, which is a click that
+  // tells the reader nothing.
+  const gapLast = (a, b) => {
+    const ga = /not set|not recorded|^Other\b/i.test(a) ? 1 : 0;
+    const gb = /not set|not recorded|^Other\b/i.test(b) ? 1 : 0;
+    return ga - gb || a.localeCompare(b);
+  };
+  const raceOrder = (a, b) => {
+    const ra = racesById[a] || {}, rb = racesById[b] || {};
+    return String(ra.race_date || '￿').localeCompare(String(rb.race_date || '￿'))
+        || (ra.race_number || 0) - (rb.race_number || 0)
+        || String(ra.race_name || '').localeCompare(String(rb.race_name || ''));
+  };
+  function kidsOf(depth, node) {
+    const keys = Object.keys(node).filter(k => k !== '$');
+    if (depth === 4) return keys.sort((a, b) =>
+      String((meta[a] || {}).name || '').localeCompare(String((meta[b] || {}).name || '')));
+    if (depth === 5) return keys.sort((a, b) => Number(b) - Number(a));
+    if (depth === 6) return keys.sort(compareClasses);
+    if (depth === 7) return keys.sort(raceOrder);
+    return keys.sort(gapLast);
+  }
 
-    const yearNodes = years.map(yr => {
-      const regs = idx[area][club][yr];
-      const regIds = Object.keys(regs).sort((a, b) =>
-        (meta[a].name || '').localeCompare(meta[b].name || ''));
-      const yearBoats = new Set();
+  // The entry rows beneath a node, however deep. Used where a level has been
+  // collapsed away and its parent has to show the boats itself.
+  function entriesUnder(node) {
+    let out = node.$ ? node.$.slice() : [];
+    Object.keys(node).forEach(k => {
+      if (k !== '$' && node[k] && typeof node[k] === 'object') out = out.concat(entriesUnder(node[k]));
+    });
+    return out;
+  }
 
-      const evNodes = regIds.map(rid => {
-        const rg = meta[rid];
-        const classes = Object.keys(regs[rid])
-          .map(c => [c, regs[rid][c]])
-          .sort((a, b) => compareClasses(a[0], b[0]));
-        const evBoats = new Set();
-        const clsNodes = classes.map(pair => {
-          const cls = pair[0], rows = pair[1];
-          const byBoat = {};
-          rows.forEach(r => {
-            const g = (byBoat[r.b] = byBoat[r.b] || { races: 0, best: null });
-            g.races++;
-            if (r.p != null && (g.best == null || r.p < g.best)) g.best = r.p;
-            evBoats.add(r.b); yearBoats.add(r.b); clubBoats.add(r.b);
-          });
-          const key = 'leaf' + (leafSeq++);
-          window.__treeData[key] = byBoat;
-          const n = Object.keys(byBoat).length;
-          return '<details class="tree-node tree-class" data-leaf="' + key + '">' +
-            '<summary><span class="tree-name">' + esc(cls) + '</span>' +
-            '<span class="tree-meta"><span>' + n + ' boat' + (n === 1 ? '' : 's') + '</span>' +
-            '<span>' + rows.length + ' entr' + (rows.length === 1 ? 'y' : 'ies') + '</span>' +
-            shareMeta(Object.keys(byBoat)) + '</span></summary>' +
-            '<div class="tree-kids tree-boats"><p class="tree-empty">Opening&hellip;</p></div></details>';
-        }).join('');
-        clubEvents++;
-        const sm = regattaSummary(rg);
-        // The country goes into data-name as well as its own attribute, so
-        // typing "france" in the search box finds French events even though
-        // no branch of the tree is named after a country.
-        return '<details class="tree-node regatta-row" data-name="' +
-          esc((rg.name + ' ' + club + ' ' + countryOf(rg)).toLowerCase()) +
-          '" data-country="' + esc(countryOf(rg)) +
-          '" data-club="' + esc(club) + '" data-recent="' + sm.nRecent +
-          '" data-boatlevel="' + (sm.hasBoatLevel ? 1 : 0) +
-          '" data-seasonboats="' + evBoats.size +
-          '" data-seasonreported="' + reportedOver(eventsOf(rg.id, yr)) + '">' +
-          '<summary><span class="tree-name">' + esc(rg.name) + '</span>' +
+  // A boat list, rendered on demand. Registering the rows here and filling the
+  // markup on first open is what keeps the page openable: every entry up front
+  // is ~54,000 rows of HTML.
+  function leafKey(rows, boats) {
+    const byBoat = {};
+    rows.forEach(r => {
+      const g = (byBoat[r.b] = byBoat[r.b] || { races: 0, best: null });
+      g.races++;
+      if (r.p != null && (g.best == null || r.p < g.best)) g.best = r.p;
+      if (boats) boats.add(r.b);
+    });
+    const key = 'leaf' + (leafSeq++);
+    window.__treeData[key] = byBoat;
+    return { key, n: Object.keys(byBoat).length, ids: Object.keys(byBoat) };
+  }
+
+  // Every node carries data-crumb, which is the only thing the breadcrumb bar
+  // needs: it walks up from whatever was just opened and reads the labels off
+  // the ancestors. Keeping the label in the DOM rather than in a parallel
+  // structure means the trail cannot drift out of step with the tree.
+  const crumb = (lvl, label) => ' data-level="' + lvl + '" data-crumb="' + esc(label) + '"';
+
+  function renderNode(depth, key, node, ctx) {
+    const boats = new Set();
+    const regs = new Set();
+    let entries = 0;
+
+    // ---- race: the leaf ----
+    if (depth === 7) {
+      const ra = racesById[key] || {};
+      const rows = node.$ || [];
+      entries = rows.length;
+      const lf = leafKey(rows, boats);
+      return { boats, regs, entries,
+        html: '<details class="tree-node tree-race" data-leaf="' + lf.key + '"' +
+          crumb('race', raceLabel(ra, ctx.cls)) + '>' +
+          '<summary><span class="tree-name">' + esc(raceLabel(ra, ctx.cls)) + '</span>' +
           '<span class="tree-meta">' +
-          // Segment on the row, not just buried on the regatta page. It is half
-          // of what the tree is now organised by, so it has to be readable
-          // without opening anything. Unset is said out loud for the same
-          // reason the area branch is: 125 regattas carry no segment.
+          (ra.race_date ? '<span>' + esc(ra.race_date) + '</span>' : '') +
+          '<span>' + lf.n + ' boat' + (lf.n === 1 ? '' : 's') + '</span>' +
+          shareMeta(lf.ids) + '</span></summary>' +
+          '<div class="tree-kids tree-boats"><p class="tree-empty">Opening&hellip;</p></div></details>' };
+    }
+
+    // ---- class: holds races, or the boats directly when there is one race ----
+    if (depth === 6) {
+      const raceKeys = kidsOf(6, node);
+      const one = raceKeys.length <= 1;
+      let inner = '', leafAttr = '', ids = [];
+      if (one) {
+        // One race in this class, so the race level says nothing the class has
+        // not already said. Boats hang straight off the class.
+        const rows = entriesUnder(node);
+        entries = rows.length;
+        const lf = leafKey(rows, boats);
+        leafAttr = ' data-leaf="' + lf.key + '"';
+        inner = '<div class="tree-kids tree-boats"><p class="tree-empty">Opening&hellip;</p></div>';
+        ids = lf.ids;
+      } else {
+        const parts = raceKeys.map(rk => {
+          const k = renderNode(7, rk, node[rk], { cls: key });
+          k.boats.forEach(b => boats.add(b)); entries += k.entries;
+          return k.html;
+        });
+        inner = '<div class="tree-kids">' + parts.join('') + '</div>';
+        ids = Array.from(boats);
+      }
+      return { boats, regs, entries,
+        html: '<details class="tree-node tree-class"' + leafAttr + crumb('class', key) + '>' +
+          '<summary><span class="tree-name">' + esc(key) + '</span>' +
+          '<span class="tree-meta">' +
+          (one ? '' : '<span>' + raceKeys.length + ' races</span>') +
+          '<span>' + boats.size + ' boat' + (boats.size === 1 ? '' : 's') + '</span>' +
+          '<span>' + entries + ' entr' + (entries === 1 ? 'y' : 'ies') + '</span>' +
+          shareMeta(ids) + '</span></summary>' + inner + '</details>' };
+    }
+
+    // ---- season: one year of a fixture ----
+    if (depth === 5) {
+      const yr = Number(key) || 0;
+      const rg = ctx.rg;
+      const classKeys = kidsOf(5, node);
+      const parts = classKeys.map(ck => {
+        const k = renderNode(6, ck, node[ck], { rg, yr });
+        k.boats.forEach(b => boats.add(b)); entries += k.entries;
+        return k.html;
+      });
+      const reported = reportedOver(eventsOf(rg.id, yr));
+      return { boats, regs, entries, reported, nClasses: classKeys.length,
+        html: '<details class="tree-node tree-year season-row"' + crumb('season', yr || 'Season unrecorded') +
+          ' data-seasonboats="' + boats.size + '" data-seasonreported="' + reported + '">' +
+          '<summary><span class="tree-name">' + (yr || 'Season unrecorded') + '</span>' +
+          '<span class="tree-meta">' +
+          '<span>' + classKeys.length + ' class' + (classKeys.length === 1 ? '' : 'es') + '</span>' +
+          countMeta(boats.size, reported) +
+          shareMeta(Array.from(boats)) + '</span>' +
+          '<a class="tree-open" href="#/regatta/' + rg.id + '?year=' + yr + '">open &rsaquo;</a>' +
+          '</summary>' +
+          '<div class="tree-kids">' + (parts.join('') || whyEmpty(rg, yr, reported)) +
+          '</div></details>' };
+    }
+
+    // ---- series / fixture: the recurring event, seasons underneath ----
+    // This is the row the filters act on. It moved up from below the season
+    // when the tree was reordered: "Cervantes Trophy, every year" is the thing
+    // a reader looks for, and "2026, everything that happened in it" is the
+    // thing they look for second. The old order asked them to pick a year
+    // before they could see whether the event existed.
+    if (depth === 4) {
+      const rg = meta[key] || regattasById[key];
+      if (!rg) return { boats, regs, entries, html: '' };
+      regs.add(rg.id);
+      const seasonKeys = kidsOf(4, node);
+      let gap = 0;
+      const parts = seasonKeys.map(sk => {
+        const k = renderNode(5, sk, node[sk], { rg });
+        k.boats.forEach(b => boats.add(b)); entries += k.entries;
+        if (k.boats.size === 0 && (k.reported || 0) > 0) gap = 1;
+        return k.html;
+      });
+      const sm = regattaSummary(rg);
+      const org = ctx.org || organiserOf(rg);
+      const reported = reportedOver(DATA.events.filter(e => e.regatta_id === rg.id));
+      const span = seasonKeys.filter(s => Number(s)).map(Number).sort((a, b) => a - b);
+      return { boats, regs, entries,
+        html: '<details class="tree-node regatta-row" data-name="' +
+          esc((rg.name + ' ' + org + ' ' + countryOf(rg)).toLowerCase()) +
+          '" data-country="' + esc(countryOf(rg)) +
+          '" data-club="' + esc(org) + '" data-recent="' + sm.nRecent +
+          '" data-boatlevel="' + (sm.hasBoatLevel ? 1 : 0) +
+          '" data-gap="' + gap + '"' + crumb('series', fixtureOf(rg, org)) + '>' +
+          '<summary><span class="tree-name">' + esc(fixtureOf(rg, org)) + '</span>' +
+          '<span class="tree-meta">' +
           (segmentOf(rg)
             ? '<span class="pill" style="background:var(--surface-2);color:var(--text-secondary);' +
               'font-weight:600;">' + esc(segmentOf(rg)) + '</span>'
             : '<span class="muted" style="font-style:italic;">segment not set</span>') +
-          countMeta(evBoats.size, reportedOver(eventsOf(rg.id, yr))) +
-          '<span>' + classes.length + ' class' + (classes.length === 1 ? '' : 'es') + '</span>' +
-          shareMeta(Array.from(evBoats)) + '</span>' +
-          '<a class="tree-open" href="#/regatta/' + rg.id + '?year=' + yr + '">open &rsaquo;</a></summary>' +
-          '<div class="tree-kids">' + (clsNodes ||
-            whyEmpty(rg, yr, reportedOver(eventsOf(rg.id, yr)))) +
-          '</div></details>';
-      }).join('');
+          '<span>' + seasonKeys.length + ' season' + (seasonKeys.length === 1 ? '' : 's') +
+          (span.length > 1 ? ' ' + span[0] + '–' + span[span.length - 1] : '') + '</span>' +
+          countMeta(boats.size, reported) +
+          shareMeta(Array.from(boats)) + '</span>' +
+          '<a class="tree-open" href="#/regatta/' + rg.id + '">open &rsaquo;</a></summary>' +
+          '<div class="tree-kids">' + parts.join('') + '</div></details>' };
+    }
 
-      return '<details class="tree-node tree-year"><summary>' +
-        '<span class="tree-name">' + (yr || 'Season unrecorded') + '</span>' +
-        '<span class="tree-meta"><span>' + regIds.length + ' event' + (regIds.length === 1 ? '' : 's') + '</span>' +
-        countMeta(yearBoats.size,
-          reportedOver(regIds.flatMap(id => eventsOf(id, yr)))) +
-        shareMeta(Array.from(yearBoats)) + '</span></summary>' +
-        '<div class="tree-kids">' + evNodes + '</div></details>';
-    }).join('');
+    // ---- organiser: the club, or the class association, that runs them ----
+    if (depth === 3) {
+      const fixKeys = kidsOf(3, node);
+      const parts = fixKeys.map(fk => {
+        const k = renderNode(4, fk, node[fk], { org: key });
+        k.boats.forEach(b => boats.add(b)); k.regs.forEach(r => regs.add(r)); entries += k.entries;
+        return k.html;
+      });
+      return { boats, regs, entries,
+        html: '<details class="card regatta-series" data-series="' + esc(key.toLowerCase()) + '"' +
+          crumb('organiser', key) + '>' +
+          '<summary class="tree-series"><span>' + esc(key) + '</span>' +
+          '<span class="muted" style="font-weight:400;font-size:13px;">' + regs.size +
+          ' event' + (regs.size === 1 ? '' : 's') + ' &middot; ' + boats.size + ' boats</span>' +
+          shareMeta(Array.from(boats)) + '</summary>' +
+          '<div class="tree-body">' + parts.join('') + '</div></details>' };
+    }
 
-    return '<details class="card regatta-series" data-series="' + esc(club.toLowerCase()) + '">' +
-      '<summary class="tree-series"><span>' + esc(club) + '</span>' +
-      '<span class="muted" style="font-weight:400;font-size:13px;">' + years.length +
-      ' season' + (years.length === 1 ? '' : 's') + ' &middot; ' + clubEvents +
-      ' event' + (clubEvents === 1 ? '' : 's') + ' &middot; ' + clubBoats.size + ' boats' +
-      (clubReported > clubBoats.size
-        ? ' &middot; <span class="tree-reported" style="display:inline;">'
-          + clubReported.toLocaleString() + ' reported</span>' : '') +
-      '</span>' + shareMeta(Array.from(clubBoats)) + '</summary>' +
-      '<div class="tree-body">' + yearNodes + '</div></details>';
-  }).join('');
+    // ---- inshore / offshore ----
+    // Rendered only when the area has one. renderChildren below returns the
+    // organisers straight through when the key is '', which is every area but
+    // the Solent.
+    if (depth === 2) {
+      const orgKeys = kidsOf(2, node);
+      const parts = orgKeys.map(ok => {
+        const k = renderNode(3, ok, node[ok], {});
+        k.boats.forEach(b => boats.add(b)); k.regs.forEach(r => regs.add(r)); entries += k.entries;
+        return k.html;
+      });
+      if (!key) return { boats, regs, entries, html: parts.join(''), bare: true };
+      return { boats, regs, entries,
+        html: '<details class="card regatta-split" data-split="' + esc(key.toLowerCase()) + '"' +
+          crumb('split', key) + '>' +
+          '<summary class="tree-series" style="font-size:15px;"><span>' + esc(key) + '</span>' +
+          '<span class="muted" style="font-weight:400;font-size:13px;">' + orgKeys.length +
+          (orgKeys.length === 1 ? ' organiser' : ' organisers') + ' &middot; ' + regs.size +
+          ' event' + (regs.size === 1 ? '' : 's') + ' &middot; ' + boats.size + ' boats</span>' +
+          shareMeta(Array.from(boats)) + '</summary>' +
+          '<div class="tree-body">' + parts.join('') + '</div></details>' };
+    }
 
-  // Totals for the area, summed over the regattas actually in it rather than
-  // over the club cards, so a club that races in two areas is not counted
-  // twice in either.
-  const areaRegs = DATA.regattas.filter(r => areaOf(r) === area);
-  const areaBoats = new Set();
-  DATA.boats.forEach(b => b.entries.forEach(e => {
-    const ra = racesById[e.race_id]; if (!ra) return;
-    const ev = eventsById[ra.event_id]; if (!ev) return;
-    const rg = regattasById[ev.regatta_id];
-    if (rg && areaOf(rg) === area) areaBoats.add(b.id);
-  }));
-  return '<details class="card regatta-area" data-area="' + esc(area.toLowerCase()) + '">' +
-    '<summary class="tree-series" style="font-size:16px;"><span>' + esc(area) + '</span>' +
-    '<span class="muted" style="font-weight:400;font-size:13px;">' + clubs.length +
-    (clubs.length === 1 ? ' organiser' : ' organisers') + ' &middot; ' + areaRegs.length +
-    ' regatta' + (areaRegs.length === 1 ? '' : 's') + ' &middot; ' + areaBoats.size + ' boats</span>' +
-    shareMeta(Array.from(areaBoats)) + '</summary>' +
-    '<div class="tree-body">' + clubCards + '</div></details>';
-  }).join('');
+    // ---- area, and country above it ----
+    const childDepth = depth + 1;
+    const childKeys = kidsOf(depth, node);
+    const parts = childKeys.map(ck => {
+      const k = renderNode(childDepth, ck, node[ck], {});
+      k.boats.forEach(b => boats.add(b)); k.regs.forEach(r => regs.add(r)); entries += k.entries;
+      return k.html;
+    });
+    const isArea = depth === 1;
+    const nSub = isArea
+      ? childKeys.filter(Boolean).length   // splits, 0 when the area has none
+      : childKeys.length;                  // areas
+    const sub = isArea
+      ? (nSub ? nSub + (nSub === 1 ? ' split' : ' splits') + ' &middot; ' : '')
+      : nSub + (nSub === 1 ? ' area' : ' areas') + ' &middot; ';
+    return { boats, regs, entries,
+      html: '<details class="card ' + (isArea ? 'regatta-area" data-area="' : 'regatta-country" data-countrynode="') +
+        esc(key.toLowerCase()) + '"' + crumb(isArea ? 'area' : 'country', key) + '>' +
+        '<summary class="tree-series" style="font-size:' + (isArea ? '16' : '17') + 'px;">' +
+        '<span>' + esc(key) + '</span>' +
+        '<span class="muted" style="font-weight:400;font-size:13px;">' + sub + regs.size +
+        ' event' + (regs.size === 1 ? '' : 's') + ' &middot; ' + boats.size + ' boats</span>' +
+        shareMeta(Array.from(boats)) + '</summary>' +
+        '<div class="tree-body">' + parts.join('') + '</div></details>' };
+  }
+
+  const cards = kidsOf(0, idx).map(c => renderNode(0, c, idx[c], {}).html).join('');
 
   const nClubs = new Set(DATA.regattas.map(r => seriesOf(r))).size;
 
@@ -3711,11 +3977,16 @@ function renderRegattasList() {
   // for "show me the Royal Southern" - a club that races in two areas has two
   // branches and no single place to look. This filters across all of them.
   // Counted off idx like the country picker, so one entry is one row.
+  // One row per REGATTA now, not per regatta-season: the series moved above
+  // the season when the tree was reordered, so a fixture appears exactly once
+  // under exactly one country, area, split and organiser. That makes the count
+  // on a picker and the number of rows it leaves showing the same number
+  // without any of the care the old shape needed.
   const byClub = {};
-  Object.keys(idx).forEach(area =>
-    Object.keys(idx[area]).forEach(club =>
-      Object.keys(idx[area][club]).forEach(yr =>
-        byClub[club] = (byClub[club] || 0) + Object.keys(idx[area][club][yr]).length)));
+  Object.keys(meta).forEach(id => {
+    const k = organiserOf(meta[id]);
+    byClub[k] = (byClub[k] || 0) + 1;
+  });
 
   // The tree's second level names the PLACE where no club is recorded, so this
   // list would otherwise offer "Palma de Mallorca" among the yacht clubs -
@@ -3746,26 +4017,31 @@ function renderRegattasList() {
   // disagrees with itself one click later is worse than no number.
   const byCountry = {};
   let nNoCountry = 0;
-  Object.keys(idx).forEach(area =>
-    Object.keys(idx[area]).forEach(club =>
-      Object.keys(idx[area][club]).forEach(yr =>
-        Object.keys(idx[area][club][yr]).forEach(rgId => {
-          const c = countryOf(regattasById[rgId]);
-          if (c) byCountry[c] = (byCountry[c] || 0) + 1; else nNoCountry++;
-        }))));
+  Object.keys(meta).forEach(id => {
+    const c = countryOf(meta[id]);
+    if (c) byCountry[c] = (byCountry[c] || 0) + 1; else nNoCountry++;
+  });
   const countryOpts = Object.keys(byCountry)
     .sort((a, b) => byCountry[b] - byCountry[a] || a.localeCompare(b))
     .map(c => `<option value="${esc(c)}">${esc(c)} (${byCountry[c]})</option>`)
     .join('') + (nNoCountry
       ? `<option value="__none__">Country not recorded (${nNoCountry})</option>` : '');
 
+  const nAreas = new Set(DATA.regattas.map(r => areaBaseOf(r))).size;
+  const nCountries = new Set(DATA.regattas.map(r => countryOf(r) || '?')).size;
+
   return `
     <h1>Regattas</h1>
-    <p class="subtitle"><span id="regatta-count">${DATA.stats.n_events}</span> event-seasons shown,
-      from ${DATA.regattas.length} regattas in ${areas.length} areas run by ${nClubs} organisers.
-      Open an area, then the club or place that runs it, then a season, an event and a class to reach the boats.
-      The area comes from the venue, so a club that races in two of them appears in both &mdash; RORC under
-      Solent and again under International offshore.</p>
+    <p class="subtitle"><span id="regatta-count">${DATA.regattas.length}</span> events shown,
+      across ${nCountries} countries and ${nAreas} areas, run by ${nClubs} organisers.
+      Country &rsaquo; area &rsaquo; inshore or offshore &rsaquo; organiser &rsaquo; series &rsaquo;
+      season &rsaquo; class &rsaquo; race. Levels that cannot divide anything are left out, so most
+      branches are shorter than that &mdash; an offshore race with one start stops at the season.
+      Use the trail above the tree to jump back out.</p>
+    <nav id="tree-crumbs" class="tree-crumbs" aria-label="Tree position">
+      <a href="#" data-depth="-1" class="crumb crumb-root">Regattas</a>
+      <span class="crumb-hint">&mdash; open a branch and your path appears here</span>
+    </nav>
     <div class="search-row">
       <input type="text" id="regatta-search" placeholder="Search event, club or country&hellip;">
       ${Object.keys(byCountry).length > 1 || nNoCountry ? `<select id="regatta-country">
@@ -7070,6 +7346,65 @@ function attachCompareHandlers() {
   if (clear) clear.addEventListener('click', () => go([]));
 }
 
+// ---------- the trail: jumping back out of a deep tree ----------
+// Eight levels is only usable if leaving them is one click rather than eight.
+// This is the file-explorer path bar: it shows where the last thing you opened
+// sits, and clicking any step collapses everything below it and takes you
+// there.
+//
+// The labels are read off the DOM (data-crumb, written by the renderer) rather
+// than kept in a parallel structure, because a trail that can disagree with
+// the tree is worse than no trail. Nothing here knows what a country or a
+// class is - it walks up from a node and reads what it finds.
+function parentNode_(d) {
+  const p = d.parentElement && d.parentElement.closest('details');
+  return p && p.dataset.crumb ? p : null;
+}
+
+let crumbNodes = [];
+function setCrumbTrail(node) {
+  const bar = document.getElementById('tree-crumbs');
+  if (!bar) return;
+  const chain = [];
+  for (let d = node; d; d = parentNode_(d)) if (d.dataset.crumb) chain.unshift(d);
+  crumbNodes = chain;
+  bar.innerHTML = '<a href="#" data-depth="-1" class="crumb crumb-root">Regattas</a>' +
+    (chain.length
+      ? chain.map((d, i) =>
+          '<span class="crumb-sep">&rsaquo;</span>' +
+          '<a href="#" class="crumb" data-depth="' + i + '" data-lvl="' + esc(d.dataset.level || '') + '">' +
+          esc(d.dataset.crumb) + '</a>').join('')
+      : '<span class="crumb-hint">&mdash; open a branch and your path appears here</span>');
+}
+
+function wireCrumbs() {
+  const bar = document.getElementById('tree-crumbs');
+  if (!bar || bar.dataset.bound) return;
+  bar.dataset.bound = '1';
+  bar.addEventListener('click', (ev) => {
+    const a = ev.target.closest('a.crumb');
+    if (!a) return;
+    ev.preventDefault();
+    const i = parseInt(a.dataset.depth, 10);
+    // i < 0 is "Regattas": all the way out. Otherwise close everything INSIDE
+    // the step clicked and leave the step itself open, which is what a folder
+    // in a file explorer does when you click it in the path bar.
+    const target = i < 0 ? null : crumbNodes[i];
+    if (i >= 0 && !target) return;
+    const scope = target || document.getElementById('main');
+    // Synchronously: close, then write the trail. The 'toggle' events these
+    // closes queue arrive afterwards, and the handler above ignores them
+    // because none of those nodes is on the trail any more. Deferring this to
+    // a frame instead was the first attempt and it silently did nothing - the
+    // preview pane runs as a background page, where requestAnimationFrame
+    // never fires.
+    scope.querySelectorAll('details[open]').forEach(d => { d.open = false; });
+    setCrumbTrail(target);
+    (target || document.querySelector('#main h1') || scope)
+      .scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
+}
+
 function attachRegattaListHandlers() {
   const search = document.getElementById('regatta-search');
   const filter = document.getElementById('regatta-filter');
@@ -7082,9 +7417,22 @@ function attachRegattaListHandlers() {
     sections.dataset.treeBound = '1';
     sections.addEventListener('toggle', (ev) => {
       const d = ev.target;
-      if (d && d.tagName === 'DETAILS' && d.open && d.dataset.leaf) fillTreeLeaf(d);
+      if (!d || d.tagName !== 'DETAILS') return;
+      if (d.open && d.dataset.leaf) fillTreeLeaf(d);
+      // The trail follows whatever was opened last. On a close it falls back
+      // to the parent, so collapsing a branch walks the trail out of it
+      // rather than leaving a path pointing at something shut - but ONLY when
+      // the thing closed was on the trail. Closing a branch you are not in
+      // should not move you, and collapsing from the trail shuts a dozen
+      // nodes whose 'toggle' events arrive after the click handler has already
+      // decided where you are; without this test each of them rebuilt the
+      // trail it had just cut.
+      if (!d.dataset.crumb) return;
+      if (d.open) setCrumbTrail(d);
+      else if (crumbNodes.indexOf(d) >= 0) setCrumbTrail(parentNode_(d));
     }, true);   // capture: 'toggle' does not bubble
   }
+  wireCrumbs();
   const apply = () => {
     const q = search.value.trim().toLowerCase();
     const f = filter.value;
@@ -7107,30 +7455,23 @@ function attachRegattaListHandlers() {
       if (ok && org) ok = tr.dataset.club === org;
       if (ok && f === 'recent') ok = parseInt(tr.dataset.recent) > 0;
       if (ok && f === 'boatlevel') ok = tr.dataset.boatlevel === '1';
-      // the work queue: a season the organiser reported entries for, where we
-      // still hold no named boats
-      if (ok && f === 'gap') ok = parseInt(tr.dataset.seasonboats || '0') === 0
-                              && parseInt(tr.dataset.seasonreported || '0') > 0;
+      // the work queue: a fixture with a season the organiser reported entries
+      // for where we still hold no named boats. Computed per season while the
+      // tree was built and flattened onto the row, because the row is the
+      // series now and the seasons are underneath it.
+      if (ok && f === 'gap') ok = tr.dataset.gap === '1';
       tr.style.display = ok ? '' : 'none';
       if (ok) shown++;
     });
-    // A season with no surviving event is noise, and so is a club with no
-    // surviving season - hide both, innermost first.
-    document.querySelectorAll('.tree-year').forEach(y => {
-      const any = Array.from(y.querySelectorAll('.regatta-row')).some(tr => tr.style.display !== 'none');
-      y.style.display = any ? '' : 'none';
-      if (any && q) y.open = true;
-    });
-    document.querySelectorAll('.regatta-series').forEach(card => {
-      const any = Array.from(card.querySelectorAll('.regatta-row')).some(tr => tr.style.display !== 'none');
-      card.style.display = any ? '' : 'none';
-      if (any && q) card.open = true;
-    });
-    // and the area above them, or a search leaves a row of empty headings
-    document.querySelectorAll('.regatta-area').forEach(card => {
-      const any = Array.from(card.querySelectorAll('.regatta-row')).some(tr => tr.style.display !== 'none');
-      card.style.display = any ? '' : 'none';
-      if (any && q) card.open = true;
+    // Every level ABOVE the row has to go when nothing inside it survives, or
+    // a search leaves a column of empty headings. Innermost first; the season
+    // and class levels are below the row and look after themselves.
+    ['.regatta-series', '.regatta-split', '.regatta-area', '.regatta-country'].forEach(sel => {
+      document.querySelectorAll(sel).forEach(card => {
+        const any = Array.from(card.querySelectorAll('.regatta-row')).some(tr => tr.style.display !== 'none');
+        card.style.display = any ? '' : 'none';
+        if (any && q) card.open = true;
+      });
     });
     const c = document.getElementById('regatta-count');
     if (c) c.textContent = shown;

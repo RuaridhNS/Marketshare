@@ -13,6 +13,41 @@
 #
 # A blank Area is not an error - it groups under 'Area not set' and shows up
 # on the Data quality page until someone decides.
+#
+# GB AREA NAMES COME FROM THE IRC REGIONS, not from the compass. The RORC
+# Rating Office runs a GBR IRC Championship in each of nine regions plus the
+# National at Cowes, and that is the vocabulary the fleet already uses:
+#
+#   Solent            National Championship, Cowes      102 regattas held
+#   East Coast        Ramsgate                            3 (West Mersea)
+#   North West        Liverpool                           2
+#   Southern          Poole                               2 (Poole, Weymouth)
+#   South West        Falmouth                            none held
+#   Scottish          Tarbert, Loch Fyne                  none held
+#   Northern Ireland  Belfast Lough                       none held
+#   Bristol Channel   Portishead / Cardiff                none held
+#   Welsh National    Pwllheli / Cardigan Bay             none held
+#   Channel Islands   Jersey                        not used - see below
+#
+# Six of those are empty. That is the honest state of the data, not a gap in
+# this file: every UK scraper we have points at the Solent, so a Scottish or
+# Cornish venue has never arrived to be filed. The names are here so that when
+# one does, it has somewhere to go.
+#
+# 'Southern', not 'South Coast' - the IRC South West is Devon and Cornwall,
+# so a compass reading of the name would put Poole in the wrong region.
+#
+# CHANNEL ISLANDS is deliberately NOT used. Alderney and St Peter Port are an
+# IRC region in their own right, but every race we hold to them is a JOG race
+# sailed FROM the Solent, and by the convention above - the area is where the
+# fleet comes from - those are Solent offshore. If a Jersey-based regatta ever
+# arrives, give it the region then.
+#
+# INSHORE / OFFSHORE is a second word on the area, not a second column:
+# 'Solent inshore', 'Solent offshore'. The dashboard reads the two apart and
+# draws them as separate levels. An area with no such word simply has no split
+# and the tree leaves the level out. Which Solent races are offshore is NOT
+# decided here - see data/regatta_areas.csv.
 Venue,Area,Why
 # "Solent inshore", not "Solent", so it pairs with "Solent offshore" and the
 # two read as one market split the way the racing is. RORC appears in both and
@@ -75,14 +110,14 @@ Alderney,Solent offshore,
 Cartagena,Mediterranean,
 Deauville,Solent offshore,
 Helsinki,Baltic & Nordic,
-Weymouth,South Coast,
+Weymouth,Southern,"IRC Southern region. Named for the RORC Rating Office GBR region, not the compass: the IRC South West is Devon and Cornwall."
 White Bear Lake,Great Lakes,
 Saint-Vaast-la-Hougue,Solent offshore,
 Le Havre,North France,"Transat Cafe l'Or, a French transatlantic. 70 boats, none on a GBR sail number, 7% with any Solent racing. It was in Solent offshore purely because the venue is on the Channel."
 Palermo,Mediterranean,
 Nantucket,US East Coast,
 Tortola,Caribbean,
-Poole,South Coast,
+Poole,Southern,"Poole hosts the IRC Southern Championship - this is the region's own championship venue."
 Liverpool,North West,
 Los Angeles,US West Coast,
 Saint Peter Port,Solent offshore,
