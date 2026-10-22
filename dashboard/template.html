@@ -7334,10 +7334,68 @@ function renderRegattaProfile(id, year, cls) {
       </table>
     </div>` : '';
 
+  // Market share for this regatta, per season and overall. The tree has
+  // carried a share bar on the regatta ROW for a while; the page you land on
+  // when you click it had none, which is the wrong way round - this is where
+  // someone comes to decide whether the event is worth working.
+  //
+  // Counted on BOATS, not entries, and deduped per season: a boat that sails
+  // eight races is one boat in that season's share, not eight. Counting
+  // entries would let a long series outvote a big fleet.
+  // Built by walking the boats ONCE and looking each entry's race up, rather
+  // than re-scanning all 5,000 boats per season. Cowes Week has seventeen,
+  // which made the first version of this O(seasons x boats) and the page
+  // visibly slow to open.
+  const seasonOfRace = {};
+  DATA.events.filter(e => e.regatta_id === r.id && e.season_year).forEach(ev => {
+    DATA.races.filter(x => x.event_id === ev.id)
+              .forEach(x => seasonOfRace[x.id] = ev.season_year);
+  });
+  const shareYears = {};
+  DATA.boats.forEach(b => {
+    const years = new Set();
+    b.entries.forEach(e => {
+      const y = seasonOfRace[e.race_id];
+      if (y) years.add(y);
+    });
+    years.forEach(y => (shareYears[y] ||= new Set()).add(b.id));
+  });
+  const shareRows = Object.keys(shareYears).map(Number).sort((a, b) => b - a);
+  const allIds = new Set();
+  shareRows.forEach(y => shareYears[y].forEach(id => allIds.add(id)));
+  const overall = shareOf([...allIds]);
+  const shareCard = shareRows.length ? `
+    <div class="card">
+      <h2 style="margin-top:0;">Market share</h2>
+      <p class="muted" style="font-size:12.5px;margin-top:-6px;">
+        North's share of the boats here whose sailmaker we know. A boat counts once per
+        season however many races it sailed.${overall.total && overall.known / overall.total < 0.25
+          ? ` <strong>Only ${Math.round(100 * overall.known / overall.total)}% of this fleet is
+              measured</strong>, so read the percentage as the best case.` : ''}</p>
+      <table>
+        <thead><tr><th>Season</th><th class="num">Boats</th><th class="num">Known</th>
+          <th class="num">North</th><th style="width:46%;">Share of known</th></tr></thead>
+        <tbody>
+          ${shareRows.map(y => {
+            const s = shareOf([...shareYears[y]]);
+            return `<tr><td><strong>${y}</strong></td><td class="num">${s.total}</td>
+              <td class="num">${s.known}</td><td class="num">${s.north}</td>
+              <td>${shareMeta([...shareYears[y]]) || '<span class="muted">—</span>'}</td></tr>`;
+          }).join('')}
+          <tr style="border-top:2px solid var(--border);">
+            <td><strong>All seasons</strong></td><td class="num"><strong>${overall.total}</strong></td>
+            <td class="num"><strong>${overall.known}</strong></td>
+            <td class="num"><strong>${overall.north}</strong></td>
+            <td>${shareMeta([...allIds]) || '<span class="muted">—</span>'}</td></tr>
+        </tbody>
+      </table>
+    </div>` : '';
+
   return `
     <a class="back-link" href="#/regattas" data-route="#/regattas">← All regattas</a>
     <h1>${esc(r.name)}</h1>
     <p class="subtitle">${esc(r.category||'')} · ${esc(r.region||'')}${r.venue ? ' · ' + esc(r.venue) : ''}</p>
+    ${shareCard}
     <div class="card seg-edit">
       <label class="field-label" for="seg-pick">Market segment</label>
       <select id="seg-pick" data-regatta="${r.id}">
