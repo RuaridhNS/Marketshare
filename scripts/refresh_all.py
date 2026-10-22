@@ -224,6 +224,14 @@ def main():
         # re-fragments the type list (J/109, J 109, J109 as three fleets). This
         # has to run after the scrape or the canonical names last exactly one
         # week.
+        # Before the canonicaliser, so a type recovered from the entries gets
+        # the same spelling treatment as one that was already there.
+        # 527 boats carried "-" or "None" as a type while their own entries
+        # named one dozens of times - SOAK THERAPY an IMOCA 60 on 56 of them.
+        # Only fills where the entries agree; 189 that disagree are reported
+        # and left, because those are shared sail numbers and column shifts
+        # rather than a spelling to pick.
+        ("Backfill boat types", ["backfill_boat_types.py", "--apply"], "types recovered"),
         ("Canonicalise boat types", ["normalise_boat_types.py"], "boat types"),
 
         # Naming history is derived from the names boats raced under, so it has
