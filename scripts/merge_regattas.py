@@ -110,7 +110,14 @@ def main():
         path = pathlib.Path(args.file)
         if path.exists():
             with open(path, newline="", encoding="utf-8-sig") as f:
-                for row in csv.DictReader(f):
+                # '#' starts a comment, as it does in the other ledgers. Without
+                # this every line of a block comment reached merge() and came
+                # back as "skip: keep regatta not found", which buries the real
+                # skips - the rows that genuinely name a regatta that is not
+                # there - in noise. The reasoning for a group of merges belongs
+                # beside them, not in a commit message nobody will find.
+                rows = (ln for ln in f if not ln.lstrip().startswith("#"))
+                for row in csv.DictReader(rows):
                     k, d = (row.get("Keep") or "").strip(), (row.get("Fold") or "").strip()
                     if k and d:
                         pairs.append((k, d, (row.get("Class") or "").strip() or None))

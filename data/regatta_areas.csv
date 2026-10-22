@@ -60,3 +60,36 @@ Pattern,Area,Why
 ^RORC 2H Offshore$,Solent offshore,93%. Named offshore as well.
 ^IRC Two-Handed$,Solent offshore,"100%. The two-handed division of the offshore races, carried as a regatta of its own."
 ^RORC Season Points Championship$,Solent offshore,"The series itself. Every rule above is 'does it score for this', so the championship belongs with the races that do, not in the inshore area with the Easter Challenge."
+#
+# --- JOG inshore vs offshore ------------------------------------------------
+# Same method as the RORC rows above, with JOG's own indicator instead of
+# RORC's: JOG scores an OFFSHORE SERIES alongside its main programme, and we
+# hold the 2025 standings - 79 boats across IRC 1, 2 and 3. For every JOG race
+# of 2025, the share of its fleet that scores in those standings:
+#
+#   Channel Race        100%      Cowes-Yarmouth       67%
+#   St Vaast            100%      Yarmouth-Cowes       66%
+#   Autumn Cherbourg    100%      Cowes-Weymouth       63%
+#   Alderney            100%      Cowes-Poole          60%
+#   Cowes-Eastbourne    100%      Poole-Cowes          59%
+#   Eastbourne-Cowes    100%      Cowes-Lymington      55%
+#   Deauville           100%      Lymington-Cowes      54%
+#   St Malo             100%      Great Escape         47%
+#                                 Lonely Tower         45%
+#
+# A clean break at 100%, with nothing between 67% and 100%. Note what it does
+# NOT say: Cowes-Weymouth is a sixty-mile passage and lands at 63%, inshore.
+# Length is not the definition here, series membership is - which is the rule
+# that was set for RORC and is kept for JOG.
+#
+# Only the races that need MOVING are listed. St Vaast, Deauville, Alderney,
+# St Peter Port and the Autumn Cherbourg Race already read Solent offshore off
+# their venue, which is the same answer arrived at twice.
+^JOG Channel Race$,Solent offshore,"100% of its 2025 fleet scored in the JOG Offshore Series. Its venue says Solent because the race starts and finishes in the Solent, which is true of every JOG race and is why the venue cannot decide this."
+^JOG St Malo$,Solent offshore,"100%. Cowes to St Malo, run jointly with RORC. Venue reads Solent because the record's name is the destination only and no port pattern catches it."
+^JOG Marlow Ropes Cowes-Eastbourne$,Solent offshore,"100%. The 2025 Easter passage race east along the coast, in the slot the Cherbourg out-and-back usually holds."
+^JOG Marlow Ropes Eastbourne-Cowes$,Solent offshore,100%. The return leg.
+^JOG Cowes-Cherbourg$,Solent offshore,"No 2025 edition to measure - Easter 2025 went to Eastbourne instead - so this is placed by the same destination's autumn race, which scores 100%. Across 2024 and 2026 it also sits at the top of the table with the Autumn Cherbourg Race (78% and 60% against the 2025 standings, where the Lonely Tower is 38-40%)."
+^JOG Cherbourg-Cowes$,Solent offshore,The return leg of the Easter Cherbourg race.
+^JOG Cowes-Dartmouth$,Solent offshore,"2026 only, and the weakest of these: 70% measured against the 2025 standings, which is the top of the 2026 group but not the clean 100% the others have in their own season. Placed offshore as a coastal passage west, alongside the Eastbourne pair. Worth re-checking when JOG publishes a 2026 Offshore Series."
+^JOG Offshore Series$,Solent offshore,"The series itself, exactly as the RORC Season Points Championship above: every rule in this block is does it score for this, so the series belongs with the races that score for it. Its three records are the IRC 1/2/3 standings, not races."

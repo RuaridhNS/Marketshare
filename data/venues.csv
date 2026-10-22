@@ -29,7 +29,14 @@ cowes|solent|royal southern|hamble|warsash|lymington|yarmouth|\bxod\b|half ton|o
 fastnet,Solent,GBR,50.740,-1.310
 myth of malham|eddystone,Eddystone,GBR,50.183,-4.258
 cervantes|de guingand|morgan cup|rorc channel race|castle rock|rorc spring|season points|rorc 2h|two-handed|2h championships,Solent,GBR,50.740,-1.310
-cherbourg|lonely tower,Cherbourg,FRA,49.640,-1.616
+cherbourg,Cherbourg,FRA,49.640,-1.616
+# 'lonely tower' was on the Cherbourg pattern above and it is a SOLENT race.
+# Proof: JOG runs the Lonely Tower and the Great Escape on consecutive days
+# every March, and 97% of the 2025 Great Escape fleet raced the Lonely Tower
+# the day before (84% in 2024). A hundred boats cannot cross to Cherbourg and
+# make the next morning's start. JOG's own Offshore Series agrees - the Lonely
+# Tower scores the LOWEST offshore share of any JOG race, 45%, below even the
+# Great Escape. It takes the Solent pattern below like the rest of the fleet.
 st vaast|saint vaast,Saint-Vaast-la-Hougue,FRA,49.590,-1.266
 deauville,Deauville,FRA,49.360,0.075
 st peter port|guernsey,Saint Peter Port,GGY,49.455,-2.536

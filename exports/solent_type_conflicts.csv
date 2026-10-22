@@ -1,0 +1,428 @@
+# Solent boats whose entries name unrelated yacht types.
+# Second column group is the minority reading; n is how many entries back it.
+sail_no,boat_name,stored_type,majority,n_majority,minority,n_minority
+GBR42N,LA REPONSE,Ker 39,Beneteau First 40 / First 40,111,KER 39 2.60 Proto / KER 39 2.60 Proto MOD hull / Ker 39 / Ker 39 (modified),78
+GBR8191R,TOE IN THE WATER,J/111,J/111,76,X 41 / X-41 / X41,56
+GBR419R,REDSHIFT,Sun Fast 3600,Sun Fast 3600 / Sun Fast 3600 2.15 / SunFast 3600 / Sunfast 3600,48,Farr GP42 / Farr Gp42 / GP 42 / Gp42,45
+GBR1599R,JUMP 2 IT,J/99,J 99 2.10 Fin6 / J/99 / J99,79,J Boat - J99,41
+GBR5831R,THUNDERBAULT,Archambault 31,A 31 1.90 / A31,40,Archaumbault 31,40
+GBR363R,WHOOPER,Lg One-off,GILES 39 Classic / L Giles 39 / L Giles One-off Sloop / Laurent / Laurent Giles Giovanni one-off Belgrano Code DNC DNF DSQ NSC RET ZFP Sailwave / Laurent Giles one- / Laurent Giles one-off,46,One Off / One-off Sloop,31
+GBR4867L,PURPLE MIST,Jeanneau Sunfast 3,SUN FAST 3200 R2 1 / SUN FAST 3200 R2 1.90 / Sun Fast 3200,123,Jeanneau Sunfast 3,27
+GBR1010L,XINSKA,X-40 Custom,X 40 / X 40 MOD hull & ap / X 40 MOD hull & appendages / X-40 / X40 / X40 - Custom / X40 Custom / X40 custom / X40mod,101,X4,26
+GBR809,LUTINE,X-55,X 55 / X 55 3.20 / X-55,79,Swan 53,26
+GBR8993R,JALAPENO 3,J/99,J 99 2.10 Fin6 / J/99 / J99,32,J Boat - J99,24
+GBR3061X,DYNAMO,Archambault A35,Archambault / Archambault - A35 / Archambault A35 / Archambault A35 John Howell & Paul Newell,98,A 35 / A 35 2.10 / A35,21
+GBR9030R,GUSTO,Rogers 30,Whitbread 30,32,Rogers 30,20
+BER11,FREQUENT FLYER,J/111,J 111 / J 111 2.20 EU / J-111 / J/111 / J111,165,Farr 280,18
+RP45,KATSU,Aquila 45,Reichel Pugh 45 / Reichel/Pugh 45 / Reichel/pugh 45,24,RP 45 / RP45,16
+RUS404,KNYAZ,A 40,A 40 / A40,19,Archambault 40 / Archambault A40,16
+GBR2631R,PRECISION,Cruiser 39,Cruiser 39,20,BAVARIA 39 CR 1.86 / Bavaria 39 Cruiser / Bavaria 39c,16
+GBR748R,KINDRED,Classic Folkboat,J 112 E 2.23 Fin6 / J/112 / J/112E / J/112e / J112 / J112 / J112E / J112e,72,Classic Folkboat,14
+MLT2222,ARTIE III,Hh 42 3.00 Mod Bulb,J/122,15,HH 42 / HH 42 3.00 MOD bulb / HH42,13
+AUT1,SISI,Volvo Ocean 65 4.78,VO 65 / VO65,14,VOLVO OCEAN 65 / VOLVO OCEAN 65 4.78 / Volvo Open 65,13
+GBR4321R,OYSTERCATCHER XXXV,Humphreys 54,Humphreys 54 / Humphreys H39,15,CARKEEK CF 520 #01 WB / CF-520 / CF520,13
+GBR114,SEA DRAGON,Far East,FAREAST 28 R 1.70 / FarEast 28 R / FarEast 28R / Fareast 28R,15,Far east,13
+FRA346,lann ael 3,Mn 35,JND 39 / Jnd 39,24,JNA 39 / Jna 39,13
+GBR6613R,NIGHTJAR,Archaumbault A31,A 31 1.90 T / A31,15,Archaumbault A31,12
+GBR715R,PEGASUS OF NORTHUMBERLAND,Open 50 4.19 (03),OPEN 50 4.19 (03) / Open 50 / Open 50 4.19 (03),46,Seacart 30,12
+USA25555,RAMBLER,Canting Keel Maxi,Canting Keel Maxi,18,Canting Keel Sloop,12
+911882,TAZ,Reichel Pugh 37,Reichel Pugh 37,25,J 70 / J/70,11
+GBR55,Martin wrigley,-,Elite / RS Elite,14,Open 60,10
+GBR1452,CALYPSO,J/70,Etchell,16,J/70,10
+GBR486,SLEEPER X,Azuree 46,Swan 48 / Swan 48 (72) Mod (thr),14,Azuree 46,10
+GBR4118L,BREEZEE,Beneteau 393,Beneteau 393,14,Oceanis 393,10
+GBR79R,SKERMISHER,Ker 36,KER 36 (05) Custom / Ker 36 / Ker 36 Jonathan Blanshard,91,Kerr 36 / Kerr 36 Custom,9
+GBR764,KINGDOM COME,Classic Folkboat,Classic Folkboat / Folkboat Classic,69,Nonsuch 30,9
+GBR1489C,ARABESQUE,Sigma 33 OD,SIGMA 33 OD / Sigma 33 OOD,44,Chance CTM 31,9
+GBR4300X,ASTRONOMIX,X-43,X 4.3 / X-4.3,22,X 4-3 / X 4-3 2.50 / X4.3,9
+NED17001,ROST - VAN UDEN,Ker 46 (12) 3.35 #1 Mod Keel,KER 46 / KER 46 (12) 3.35 # / KER 46 (12) 3.35 #1 MOD keel / Ker 46,80,Racer,8
+GBR742,SALLY,Nordic Folkboat,Folkboat / Nordic Folkboat,37,J/70,8
+FRA27909,COURIER DU COEUR,First 44.7,First 44.7,12,Bermudian Sloop,8
+LTU1000,AMBERSAIL,Vo 60,VO 60 / VO60,12,Volvo 60 / Volvo Open 60,8
+FRA1953,Dinzer Doo,Volvo Open 70,VOLVO OPEN 70 / Volvo Open 70,19,Vor 70,8
+GBR7557,INNUENDO,"Quarter Ton, Mciiraith","1/4 Tonner / QUARTER TON McIlra / Quarter Tonner / Quarter ton, McIIraith",11,Faroux,8
+GBR1419L,SIDNEY II,Grand Soleil 50 2.,GRAND SOLEIL 50 / GRAND SOLEIL 50 2. / GRAND SOLEIL 50 2.35 / Grand Soleil 50,45,GS50,7
+FRA8668,TEASING MACHINE,Teasing 52 3.00,NMYD 54 / Nmyd 54 / Nmyd54,38,TEASING 52 3.00,7
+AUT2002,GREEN DRAGON,Vo 70,Volvo 60 / Volvo 70 / Volvo Open 70 / Volvo Open 70 (2008),21,VO 70 / VO60 Mk1,7
+GBR1203,SARDONYX,J/70,J/70,10,Nicholson 55,7
+GBR743,FRITHA,Nordic Folkboat,Folkboat / Nordic / Nordic Folkboat,74,J/70,7
+FRA36513,MAX,First 31.7,Beneteau 36.7 / Beneteau First 36.7 / FIRST 31 7 / First 31.7,49,Pogo 50,7
+GBR86R,FARGO,Cape 31,Swan / Swan 42,14,CAPE 31 UK-IRL / Cape 31,7
+GBR137,TQUILA,-,Class 40 / Class40,24,J70,7
+IRL39000,ZERO II,Mills 39,MILLS 39 Custom / Mills 39 / Mills 39 Custom / Mills 39 VME Racing,55,Bermudian Sloop,7
+USA45,Pravda 2,Maxi 72,JV 72 Custom,21,Botin Maxi 74 / Maxi 72 / Maxi 72 /  Botìn & P. /  New England Boatworks / 2018 / Maxi 72 Botin,7
+ITA16540,CATTY SARK,"Azuree, 40","Azuree 40 / Azuree, 40",10,Azurre 40,7
+GBR5725L,LEXI,X-43,X4.3,9,X 4.3,7
+GBR888X,SUNRISE BY THE ADVENTURER,IP1180,JPK 10.80 / JPK 11.80 / JPK 11.80 2.35 / JPK 11.80 2.35 Fin / JPK 11.80 2.35 Fin6 MOD int / JPK 1180 / JPK1180 / Jpk 1080 / Jpk 11.80 / Jpk 1180,121,1180,6
+FRA3600,DAGUET3,Akilaria 950,Akilaria 950,13,Ker 46,6
+FRA43857,L'ANGE DE MILON,Prototype,MILON 41 / Milon 41,47,PROTOTYPE,6
+BEL6669,Blackfish,J&v 39,Bente 39,12,J&V 39,6
+GER6009,LEU,Judel Vrolijk One-off,JUDEL VROLIJK 45 / JUDEL VROLIJK IRC 1 / Judel Vrolijk 45 / Judel Vrolijk one-off,12,JV 45 One Off,6
+USA60564,FINAL FINAL,TP 52 J/V Pac 52 Wb,PAC 52 / PAC52 / Pac 52 / Pac52 / TP 52 / TP 52 J/V PAC 52 / TP 52 J/V PAC 52 WB,19,XP 44 / XP 44 Sport,6
+GBR4018N,JAZZ,-,FIRST 40 / FIRST 40 2.48 / First 40 / First 40 2.48,22,Sunsail F40,6
+GBR4019N,TANGO,-,FIRST 40 / FIRST 40 2.48 / FIRST 40 2.48 T / First 40,23,Sunsail F40,6
+GBR536,ZEST,Humphreys 36 Custom,Humphreys 36 / Humphreys 36 Custom,35,Custom,6
+FRA7,MG5 - ECONAV,Class 9.50 Akilaria,MaÃ¯ca Rorc,10,50' Trimaran,6
+GBR1293R,BATFISH,J/133,J 133 / J-133 / J/133,20,Banner 41,6
+GBR6504N,TALISMAN,Prima 38,PRIMA 38 / PRIMA 38 2.46 / Prima 38,94,Botin Carkeek / Botin Carkeek 58 / Botin/Carkeek 58,6
+GBR7716R,PSIPSINA,HOD 35,HOD 35 / Hod 35,51,2H,6
+NED7990,YETI,J/109,J 109 / J/109,22,Rommel 36 Er,6
+FRA45,RIFIFI,Class40,Mach 45,17,Class40,6
+GBR7236R,SORCHA,Jv 72,JV 72,14,Maxi 72,6
+GBR93,Sabre II,Class40,Class 40 / Class40,29,Akilaria 40,6
+GBR73R,SCHERZO OF COWES,Jnd 35,Corby 33,8,JND 35 / Jnd 35,6
+FRA76,PEGASUS DEKMARX,Mumm 30,Farr 30 / Farr 30 2.15,8,Mumm 30,6
+ESP10315,STAMINA,Mmw 40,JND 39 / Jnd 39,17,MMW40,6
+NED8083,BLACQ MAGIC,Th38,Th 38 / Th38,11,Nicholson 43,6
+GBR4080T,CRAKAJAX,X-95,X 95 / X 95 1.73 MOD (rud / X 95 1.73 MOD (rudder) / X-95 / X95,24,Half Tonner,6
+GBR726R,LADY IN RED,Classic Folkboat,Classic Folkboat,13,J/80,6
+ANT1761,Falcon,Dna F4,DNA F4 / Dna F4,7,J 35 / J/35,6
+GBR9778R,ZIG ZAG,Sun Fast 3200,SUN FAST 3200 1.90 / Sunfast 3200,11,J 122 / J/122,6
+GBR767,RAEV,Nordic Folkboat,FOLKBOAT / Folkboat / Nordic Folkboat,158,DRAGON / Dragon,6
+GBR4822R,MOJITO,J/112e,J 122 / J 122 2.20 / J/122E,13,J/112E,6
+IRL3127,AJA,Cape 31,Cape 31,6,X-41 / X-41 Mod,6
+FRA830,ALBATOR,Nmd 43,NMD 43 / NMD 43 2.99 / NMD43,31,One-Off,5
+POL1,KRANENDONK,Vo 65,VO 65 / VO65,6,VOLVO OCEAN 65 4.78 / Volvo Open 65,5
+FRA78,TEAM 42,J/111,J/111 / J111,21,TOFINOU 9.5 / Tofinou,5
+FIN38,FUJI,OCD40,Class40,7,OCD40,5
+FRA9210,delnic,JPK 1010,JPK 10.10 / JPK 1010 / Jpk 10.10,14,Swan 391,5
+NED6854,Blondie,First 42s7,First 42.7 / First 42s7,8,J/112 / J/112e / J112e,5
+FRA98,El Velo Solex,Class40,Class40,10,Figaro 2,5
+K4702,OJALA' II,One-off,Classic One Tonner IOR / IOR One Tonner / ONE TONNER IOR,6,One-Off / One-Off Sloop,5
+GBR9463R,ARABELLA,Fast 40+,Fast 40+ / Fast40+,6,Ker40+,5
+GBR4242C,ZEPHYR,Fast 40+,GP 42 / Gp 42 / Gp42,7,Fast 40+ / Fast40+,5
+USA52329,HEARTBREAKER,Transpac 52,Transpac 52,6,Botin TP 52 / TP 52,5
+GBR66,REDWYCH,Classic Folkboat,Classic Folkboat,18,SINERGIA 40 / SINERGIA 40 MOD / SINERGIA 40 MOD.,5
+X156,GLEAM,XOD,XOD,247,12 Meter,5
+GBR6690R,PANTHER,Mumm 36,FARR 36M 2.23,9,Mumm 36,5
+GBR7924R,BRISTOLIAN,Cnb 92,CNB 92 / CNB 92 Special Design,7,Frers 93 Custom,5
+USA60790,ANDIAMO,Gunfleet 58,GRAND SOLEIL 44 / GRAND SOLEIL 44 PERF / Grand Soleil 40 / Grand soleil 44,5,Gunfleet 58,5
+USA61164,Sic Parvis Magna,J/145,J145,6,PG390,5
+GBR5779L,Cork Malt II,Oceanis 50,Beneteau,10,OCEANIS 50,5
+GBR7381R,COUGAR,Reflex 38,REFLEX 38 / REFLEX 38 2.30 / Reflex 38,68,J/160 / J/160 Sd,4
+IRL8088,FRANK 4,J/109,J 109 / J 109 2.10 / J/109 / J109,163,J/105,4
+GBR795R,DIABLO,Sun Fast 3600,SUN FAST 3600  Fin6 / SUN FAST 3600 2.20 Fin6 / Sun Fast 3600,182,2H,4
+SUI4777,KALI,First 47.7 Thr,FIRST 47.7  Thr / First 47.7,43,BeneteauFirst 47.7,4
+FIN1,Blue Marlin,TP 52,TP52,4,W 60,4
+AUT2895,LUNZ AM MEER,Swan 651,Swan 65.1 / Swan 651 / Swan 651 / G. Frers / Nautor Swan / 1984,24,651,4
+GER5676,RAFALE,Elliott 52 Ss,ELLIOT 52 SS / ELLIOTT 52 SS / Elliott 52 SS / Elliott 52 Ss,14,Eliott 52,4
+LTU001,AMBERSAIL 2,Volvo Ocean 65 OD,VOR 65,6,VO65,4
+MEX1,VIVA MEXICO,Vo 65,VO 65,4,Volvo Open 65,4
+USA61023,MALEMOK,Elan 450,ELAN 450 / Elan 450,8,E450,4
+FRA43534,CHALLENGE OCEAN,Vor 60,VOLVO OCEAN 60 (01) WB / Volvo 60 / Volvo Ocean Racer 60,39,VO60,4
+GBR4947R,BLACK MAGIC,First 44.7,FIRST 44.7 / First 44.7,54,Beneteau,4
+USA74434,HIRO MARU,S & S 49 (1971),S & S 49 (1971) / S&S 49,9,Sparkman & Stephens,4
+GER6300,HASPA HAMBURG,Jv 52 Custom,J/V 52 Custom / J/v 52 Custom / JV 52 Custom,38,JUDEL/VROLIJK 52 Youth Training,4
+GBR9383R,Intuition,Reflex 38,Reflex 38,66,Sailing Yacht,4
+NED20002,BOUDRAGON,Volvo 60,Volvo 60,48,WHITBREAD 60 (97),4
+GBR907R,GYR JUA KALI,Stimson 42,Stimson 42,34,GS 43,4
+GER1375,XANTHO,Lutra 52 Custom,"LUTRA 52 / LUTRA 52 Custom / Lutra 52 / Lutra 52, One Off",27,Standfast,4
+GBR9949T,FIREBALL,Beneteau First 40.7,Beneteau First 40. / Beneteau First 40.7 / Beneteau Racing 40 / FIRST 40.7 2.40 Di / FIRST 40.7 2.40 Distinction / FIRST 40.7 Dist DK / First 40.7,102,Chris Clark,4
+IRL3607,LULA BELLE,First 36.7,First 36.7,25,Beneteau 36.7,4
+GBR9319R,JAYDREAMER,J/109,J/109 / J109,12,J/09,4
+IRL2260,SARNIA,Sparkman And Stephens 36,S&S,4,Sparkman and Stephens 36,4
+GBR980R,STRATA 3,Sun Odyssey 36i,Sun Fast 35 / Sun Odyssey 36i,23,Dufour 385,4
+NED7935,FLYING DOLPHIN,Dufour 40 Performance,DUFOUR 40 PERFORMANCE / Dufour 40 / Dufour 40 Performance / Dufour 40 x 2.10,18,First 40,4
+FRA9631,ADELIE,First 34.7,First 34.7,18,Beneteau 34.7,4
+FRA50,PALANAD 4,Proto50,MACH 50 / MACH 50 3.50,5,Class40,4
+FRA47,OUTSIDER,Nelson Marek 47,TOFINOU 9.5 / Tofinou,5,NELSON MAREK 47 / Nelson Marek 47,4
+GER6002,Salty Dogs,Pogo 40 Class40,Class 40 / Class40,11,Pogo 40 Class40,4
+RSA23,ARWEN,Akilaria Class40,Class 40 / Class40,41,Akilaria Class40,4
+PUR11,Smile and Wave,First 40,Melges 24,8,First 40,4
+FRA1575,MED SPIRIT,Welbourn 92,Prototype,4,Welbourn 92,4
+GBR1513L,Euphoria,Grand Soleil 43,Grand Soleil 43,49,GS 43',4
+FRA403,Arcane,Suspens 78 +jupe Mod,Suspense,17,SUSPENS 78 +jupe MOD / SUSPENS Q LAC,4
+GBR800N,ARCTIC ENERGY,Nauta 78,RP 78,12,Nauta 78,4
+NED1,JAJO,Volvo Ocean 65 4.7,VOR 65,6,M 34,4
+FRA16559,LATITUDE,X-119,X 119 / X119,12,J/120,4
+GBR3033L,RIGIT ON WILD CHILD,Corby 30,Corby 30,7,Brian Wilkinson,4
+SUI5006,SWISS NAUTIC III,Baltic 50,Baltic 50,4,Bermudian Sloop,4
+NED8812,TULIP,Frers Custom 88,Classic 88' Sloop,4,Frers Custom 88,4
+GBR3657L,SMASH,Sun Fast 3600,SUN FAST 3600 / SUN FAST 3600 2.15 / Sun Fast 3600 / Sunfast 3600,96,2H,4
+GBR5936R,REDEYE,Sun Fast 3600,SUN FAST 3600 2.20 / Sun Fast 3600 / Sunfast 3600,77,Ian Hoddle / Ian Hoddle & Nigel Colley,4
+FRA27754,CLEZIO,Grand Soleil 39,Grand Soleil 39,20,Yvon Haquet,4
+GER11,Almi,M34,M34,11,DRAGON / Dragon,4
+NED6775,Redan,Dehler 39,Dehler 39,5,Mat1180,4
+NED6803,JAZZ,A.c.,Comfortina 42,6,A.c.,4
+FRA18,MÉFIE TE,Figaro II,FIGARO 3 / FIGARO II 2.10 WB / FIGARO II OD  WB / Figaro II,10,Imoca,4
+FRA9506,LADY FIRST²,Grand Soleil 50,Grand Soleil 50,6,GS 50,4
+GBR115X,NIKATA,J/V 115 Custom,J/V 115 Custom / J/v 115 Custom,12,JVNB 115,4
+SWE1,TerraPi,S&S 63,S&S 63,7,A 35,4
+ESP5570,PETROUCHKA III,Nautatec 40,Nautatec 40,4,One Off,4
+ITA15373,IAIAI FOR CANOTTIERI TIMAVO,Elan 37,Elan 37,6,37,4
+CRO2356,MUNJEK F,M34,M 34,8,Archambault M 34,4
+GBR2736R,JOKER,Jezequel 116,Jezequel 116,5,Quarter Ton / Quarter Tonner,4
+11,BARBASTELLE,Sloop,Sloop,7,Daring,4
+SLO1001,ESIMIT EUROPA 2,Reichel/pugh 100,RP 100,4,Reichel/Pugh 100,4
+GBR6944R,Smoke 'n Oakum,Grand Soleil 44 Race,Grand Soleil 44 Race,8,J/105,4
+SUI4200,KUKA LIGHT,One Off 42,One Off 42,7,Franco Niggeler,4
+FRA83,Libertè,J/111,J/111,12,Class40,4
+CZE100,FULCRUM II,Pogo 40S2 Class 40,Class40,4,Pogo 40S2 Class 40,4
+CAN54321,SORCERESS,Sws 96,Southernwind 96,4,Sws 96,4
+GBR594R,GEMERVESCENCE,Dalzell 50 Cutter,Cutter,7,One Off,4
+USA50852,Patriot,Apogee 58,Apogee 58,4,Cal 25 / Cal-25,4
+GBR710,SPEEDWELL,Trapper 950,Trapper 950,7,Contessa 32,4
+BEL433,Mockingbird,Grand Soleil 43,Botin TP 52 / TP 52 / TP52,6,GRAND SOLEIL 43,4
+GBR1479R,FLASHHEART,Ed Dubois Quarter Tonner,Starflash,7,Ed Dubois Quarter Tonner,4
+SWE5,SOLARIS,Fast 40+,Fast 40+,9,Ker 40+ / Ker40+,4
+GBR43N,BAGHEERA,Grand Soleil 43,GRAND SOLEIL 43 2. / Grand Soleil 43,14,GS 43,4
+GBR923R,SKADI,Bowman 44,Bowman 44,12,J/109,4
+GBR2093L,Wolverine,Elan 450,Frers 33,10,Elan 450,4
+NED342,ADRIAN HOTELES MACARONESIA,Sydney Gts 43,Sydney 43 GTS / Sydney 43GTS / Sydney Gts 43,17,Ker 43,4
+115,STORMY WEATHER OF COWES,S&S 53 Yawl,S&S 53 Yawl,8,S & S 53 Classic,4
+ITA2311,MY SONG,Baltic 130 6.96,CLUB SWAN 80 / ClubSwan 80 / Juan Kouyoumdjan / Persico / 2022 / Clubswan 80,5,Baltic 130 6.96,4
+USA28252,Sin Duda!,Santa Cruz 52,Santa Cruz 52,6,Melges 24,4
+GBR74R,JETHOU,Maxi 72,Maxi 72,5,Mini Maxi,4
+GBR8859R,JACKKNIFE,J 125 #01,J 125  #01 / J 125 2.48 #01 custom,8,J/125,4
+SUI10,SCHERZO,Marten 49,MARTEN 49 / Marten 49,5,Baltic 45,4
+FRA9778,FLUKE,Jean-baptiste Crepin,Jean-Baptiste Crepin,4,Sun Fast 3200,4
+USA2872,Lucky,Juan K 27M,JUAN K 27M / Juan K 27m,6,Botin 72 Custom,4
+FRA177,MIC Odyssey,Outremer 5x Racing,Reichel Pugh 63 / Reichel/Pugh 63,5,Outremer 5x Racing,4
+USA95,Jameson,TP 52,2.4mR OD,9,TP 52,4
+GBR8436R,MAGEC,X Yacht 362S,X 362 / X362S,14,X Yacht 362S,4
+GBR6858T,FIRST LIGHT,Elan 333,ELAN 333 1.90,30,Beneteau 47.7 / Beneteau First 47 / Beneteau First 47.7 / FIRST 47.7,4
+USA68900,RED RUBY,Sf 3300 Christina & Justin Wolfe,SF 3300 Christina & Justin Wolfe / SF 3300 Jonathan Mckee,4,SUN FAST 3300 1.95 / Sun Fast 3300,4
+GBR4357T,MIST,Nicholson 33,Nicholson 33,10,TP 52 / TP52,4
+USA 206,SWIFT,J/70,VIPER 640 / Viper 640 / viper 640,5,Class 40,4
+GBR8809R,MOJO RISIN',J/109,J 109 / J 109 2.10 / J/109 / J109,273,Parker 27.5,3
+GBR9205R,DIABLO-J,J/105,J 105 / J 105 1.98 / J/105 / J105,181,Nick Martin,3
+GBR8285,KINDRED SPIRIT,Beneteau 4,SIGMA 38 / SIGMA 38 OOD / Sigma 38,68,Beneteau 4,3
+GBR8338,WITH ALACRITY,J/112e,SIGMA 38 / Sigma 38,162,J/112E,3
+GBR9701T,RED KITE,Corby 33,ELAN 31 1.85,5,Corby 33,3
+USA60006,VENOMOUS,Carroll Marine 60,CARROLL MARINE 60 / CARROLL MARINE 60 3.99 / Carroll Marine 60,97,CM 60 / CM60,3
+GBR4921R,Ino XXX,Hh 42,HH 42 / HH 422 / HH42 / Hh42,85,James Neville,3
+SWE69,Blur,J/111,J/111,11,J/99,3
+ITA14689,RENOIR,Grand Soleil 40 Reg,GS 40,5,GRAND SOLEIL 40 Reg / Grand Soleil 40,3
+ITA15145,LIBERTINE,Comet 45 R,COMET 45S / Comet 45 R / Comet 45 S / Comet 45S / Comet45 S,27,"JPK 11,80 (2,32) / JPK 11.80 2.35 Fin6 WB / JPK 11.80 RC 2.35",3
+MLT4496,EUGENIA V,Prototype,Prototype,4,KETCH BERMUDIEN,3
+GBR7017R,BLACK PEARL,Botin 56 (18) Wb,IRC 56,6,BOTIN 56 (18) WB,3
+CAN1213,Hermes,Pogo 12.50,Pogo 12.50,20,Melges 24,3
+GBR6899R,JAM,J/99,J 99 2.00 / J/99 / J99,49,DRAGON / Dragon,3
+GBR68,PEREGRINE,Class40,Class40,8,Pogo 40s,3
+FRA64,GDD,Figaro II,Figaro II / Figaro II 2.10 Wb,12,ORC 50 / ORC50,3
+GBR2183R,SUNSTONE,S & S 39 Custom,S & S 40 Custom,4,S & S 39 Custom,3
+GBR4863R,YES!,JPK 1080,JPK 10.80 / JPK 10.80 2.15 fin / JPK 10.80 2.15 fin6 / JPK 1080 / JPK 1080+ / JPK 1180,29,Corby 36,3
+GBR8525R,LIQUIDITY RISK II,Corby 25,CORBY 25 / CORBY 25 1.80 / Corby 25,73,J105,3
+GBR9022T,TOUCHPAPER,J/105,CORBY 29 / CORBY 29 (05) 1.98 / Corby 29,54,J105,3
+GBR1496,OSPREY,J/70,J/70,10,GBR,3
+GBR1108L,Paragon,Ker 11.3,IC37,4,KER 11.3 OD / Ker 11.3,3
+GBR9401R,GENE JENIE,J/105,J 105 / J/105,10,J,3
+GBR8327,LIGHT,Beneteau F,SIGMA 38 / Sigma 38,27,Beneteau F,3
+GBR4545N,FORTIFY,Sun Fast 3200,Sun Fast 3200 / SunFast 3200,7,2H,3
+GBR100,SOAK THERAPY,-,IMOCA 60,56,Open 60,3
+FRA88,Acapella-Proludic-The Chain of Hope,Class40,Acapella,4,Class40,3
+GBR4365T,HAVEN KJ ENIGMA,Nicholson,MG 346 / MG 346 1.90 / MG346 / Mg 346,43,NICHOLSON,3
+GBR9232R,JAX,Beneteau 4,Brooklin 43 / Brooklin Boat Yard,9,Beneteau 4,3
+SUI19,JUBILEE,Arcona 430,GP 42 / GP42 / Gp 42,9,Arcona 430,3
+FRA43653,NIRVANA,Jeanneau Sunfast 3200,Jeanneau SunFast 3200 / SUN FAST 3200 1.90 / SUN FAST 3200R1 1. / SUN FAST 3200R1 1.90 / Sun Fast 3200 / Sunfast 3200,114,2H,3
+GBR912R,POLKA,J/105,FIRST 34.7 2.00 / First 34.7,45,J105,3
+NED10031,VICTORIA,A 31,A 31 / A 31 1.90 V2,10,J/105,3
+GBR8380R,ELIXIR,Elan 380,Elan 380,89,2H,3
+GBR50R,THE JEAN GENIE,Quarter Tonner,Carkeek 40 Mk3 / Carkeek MKIV,9,Farr 1/4 Tonner / Quarter Tonner,3
+KZ3494,SWUZZLEBUBBLE,Farr,Farr,6,Half Tonner,3
+USA60722,PROTEUS,Maxi 72,Maxi 72,14,J/V 72 / J/V / Persico / 2014 / JV / JV72 /  Jurdel-Vrolijk / Persico / 2014,3
+GBR72L,LOUISE,Racoupeau 72 Custom,Racoupeau 72 Custom,4,DRAGON / Dragon,3
+GBR2080L,EL ORO,Auzepy-brenneur 68,AUZEPY-BRENNEUR 68 / Auzepy-brenneur 68,5,KETCH / KETCH BERMUDIEN,3
+CAN8,JAM,Volvo 60,Volvo60,4,J 92 / J/92,3
+FRA43645,DREAM PEARLS,JPK 1080,JPK 10.80 / Jpk 10.80,52,Eric Mordret,3
+GBR1174L,TAIKA,J/105,J 105 1.98 / J/105 / J105,54,J 109,3
+FRA43964,VOYAGER,Sun Fast 3600,Sun Fast 3600,10,S2 9.1,3
+NED8882,LEELOO,Mat 1180,Mat 1180 / Mat1180,8,X43,3
+GBR724R,BERTIE,-,First 40,26,International Dragon,3
+GBR8606R,BOOTY!,Sun Fast 3200,Stewart 109,3,Sun Fast 3200,3
+RUS1,COCKATOO,Vor 70,Volvo 70 / Volvo Open 70,50,VOR 70,3
+GBR53N,Music,Swan 53,Swan 53,11,Oyster 885,3
+CAY65,CARO,Botin IRC 65,Botin 65 / Botin IRC 65 / Botin Irc 65,31,KNIERIM 49,3
+NZ35551,CRUSADER,Elliott 35 Ss,Elliott 35Ss,4,Bluenose,3
+RUS2480,BRONENOSEC,Elan 431,Elan 431,22,Swan 60,3
+USA7000,Victorine,Sloop,Sloop,4,C&C 61,3
+GER7,Blue Note,Pogo 40,Pogo 40,6,SPIRIT 46 / SPIRIT OF TRADITION / SPIRIT46,3
+AUS3002,Morticia,Modified Sea Cart 30,Modified Sea Cart 30,3,Seacart 30 / Seacart 30 Trimaran,3
+GBR6733R,BLACK DIAMOND,Figaro Solo,Figaro I / Figaro Solo,4,Santa Cruz 37 / Santa Cruz 37 Mod,3
+FRA38902,RAGING BEE,JPK 1010,JPK 10.10 / JPK 10.10 1.98 Fin6 / JPK 1010,85,2H,3
+GBR3700L,Fatjax,X-37,X 37,14,Shipman 63,3
+NED8436,SAFFIER NITRO,Saffier 36,Bosgraff 36 2.10,4,Saffier 36,3
+FRA155,Flamingo rosso,Class40,Class40,5,Mach 40.3,3
+MLT441,CALYPSO,Bermudian Sloop,XP 44,4,Bermudian Sloop,3
+IRL375IRL,Andante,Yamaha 36,Yamaha 36,16,Hanse 315,3
+FRA36840,COLUMBUS CIRCLE,A 31,A31,20,Denis Hauser,3
+FRA43791,SHAITAN,JPK 1080,JPK 10.80 / Jpk 10.80,61,2H,3
+HKG2192,DOUBLE EDGE,Corby 38,Corby 38,50,One Off,3
+GBR1345R,MATAKANA BLUE,X-yachts X,XC45 / Xc45,7,X-Yachts X,3
+DEN159,Uijuijui fly,X-43,X-43,4,XP-44,3
+GBR1014,PALAVER,Int Etchel,Etchells,4,Int Etchel,3
+SUI888,ALLEGRA,Catamaran,Custom / custom,4,Catamaran,3
+U4,SIRENA,-,Seaview Mermaid,15,U CLASS Classic,3
+K1034,CETEWAYO,-,7/8 Sloop,14,SLOOP,3
+GBR6834R,ALAMARA IV,GS34,Grand Soleil 34,21,GS34,3
+MLT445,SIGIRIYA,445Gl,445 Grand Large,4,445Gl,3
+GER16,Cooper,Class40,Class 40,4,DRAGON / Dragon,3
+NED8,GREEN DRAGON,Volvo Open 70 (2008),VOLVO OPEN 70 (2008),3,VOR 65,3
+SUI18,GEYSER,Bongo 9.60,Bongo 9.60,6,TOFINOU 9.5 / Tofinou,3
+GBR192,BLUEBOTTLE,,Dragon,5,Pogo S4,3
+125,ARGYLL,S&S 57 Yawl,S&S 57 Yawl,6,YAWL BERMUDIEN,3
+USA71,BLACK WATCH,S&S 68 Custom Yawl,S&S Custom Yawl,4,Custom Yawl,3
+USA60010,GoodEnergy,Reichel/pugh 63,Reichel/Pugh 63,8,R/P 63 / RP 63,3
+GER21,EINSTEIN,IMOCA 60,Imoca 60,4,49er / 49ers,3
+GBR5436R,SUNRISE,E4,Elan E4/360s,9,JPK 1180 / JPK1180,3
+GBR8367T,RED HAWK,First 36.7,FIRST 36.7 / FIRST 36.7 2.20 / First 36.7,41,Beneteau 36.7,3
+GBR5422R,DAVANTI TYRES,Gs 54,GS 54,4,Grand Soleil 54,3
+DEN21,Bæst,Figaro 2,2.4mR OD,8,Figaro 2,3
+FIN10647,INDIGO,Finngulf 41,Finngulf 41,3,Quickstep 24,3
+DEN2,PELIKANEN,J/105,BB 10,5,J105,3
+CO925,MUSKETEER II,,49er / 49ers,3,CONTESSA 32 / Contessa 32,3
+AUS1466,TANGO,,ETCHELLS / Etchells,5,J/42 SD,3
+GBR511,EMOJI,J/80,J/80 / J80,14,Reflex 38,3
+GBR7696T,MEMORY MAKER,First 31.7,FIRST 31.7 / FIRST 31.7 1.90 / First 31.7,51,Beneteau / Beneteau 31.7 Don Forster,3
+GBR8419,X-DAY,GP 42 Farr,GP 42 Farr  (07) / GP 42 Farr 2.60 (0 / GP 42 Farr 2.60 (07) / GP42,15,Fast 40+ / Fast40+,3
+GBR4647R,GAEL FORCE,Beneteau 4,FIRST 40.7 2.40 / First 40.7,5,Beneteau 4,3
+GBR3785,WILDCAT V,Beneteau F,J 29 1.75 / J/29 / J29,7,Beneteau F,3
+GBR123N,RESOLUTION,Evolution 26,EVOLUTION 26 1.52 / Evolution 26,4,Cabo Rico / Cabo Rico 38,3
+FRA27853,Exodus,Bongo 9.60,BONGO 9.60 / BONGO 9.60 1.95,6,Beneteau 36.7 / Beneteau First 36.7,3
+USA 4444,Running Tide,Sail,Beneteau 36.7 / Beneteau First 36.7,6,S&S / S&s Custom 59,3
+GBR843R,TANGENT MINUS 1,Arcona 430,ARCONA 430 2.55 / Arcona 430,58,49er / 49ers,2
+GBR1575L,PURE ATTITUDE,X-37,X 37 / X 37 1.98 / X-37 / X/37 / X37,103,X Yacht 37,2
+GBR9201N,LAST CALL,Projection 920 Mod,PROJECTION 920 MOD,25,J 70 / J70,2
+GBR754R,XTRACT,Salona 45,X 302 1.70 Mk2 Fe / X 302 MK2 1.70 / X-302,58,Salona 45,2
+GBR4068R,STANDFAST,Fast 40+,Fast 40 / Fast 40+,22,KER 40+ Nomex MOD / Ker 40+,2
+GBR942R,BULLDOG,J/122,J 122 / J 122 2.20 / J/122 / J/122 P40 Derek Shakespeare,95,Nelson Marek 41,2
+NED118,WINSOME,S&S 41,S & S 41 / S & S 41 MOD (keel) / S & S 41 MOD keel / S&S '41 / S&S 41 / S&s 41,170,Harry J. Heijst,2
+GBR6255N,LISA R,Ker 46,KER 46 / Ker 46,69,Th 38,2
+AUT5021,Stella Maris,Clubswan 50,Club Swan 50 / ClubSwan 50,5,Cape 31,2
+HUN7002,WILD JOE,RP60,R/P 60 / R/P Custom 60 / RP 60 / RP Custom 60 / RP60 / RP60 Custom,29,REICHEL/PUGH 60 Custom,2
+USA60669,SPACE MONKEY,Mills 68,Mills 68,6,Mini Maxi,2
+USA50009,PRIVATEER,Cookson 50 3.50 Mod App,COOKSON 50 3.50 MOD app / Cookson 50,41,Bluenose,2
+FRA34824,CASAMYAS,JPK 960,JPK 9.60 / JPK 960 / Jpk 9.60,69,Olivier Hays,2
+FRA9795,ENDLESS SUMMER,,PROTOTYPE / Prototype,10,Hunter Legend 40.5,2
+GBR8409R,GALAHAD OF COWES,Beneteau F,Beneteau / Beneteau F / Beneteau First 40 / FIRST 40 CR / FIRST 40 CR 2.45 / First 40,132,Ronan Banim,2
+GBR6908R,WHITE KNIGHT 7,J/109,J 109 / J 109 2.10 / J/109,110,Paul Macro,2
+FRA5999,Pen Duick VI,73' Aluminium Ketch,73' Aluminium Ketch,8,A. Mauric Ketch,2
+FRA43749,NUTMEG VI SOLIDAIRES EN PELOTON,MC34,MC 34 / MC34,40,PATTON 34  MOD WB,2
+SWE450,EMILY OF COWES,Elan 450,ELAN 450 / ELAN 450 2.05 / Elan 450,80,Bermudian sloop,2
+GBR1307R,ARGO,Arcona 340 Neville Askew,Arcona 340 1.95 / Arcona 340 Neville Askew,7,Salona 34,2
+GBR5,MORAL COMPASS,Farr 280,Farr 280,42,Class 40,2
+GBR9908T,BEWITCHED,Archambault Grand Surprise,Archambault - G.S. / Archambault - Grand Surprise / Archambault Grand / Archambault Grand Surprise / GRAND SURPRISE 2.0,46,B25,2
+GBR8888N,COBRA,King 40,King 40 / King 40 Hannah Stodel / SUMMIT 40 KING 2.5 / SUMMIT 40 KING 2.51 MOD (bulb),93,Michael Blair,2
+GBR6384T,DARK HORSE,Mustang 30,Mustang 30,39,SWAN 80 / Swan 80,2
+GBR3111N,MOSTLY HARMLESS,J/105,J 105 1.98 / J/105 / J105,153,J/109,2
+GBR4,COOL RUNNINGS,-,Open 7.50,6,49ers,2
+NED1106,Havoc,Prima 38,Prima 38,8,KER 11.3 / Ker 11.3,2
+NED6555,DELFT CHALLENGE,Farr 45,Farr 30 / Farr 45,7,Mumm 30,2
+FRA5851,CRACKLIN ROSIE,Corby 40,Corby 40 / Corby One Off,129,Steven Anderson,2
+NED7345,STORTEMELK,J/120,X 43 / X 43 bermudian sloop / X-43 / X43,14,J/120,2
+GBR1090L,ARIA,J/109,Beneteau Figaro 3 / Figaro 3,4,J 109,2
+4300C,Reindeer,Swan 43,SWAN 43 (69) / Swan 43,14,Morris 47,2
+NED7386,Moshulu,Imx 38,IMX 38,8,XP 38-210,2
+FRA15055,PRINCESSE GOTIONUDE,JOD 35,JOD 35 / JOD35 / Jod 35,36,Nicolas Dezeustre,2
+GBR3708R,ONE LIFE,Sun Fast 37,Sun Fast 37 / Sunfast 37,19,J/99 / J99,2
+GBR8956T,TARANTELLA,JOD 35,JOD 35 / JOD35 WB,11,SWAN 36 / Swan 36,2
+GBR1751T,SPELLBINDER OF WYTCH,Starlight 39,Starlight 39,75,Anthony (tony) Riley,2
+GBR4520,SCARLET SAILPLANE,First 45,First 45,4,Sigma 33 / Sigma 33 OOD,2
+GBR9633R,RUTHLESS,Dehler 33 Cr,DEHLER 33 CR 1.65 / Dehler 33 / Dehler 33 Cr / Dehler 33 Crusing,13,Phase Iv Cruiser,2
+FRA9677,ORANGE MECANIX,X-41,X 41 / X41,40,Maxime de Mareuil,2
+BEL9600,Lucky Duck,JPK 960,JPK 9.60,5,J/90,2
+GBR3402L,Relentless,Dehler 34 RS,C&C 121,3,Dehler 34 RS / Delher 34RS,2
+FRA29221,Perseverance,J/109,J/109 / J109,6,J/105,2
+GBR4838R,WILD THING,Prima 38,PRIMA 38 2.46 / Prima 38,7,FIRST 40 CR 2.45,2
+GBR1184,Volante,Camper & Nicholson 38,Camper & Nicholson 38,11,Beneteau First 40.7,2
+FRA99,SOLANO,J/80,J80,4,Class 40,2
+FRA17,Purple Haze,Trimaran,Moric,8,Trimaran,2
+GBR22N,AEGIR,Carbon Ocean 82,CARBON OCEAN 8 / Carbon Ocean 82 / Carbon Ocean Yachts / ROGERS 82 / Rodgers 82 / Rodgers / Carbon Ocea / 2010 / Rogers 82 / Rogers 84 / S. Rogers / Carbon Ocean / 2010,22,DRAGON / Dragon,2
+GBR9042T,COYOTE,First 40.7,First 40.7,3,IMX 45,2
+FRA37310,GARUDA 4,JPK 1010,JPK 10.10 / JPK 10.10  mod / JPK 10.10 1.98 mod / Jpk 10.10,138,Noel Racine,2
+FRA34983,DRONNING BLÅ,A 35,A 35 / A35,40,Archambault A35,2
+GBR6671T,BLUE JUICE,First 40.7,First 40.7,18,Beneteau 40.7,2
+GBR1007L,DIAMONDS ARE FOREVER,Elan 37,Elan 37,29,Lucinda Allaway,2
+USA315,Weather Permitting,Mccurdy Rhodes 48,McCurdy & Rhodes 48 / McCurdy Rhodes 48,8,Viper 640,2
+SWE95,TALANTA,Class40,Class40,8,Pogo 40S2,2
+AUT49,CROSSING ROUTES - VAQUITA,Akilaria RC1,Class 40 / Class40,6,Akilaria Rc1,2
+FRA135,VOGUE AVEC UN CROHN,Class40,CLASS 40 / Class40 / Class40 Mach40.5,13,Pogo 40 S3,2
+FRA140,SENSATION CLASS40 EXTREME,Class40,Class40,21,Sabrosa 40 Mk2,2
+GBR3789L,JUST PLAIN KRAZY,JPK 1010,JPK 10.10 / Jpk 10.10,30,Ian Knight,2
+FRA19816,ESPRITCLUB,Sun Fast 32,Sun Fast 32,8,Hugo Buratti,2
+GBR5253,SILVER SHAMROCK,Shamrock 1/2 Ton Prototype,Shamrock 1/2 Ton / Shamrock 1/2 Ton Prototype,41,Stuart Greenfield,2
+GBR1652R,ITHAKA,Swan 44,Swan 44,37,S & S 44,2
+GBR2797R,ROCK LOBSTER,Swan 55 Yawl,J 97 1.92,2,Swan 55 Yawl,2
+NED8831,SCHEEPSRECHT,Bavaria 410,Bavaria 410,8,Swan 431,2
+7575,Blackbird,Tripp 75,Tripp 75,4,Corsair 28R,2
+GBR4950,WOOZLE HUNTER,Sigma 33,Sigma 33 / Sigma 33 OOD,28,Farr 45,2
+GBR8750R,BELLA OF LONDON,Grand Soleil 50 2.,GRAND SOLEIL 50 2. / Grand Soleil 50,45,Mike Surridge,2
+GBR4081L,JULIA,Oceanis 55,Oceanis 55,42,Mark Osborn,2
+GBR741R,HOOLIGAN VII,Ker 40,Ker 40,111,Edward Broadway,2
+NED51,OYSTERCATCHER XXXIII,Ker 51 Custom,Ker 51 / Ker 51 Custom,42,Grand Soleil 34.1,2
+CAY1,SHOCKWAVE,One Off 63' Trimaran,One Off 63' Trimaran,8,Irens,2
+GBR3234L,EVANS HALSHAW ROCKET DOG,First 40,Beneteau First 40 / First 40,68,Richard Oswald,2
+AUS7742,KIALOA II,S&S 73’ Yawl,S & S 73 Classic #1713,11,S&S 73’ yawl,2
+GBR9974T,MAMACOCHA,Beneteau First 40.7,Beneteau First 40.7,6,J/109,2
+CRO772,ANATELA,Grand Soleil 46.3,Grand Soleil 46.3,4,49er / 49ers,2
+ITA136,GREEN CHALLENGE,Bm40,Bm40,4,Class40,2
+NED14884,CHECKMATE,X-37,X-37,8,Ff110,2
+ITA55,MASERATI,Multi 70,Multi 70,12,Mod 70,2
+NED27,FORMIDABLE,A.c.,A.C. / A.c.,35,SUN FAST 36,2
+GBR5187,Crazy Horse,Mustang 30,BALTIC 50 Custom / Baltic,4,C&C 110,2
+FRA7891,BULLIT,Faroux,Quarter / Quarter Ton / Quarter Tonner,15,Faroux,2
+GBR007,KALLIMA,8 Metre,SWAN 80 / Swan 80 Mod,5,8 Metre,2
+GBR7881R,TIGER,Quarter Ton,1/4 TONNER / QUARTER TON Faurou / QUARTER TONNER / Quarter / Quarter Ton / Quarter Tonner / Quarter ton,28,Etchells,2
+GBR787,Paladin,Excalibur 36,Excalibur 36,6,J/105 / J105,2
+FRA13,ETOILE HORIZON,IMOCA 50,IMOCA 50,4,49ers,2
+GBR9453R,DABRA,Jeanneau Sunfast 32,Sun Fast 32,6,Jeanneau SunFast 32 / Jeanneau Sunfast 32,2
+BEL5012,BALTHASAR,Swan 50,ClubSwan 50,12,Swan 50,2
+FRA36907,ALOHA,Pogo 12.50,Pogo 1250,12,Grand Soleil 44,2
+CZE998,Giulia,Italia 9.98,ITALIA YACHTS 9.98 / Italia 9.98 / Italia Yachts 9.98,9,IY 998,2
+GBR4500T,STARGAZER,First 405,Beneteau First 375 / Beneteau First 38s5 / Beneteau First 40.7 / First 405,7,NEO 400+ / NEO+400,2
+FRA35,SEED OF COURAGE,Vplp Design,IMOCA 60,4,Multi50,2
+USA61002,Flow,Gunboat 60,Elan 380,2,Gunboat 60,2
+GBR718,CRACKERJACK,Nordic Folkboat,Folkboat / Nordic / Nordic Folkboat,63,Contessa 32,2
+FRA9371,MENACE,Faroux,1/4 tonner,7,IC37,2
+U2,CYNTHIA,-,Mermaid,3,Morgan 41,2
+USA60272,SHOCKWAVE,Maxi 72,Maxi 72,4,Mini Maxi,2
+USA52830,KISMET,Morris 486,Morris 486,7,FIFE / fife,2
+ANT464,MARIELLA,Alfred Mylne Design,Alfred Mylne Design,4,YAWL,2
+16,DORADE,S&S 52 Yawl,S&S 52 / S&S 52 YAWL / S&S 52 Yawl,12,Classic Yawl,2
+FRA38599,DESPERADO,Sun Fast 3200,Sun Fast 3200,4,Star,2
+IRL9742,ABRAXAS,Benneteau,Benneteau,3,FIRST 40.7 2.40 Di,2
+GBR8000L,GREY GOOSE,Swan 82,Nautor Swan 82 / Swan 82,5,OYSTER 675,2
+ITA16126,ZENHEA TAKESHA,Milius 48,Milius 48 / Milius 49,8,Mylius 14e55,2
+FRA24,Wewise,Figaro 3,Figaro 3,6,IMOCA / IMOCA 60,2
+USA20,Speedwell,Diam 24,J 111 / J/111 / J111,7,IC37,2
+GER5588,DESNA,Performance Cruiser,Performance Cruiser,4,JV 49,2
+SA2371,Zeus,Fast 42,FAST 42 / Fast 42,6,Infiniti 52,2
+ITA70,Celestial V70,Vo 70,VO 70,3,Volvo Open 70,2
+GBR44,Ovington Boats,Sigma 33,RS Elite,3,Rhodes 46 Classic Yawl,2
+GER52,Jeanne d'Arg,J/V 52,TP 52 / TP 52 J/V,7,J/V 52,2
+GBR8285T,PENELOPE,Dehler 34 (1990),Dehler 34 / Dehler 34 (1990),17,First 31.7,2
+FRA8,The Red Cigar,Prototype,Wasa 55,3,PROTOTYPE,2
+USA144,PATRIOT,Class40,Class 40 / Class40,10,2026 Atlantic Class National Championship / Atlantic,2
+FRA525,LEVEL 3 FUN,Mrs B525,49er / 49ers,2,Mrs B525,2
+USA61006,Arethusa,Gunboat 60,IC37,6,Gunboat 60,2
+FRA123,COUP DE POUCE,Class40,Class40,2,IMOCA / IMOCA 60,2
+GBR3907,Sundance,Sigma 36,Sigma 36,10,NA 40,2
+NED8606,SAILSELECT,Camper & Nicolson,Camper & Nicolson,5,NICHOLSON 43 / Nicholson 43,2
+GBR17,SIOMA II,6 Metre,6 Metre,3,Multi 50 Class,2
+SWE918,GARM,JPK 1180,JPK 11.80 / JPK 11.80 2.35 / JPK 11.80 2.35 Fin6 MOD (int) / JPK1180,13,GP 42 / GP42,2
+EST773,NOLA,Mat 1220,MAT 1220  Fin6 MOD keel / MAT 1220 2.50 Fin6 MOD keel,8,J/112e,2
+FRA3,ANGUILLA,Sun Fast 30 OD,Multi 50,2,SUN FAST 30 OD,2
+GBR3130X,NARWHAL,Cape 31,CAPE 31 UK-IRL / Cape31,19,Aerodyne 38,2
+GBR626R,OLD MOTHER GUN,Humphries 40 Ft,HUMPHREYS 41 Custo / HUMPHREYS 41 Custom / Humphreys 40,11,Humphries 40 ft,2
+GBR720,THE OTTER,Nordic Folkboat,Folkboat / Nordic Folkboat,149,Concordia 41,2
+K21,AEOLUS,-,30 Square Metre / 30 Square metre,6,30 SQ METRE Reimer / Knud Reimers 30sq,2
+FRA45970,Mathilda,Sun Fast 3300,SUN FAST 3300 / Sun Fast 3300,4,Bavaria 38 Match,2
+GER7722,ELIDA,Tison 48,TISON 48,3,One-off,2
+GBR2562T,XTROVERT,X-372,X 372 2.00 SPORT / X 372 Sport,6,X Yacht 372 Joseph Hehir,2
+GBR4343X,ORIXA,X 4-3 (22),X 4-3 (22) / X 4-3 (22) 2.20,4,X-43,2
+FRA53519,COURRIER POGO,Pogo Rc,POGO RC / POGO RC 2.25 WB - Mod,4,CLASS 40 / Class 40,2
+GBR4664T,Moonbeam,Starlight 35,Alerion Express 28,2,STARLIGHT 35 1.82 / Starlight 35,2
+GBR57,Erica,,J 88 / J88,3,Tartan 10,2
+X106,SANDPIPER,XOD,XOD,333,Bluenose / Bluenose Sloop,2
+GBR4365,Shaka,,Beneteau 10R,2,PHRF,2
+GBR1,YOHO OF WIGHT,Classic Folkboat,Classic Folkboat,14,Hanse 505,2
+X20,Puffin’,-,J 80 / J/80,4,Pogo 850,2
+GBR7299,Panic,Gimpel,J/105 / J105,4,Gimpel,2
+AUS61,ALPHA CRUCIS,International 5.5m,International 5.5m,11,49ers,2
+TTO43,Legacy,Soverel 43 Model,Cookson TP52 / TP52,3,Beneteau First 40 / Beneteau First 40 SD,2
+TBC,SOUTHERN SWELL II,Contessa 32,Contessa 32,3,Moody 62,2
+USA009,Nelda Ray,Farr 280,Farr 280,2,Farrier F-33RX / Farrier F33RX,2
+USA 126,Freedom,J/100,J/100,2,Jeanneau 37 Sun Odyssey,2
+USA 8464,Pied Piper,Star,Reichel Pugh 68 / Reichel/Pugh 68 / Riechel Pugh 68 / Riechel/Pugh 68,5,Star,2
+USA 27,Niuhi,Impulse 26,J 70 / J/70,7,Catalina 275 Sport,2
+1929,VIVEKA,Big Boats,STAYSAIL SCHOONER / Staysail schooer,4,BIG BOATS / Big Boat,2
