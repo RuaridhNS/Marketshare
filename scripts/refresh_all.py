@@ -182,6 +182,11 @@ def main():
         # report after records that are not duplicates. The UK IRC Nationals
         # 2025 list is inside the Moth Worlds and 470 Worlds workbooks as
         # well as its own.
+        # A spreadsheet division heading imported as a boat. Before the boat
+        # reasoning for the same reason as the row below: a subtotal in the
+        # fleet is a phantom record the duplicate report then asks about.
+        ("Drop spreadsheet heading rows", ["drop_heading_rows.py"], "heading rows"),
+
         ("Drop misfiled entry lists",
          ["drop_misfiled_entry_lists.py", "--file", "data/misfiled_entry_lists.csv"],
          "misfiled entry lists"),
