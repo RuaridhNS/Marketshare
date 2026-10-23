@@ -150,3 +150,35 @@ Grenada,Caribbean,
 Las Palmas de Gran Canaria,Iberia & Atlantic Islands,
 Sint Maarten,Caribbean,
 St Thomas,Caribbean,
+# --- the IRC regions outside the Solent -------------------------------------
+# Thirteen of these venues were already in data/venues.csv with no area, so a
+# regatta geocoded to Falmouth or Tarbert landed under 'Area not set'. The rest
+# come with the venues added in the same change.
+Belfast Lough,Northern Ireland,"IRC Northern Ireland region, whose championship is sailed here. Bangor Regatta (Royal Ulster YC) is the major fixture."
+Tarbert,Scottish,"Loch Fyne, home of the Jura Scottish Series and the IRC Scottish Championship."
+Falmouth,South West,The IRC South West Championship venue. Falmouth Week races here.
+Plymouth,South West,
+Dartmouth,South West,
+Torbay,South West,
+Ramsgate,East Coast,The IRC East Coast Championship venue.
+Harwich,East Coast,
+Portishead,Bristol Channel,The IRC Bristol Channel Championship venue.
+Pwllheli,Welsh,"The IRC Welsh National Championship venue, on Cardigan Bay."
+Saint Helier,Channel Islands,"Jersey, and an IRC region of its own. NOT to be confused with Alderney and St Peter Port, which are in Solent offshore: those are JOG races sailed FROM the Solent, where this is a Jersey-based fixture."
+Eastbourne,East Coast,"Sussex, which no IRC region names. Filed East Coast because Ramsgate anchors that region and is the nearer of the two. The JOG Cowes-Eastbourne race is not affected - data/regatta_areas.csv already puts it in Solent offshore, where its fleet is."
+Whitby,North East,"Yorkshire, which no IRC region covers at all - the regions jump from the East Coast to Scotland. 'North East' is this file's own name for the gap, not an IRC one."
+Oban,Scottish,West Highland Yachting Week.
+Largs,Scottish,The Fife Regatta and the Largs Regatta Festival.
+Troon,Scottish,
+Crosshaven,Ireland,Royal Cork YC and Cork Week.
+Howth,Ireland,
+Kinsale,Ireland,
+Menai Strait,Welsh,"The Menai Strait Regattas, a fortnight sailed between Beaumaris and Caernarfon. This is the Welsh Bangor; Bangor Regatta is the Northern Irish one, on Belfast Lough."
+Abersoch,Welsh,"Abersoch Keelboat Week, South Caernarvonshire YC."
+Conwy,Welsh,
+Holyhead,Welsh,
+Burnham-on-Crouch,East Coast,"Burnham Week, the major East Coast regatta."
+Brightlingsea,East Coast,Pyefleet Week.
+Whitstable,East Coast,Whitstable Week.
+Cardiff,Bristol Channel,
+Swansea,Bristol Channel,

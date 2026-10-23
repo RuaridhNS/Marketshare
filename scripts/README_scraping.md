@@ -48,6 +48,35 @@ platforms are still blocked:
   existing rep relationship - partners are often given access even where the
   public crawler policy says no.
 
+## The major regional regattas outside the Solent (checked 2026-10-23)
+
+The coverage here is 86 Solent regattas against 11 for the whole of the rest
+of the UK and Ireland, and all 11 arrived as by-products - RORC races that
+start somewhere else, and two one-off spreadsheets. No scraper has ever been
+pointed at a Scottish, Welsh, Cornish or Northern Irish club.
+
+`data/venues.csv` and `data/venue_areas.csv` now carry the venues and IRC
+regions for the major regional fixtures, so any of them files itself the
+moment it is loaded. These are the sources, and they do not all say the same
+thing:
+
+| Regatta | Region | robots.txt | Verdict |
+|---|---|---|---|
+| Burnham Week (`burnhamweek.com`) | East Coast | `Disallow: /wp-admin/` only | **Scrapable.** Results are plain Sailwave `.htm` pages, one per class, the same shape `scrape_warsash.py` already reads. |
+| Cork Week (`corkweek.ie`) | Ireland | `Disallow:` - empty, so everything is allowed | **Scrapable.** |
+| Jura Scottish Series (`scottishseries.com`) | Scottish | `User-agent: * Disallow: /`, and `ClaudeBot` and `anthropic-ai` named individually | **Not scraped.** The whole site is closed to crawlers. Same category as JOG and sailracehq: use `load_pasted_results.py`, or ask the Clyde Cruising Club for an export. |
+
+Unchecked and worth checking before anyone writes a scraper: West Highland
+Yachting Week (Oban), Bangor Regatta (Royal Ulster YC, Belfast Lough),
+Abersoch Keelboat Week, the Menai Strait Regattas, Dun Laoghaire Regatta, and
+the IRC regional championships at Falmouth, Ramsgate, Portishead, Pwllheli
+and Jersey.
+
+A note on names: Bangor is a town in Wales AND one on Belfast Lough, and only
+the second has the regatta. `data/venues.csv` therefore matches on
+`bangor regatta|royal ulster|ballyholme` rather than on the word alone, and
+the Welsh events are matched on `menai|beaumaris|caernarfon|trearddur`.
+
 ## RORC legacy archive workflow (2007-2022)
 
 1. **Discover race URLs for a season.** Fetch the season index page:

@@ -44,3 +44,11 @@ Pacific Northwest,,"Canada 15, USA 1 - so is the Salish Sea."
 North Sea,,"Netherlands 3, Germany 1."
 Iberia & Atlantic Islands,,"Spain 1, Portugal 1."
 International offshore,,"No home market by definition - that is what the area means. Each race keeps its own country, so the Fastnet is British and the Caribbean 600 Antiguan, while neither counts as a LOCAL market anywhere."
+# --- the GB regions that had no holdings until now --------------------------
+Scottish,GBR,
+Northern Ireland,GBR,
+Welsh,GBR,
+South West,GBR,"Devon and Cornwall. NOT the south coast generally - Poole and Weymouth are 'Southern', which is what the IRC regions call them."
+Bristol Channel,GBR,
+Channel Islands,GBR,"A Crown Dependency rather than part of the UK, but one IRC region and one market, and the fleet rates and buys as British."
+North East,GBR,

@@ -178,3 +178,25 @@ crescent one design|nova scotia,Chester NS,CAN,44.540,-64.240
 e scow nationals|white bear|minnetonka,White Bear Lake,USA,45.075,-92.980
 flying scot|thistle nationals|interlake|daysailer|snipe nationals,Lake Erie,USA,41.480,-82.710
 martin 242|shark worlds|shark north american,Vancouver,CAN,49.290,-123.140
+# --- the major UK and Irish regional regattas -------------------------------
+# Added so these events file themselves the moment any of them is loaded,
+# rather than arriving with no venue and so no area. Matched on the regatta
+# NAME, first match wins, so the pattern names the event where the place alone
+# would be ambiguous: 'bangor regatta' and not 'bangor', because Bangor is a
+# town in Wales AND one on Belfast Lough, and only the second has the regatta.
+west highland|oban,Oban,GBR,56.415,-5.471
+largs|fife regatta,Largs,GBR,55.795,-4.869
+troon,Troon,GBR,55.543,-4.665
+cork week|crosshaven|royal cork,Crosshaven,IRL,51.800,-8.300
+howth,Howth,IRL,53.392,-6.067
+kinsale,Kinsale,IRL,51.706,-8.522
+bangor regatta|royal ulster|ballyholme,Belfast Lough,GBR,54.666,-5.670
+menai|beaumaris|caernarfon|trearddur,Menai Strait,GBR,53.228,-4.160
+abersoch|south caernarvonshire,Abersoch,GBR,52.828,-4.504
+conwy,Conwy,GBR,53.283,-3.830
+holyhead,Holyhead,GBR,53.309,-4.633
+burnham week|burnham.on.crouch|royal corinthian,Burnham-on-Crouch,GBR,51.620,0.815
+pyefleet|brightlingsea,Brightlingsea,GBR,51.806,1.023
+whitstable,Whitstable,GBR,51.362,1.026
+cardiff|penarth,Cardiff,GBR,51.449,-3.166
+swansea|mumbles,Swansea,GBR,51.611,-3.944
