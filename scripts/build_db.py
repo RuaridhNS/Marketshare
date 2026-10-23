@@ -13,6 +13,7 @@ import csv
 import pathlib
 import sqlite3
 import datetime
+import unicodedata
 import openpyxl
 
 SCHEMA_PATH = "/home/claude/marketshare/db/schema.sql"
@@ -83,6 +84,31 @@ def get_or_create_sailmaker(cur, raw_name):
     return cur.lastrowid
 
 
+def owner_key(name):
+    """One person, one key, however the entry list spelled them.
+
+    Case, spacing, punctuation, accents and the choice between "and", "&",
+    "/" and "," all come out. "PAUL AND JULIA AISHER" and "PAUL & JULIA
+    AISHER" are one couple; which mark sits between them is typing, not fact.
+
+    This decides nothing about ownership. "NICK EDMONDS" and "NICK &
+    JACQUETTA EDMONDS" keep separate keys, because one of them names a
+    second person and that is a question for data/owner_corrections.csv.
+    """
+    s = (name or "").lower()
+    # Accents FOLDED, not dropped: stripping them turns RENE-with-acute into
+    # "ren" and plain RENE into "rene", so the two spellings stop matching.
+    s = "".join(ch for ch in unicodedata.normalize("NFKD", s)
+                if not unicodedata.combining(ch))
+    s = re.sub(r"\s*(?:\band\b|&|/|\+|,)\s*", "&", s)
+    return re.sub(r"[^a-z0-9&]", "", s)
+
+
+# name-key -> owner id, built once per process. 10,000 owners is too many to
+# re-scan on every entry loaded, and every loader goes through here.
+_OWNER_KEYS = {}
+
+
 def get_or_create_owner(cur, raw_name):
     n = norm_upper(raw_name)
     if not n:
@@ -91,8 +117,26 @@ def get_or_create_owner(cur, raw_name):
     row = cur.fetchone()
     if row:
         return row[0]
+
+    # Not an exact match, but it may be a spelling of somebody already here.
+    # Without this every loader re-creates the variants that
+    # merge_owner_spellings.py just folded away, and a boat reads as sold and
+    # bought back because one results page wrote "&" where another wrote
+    # "and".
+    k = owner_key(n)
+    if k:
+        if not _OWNER_KEYS:
+            for oid, name in cur.execute("SELECT id, name FROM owners"):
+                _OWNER_KEYS.setdefault(owner_key(name), oid)
+        hit = _OWNER_KEYS.get(k)
+        if hit:
+            return hit
+
     cur.execute("INSERT INTO owners (name) VALUES (?)", (n,))
-    return cur.lastrowid
+    new_id = cur.lastrowid
+    if k:
+        _OWNER_KEYS[k] = new_id
+    return new_id
 
 
 def get_or_create_boat(cur, sail_no, boat_name, boat_type=None, tcc=None):

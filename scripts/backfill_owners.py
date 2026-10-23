@@ -28,7 +28,7 @@ import sqlite3
 from collections import defaultdict, Counter
 
 sys.path.insert(0, str(__import__("pathlib").Path(__file__).resolve().parent))
-from build_db import norm_upper
+from build_db import norm_upper, owner_key
 
 SOURCE = "inferred:race_entries"
 
@@ -53,9 +53,25 @@ def main():
           AND e.season_year IS NOT NULL
     """).fetchall()
 
+    # Grouped on the owner KEY, not the raw name. Segments are what make a
+    # timeline, and a timeline built on raw strings reads "PAUL AND JULIA
+    # AISHER" and "PAUL & JULIA AISHER" as two owners - so a boat whose
+    # entry lists alternate between the two spellings appears to be sold and
+    # bought back every other season. 599 boats on the dashboard showed an
+    # owner who left and returned; a third of them were only this.
+    #
+    # The name KEPT for each key is the one recorded most often, so the
+    # segment still carries a spelling a person actually typed.
+    spellings = defaultdict(Counter)
+    for _, _, owner_name in rows:
+        n = norm_upper(owner_name)
+        spellings[owner_key(n)][n] += 1
+    canonical = {k: c.most_common(1)[0][0] for k, c in spellings.items()}
+
     by_boat = defaultdict(list)
     for boat_id, year, owner_name in rows:
-        by_boat[boat_id].append((year, norm_upper(owner_name)))
+        n = norm_upper(owner_name)
+        by_boat[boat_id].append((year, canonical.get(owner_key(n), n)))
 
     owner_id_cache = {}
     def owner_id_for(name):

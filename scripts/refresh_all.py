@@ -226,6 +226,12 @@ def main():
         # record the dashboard actually reads. Skipping it left 2,729 boats
         # looking ownerless while their own race history named the owner, so it
         # belongs in every run rather than being remembered occasionally.
+        # Before the backfill below, which builds a boat's ownership TIMELINE.
+        # Two spellings of one person make two segments and a boat reads as
+        # sold and bought back - 599 dashboard boats showed that, a third of
+        # them for no other reason.
+        ("Fold owner spellings", ["merge_owner_spellings.py", "--apply"], "owner spellings"),
+
         ("Backfill owners", ["backfill_owners.py"], "owners"),
 
         # Strictly after the backfill above, which re-derives ownership from
