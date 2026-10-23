@@ -1,7 +1,32 @@
-FromSailNo,NewSailNo,NewBoatName,NewBoatType,MoveNames
+FromSailNo,NewSailNo,NewBoatName,NewBoatType,MoveNames,MoveSails,Why
 GBR7775R,GBR7557,INNUENDO,QUARTER TON McIlraith,INNUENDO
 GBR86R,TBC-MAVERICK3,MAVERICK 3,X 41,MAVERICK 3|MAVERICK 3 OF COWES
 GBR86R,TBC-MAVERICK5,MAVERICK 5,Swan 42 Club,MAVERICK 5
 GBR942R,TBC-MADRUGADA,MADRUGADA,Pacer 42 Club,MADRUGADA
 GBR2881,TBC-JACOBITE,JACOBITE,Swan 37,JACOBITE
 GBR2881,TBC-ALVINEXV,ALVINE XV,,ALVINE XV
+# GBR3142 was folded into GBR318X as a duplicate KHUMBU and that was wrong.
+# GBR318X is a Cape 31 hull that has changed hands repeatedly - HARLEQUIN
+# (Jonnie Goodwin) 2021, FANATIC (John Cooper) 2022, ADRENALINE (Darren
+# Wright) 2023 - and only became Guy Gillon's KHUMBU in 2026. It holds no
+# 2025 racing of its own, so the four 2025 entries that arrived with the
+# fold had nothing to be a duplicate OF.
+#
+# The real picture, from Ruaridh: KHUMBU was one boat jointly owned by Guy
+# Gillon and Christian Hamilton - GBR1542R, the GP 42, theirs together
+# 2020-22. They then bought a Cape 31 each and named them KHUMBU BLACK
+# (Gillon) and KHUMBU RED (Hamilton). Neither of those names is anywhere in
+# this data yet; we hold KHUMBU and KHUMBU 2, which is what the sources
+# published. Any merge between those records is a question about which of
+# the two boats is which, and nobody has answered it.
+#
+# Split on the SAIL NUMBER, not the name: the entries that must leave are
+# named 'Khumbu' and the ones that must stay are named 'KHUMBU', and a
+# difference of case is house style, not identity.
+GBR318X,GBR3142,KHUMBU,Cape 31,,GBR3142,"Four 2025 entries wrongly folded in: 470 Worlds, IRC Nationals and Moth Worlds (owner Peter Greenhalgh, who is neither Gillon nor Hamilton) and one Cowes Week row entered as KHUMBU 2. All four came from marketshare spreadsheets, all four were entered under GBR3142, and GBR318X was ADRENALINE in 2023 and KHUMBU only from 2026. Restored as its own record rather than reassigned, because which Khumbu it is - Black, Red, or the GBR3412/GBR3412R pair - is not something the data settles."
+# And one entry that was on GBR318X before any of this: the 2025 Cape 31
+# European Championships, entered under 'GBR 3412R' and named Khumbu. That
+# is KHUMBU 2's sail number with a space in it. GBR318X held no other 2025
+# racing, so there was nothing for it to belong to there. GBR3412R already
+# exists, so this row moves the entry rather than minting a record.
+GBR318X,GBR3412R,KHUMBU 2,Cape 31,,GBR 3412R,"Entered under KHUMBU 2's sail number with a space in it, and filed onto a hull that was ADRENALINE in 2023 and did not become KHUMBU until 2026."

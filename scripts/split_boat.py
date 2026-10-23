@@ -17,10 +17,18 @@ under, not by sail number, because when two boats are confused it is almost
 always the sail number that was mistyped - the name and owner travel together
 and are the more reliable pair.
 
-  CSV: FromSailNo,NewSailNo,NewBoatName,NewBoatType,MoveNames
+  CSV: FromSailNo,NewSailNo,NewBoatName,NewBoatType,MoveNames[,MoveSails]
 
 MoveNames is a '|'-separated list of boat_name_used values that belong to the
 boat being split off. Everything else stays put.
+
+MoveSails is the same list over sail_no_used, for the case the name cannot
+decide. Two Cape 31s both called KHUMBU is the example: the 2025 entries were
+entered under GBR3142 and the 2026 ones under GBR318X, and the name is the
+same word in both - differing only in case, which is house style, not
+identity. Matching is done on an upper-cased, space-stripped form, so
+'GBR 3412R' and 'gbr3412r' are one value. An entry moves if it matches
+MoveNames OR MoveSails; a row needs at least one of the two.
 
 Usage:
   python3 split_boat.py <db.sqlite> <splits.csv> [--dry-run]
@@ -36,6 +44,12 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 from build_db import get_or_create_owner, norm, norm_upper
 
 
+def tight(s):
+    """A sail number with its spacing and case taken out, for comparing one
+    source's 'GBR 3412R' with another's 'gbr3412r'."""
+    return (s or "").replace(" ", "").upper().strip()
+
+
 def main():
     p = argparse.ArgumentParser()
     p.add_argument("db")
@@ -48,7 +62,10 @@ def main():
     now = datetime.datetime.now().isoformat()
 
     with open(args.csv_file, newline="", encoding="utf-8-sig") as f:
-        rows = list(csv.DictReader(f))
+        # '#' starts a comment, as in the other ledgers. Without this every
+        # line of a block comment came back as "incomplete row, skipped",
+        # which buries the rows that are genuinely malformed.
+        rows = list(csv.DictReader(ln for ln in f if not ln.lstrip().startswith("#")))
 
     for row in rows:
         src_sail = norm_upper(row.get("FromSailNo"))
@@ -56,9 +73,26 @@ def main():
         new_name = norm_upper(row.get("NewBoatName"))
         new_type = norm(row.get("NewBoatType"))
         move_names = {norm_upper(n) for n in (row.get("MoveNames") or "").split("|") if norm(n)}
-        if not (src_sail and new_sail and move_names):
+        move_sails = {tight(n) for n in (row.get("MoveSails") or "").split("|") if norm(n)}
+        if not (src_sail and new_sail and (move_names or move_sails)):
             print("  incomplete row, skipped: %r" % row)
             continue
+
+        # The predicate the whole row turns on, built once: an entry belongs to
+        # the boat being split off if its NAME is one of MoveNames or its
+        # SAIL NUMBER is one of MoveSails. Sail numbers are compared on the
+        # tightened form because sources write 'GBR 3412R' and 'GBR3412R'.
+        def selector(negate=False):
+            terms, params = [], []
+            if move_names:
+                terms.append("IFNULL(boat_name_used,'') IN (%s)" % ",".join("?" * len(move_names)))
+                params += sorted(move_names)
+            if move_sails:
+                terms.append("REPLACE(UPPER(IFNULL(sail_no_used,'')),' ','') IN (%s)"
+                             % ",".join("?" * len(move_sails)))
+                params += sorted(move_sails)
+            sql = "(" + " OR ".join(terms) + ")"
+            return ("NOT " + sql if negate else sql), params
 
         got = cur.execute("SELECT id, boat_name FROM boats WHERE sail_no = ?", (src_sail,)).fetchone()
         if not got:
@@ -75,9 +109,10 @@ def main():
         existing = cur.execute("SELECT id FROM boats WHERE sail_no = ?", (new_sail,)).fetchone()
         if existing:
             new_id = existing[0]
+            sel, sel_params = selector()
             back = cur.execute(
-                "SELECT id FROM race_entries WHERE boat_id = ? AND boat_name_used IN (%s)"
-                % ",".join("?" * len(move_names)), [src_id] + sorted(move_names)).fetchall()
+                "SELECT id FROM race_entries WHERE boat_id = ? AND " + sel,
+                [src_id] + sel_params).fetchall()
             if not back:
                 print("  %s already split out; nothing has drifted back" % new_sail)
                 continue
@@ -90,12 +125,14 @@ def main():
                 conn.commit()
             continue
 
+        sel, sel_params = selector()
+        nsel, nsel_params = selector(negate=True)
         moving = cur.execute(
-            "SELECT id FROM race_entries WHERE boat_id = ? AND boat_name_used IN (%s)"
-            % ",".join("?" * len(move_names)), [src_id] + sorted(move_names)).fetchall()
+            "SELECT id FROM race_entries WHERE boat_id = ? AND " + sel,
+            [src_id] + sel_params).fetchall()
         staying = cur.execute(
-            "SELECT COUNT(*) FROM race_entries WHERE boat_id = ? AND IFNULL(boat_name_used,'') NOT IN (%s)"
-            % ",".join("?" * len(move_names)), [src_id] + sorted(move_names)).fetchone()[0]
+            "SELECT COUNT(*) FROM race_entries WHERE boat_id = ? AND " + nsel,
+            [src_id] + nsel_params).fetchone()[0]
 
         print("\n%s (%s) splits:" % (src_name, src_sail))
         print("    %-14s %s  <- %d entries move" % (new_sail, new_name, len(moving)))
@@ -120,9 +157,13 @@ def main():
         cur.execute("DELETE FROM boat_sail_aliases WHERE alias_sail_no = ? AND boat_id = ?",
                     (new_sail, src_id))
 
-        # Name history: the moved names belong to the new boat.
-        cur.execute("UPDATE boat_name_history SET boat_id = ? WHERE boat_id = ? AND name IN (%s)"
-                    % ",".join("?" * len(move_names)), [new_id, src_id] + sorted(move_names))
+        # Name history: the moved names belong to the new boat. Only when the
+        # split was made ON names - a sail-number split leaves it alone,
+        # because there the two boats share the name and moving the history
+        # would take it off the record that still uses it.
+        if move_names:
+            cur.execute("UPDATE boat_name_history SET boat_id = ? WHERE boat_id = ? AND name IN (%s)"
+                        % ",".join("?" * len(move_names)), [new_id, src_id] + sorted(move_names))
         # What is left no longer overlaps anything, so the flag is stale.
         cur.execute("UPDATE boat_name_history SET confidence = 'inferred' "
                     "WHERE boat_id IN (?, ?) AND confidence = 'overlapping'", (src_id, new_id))
@@ -130,7 +171,7 @@ def main():
         # The record kept the wrong boat's name when the merge ran, so if the
         # name now living on the source row is one of the ones that just left,
         # take the most recent name its remaining entries were sailed under.
-        if norm_upper(src_name) in move_names:
+        if move_names and norm_upper(src_name) in move_names:
             keep = cur.execute(
                 "SELECT re.boat_name_used, re.boat_type_used FROM race_entries re "
                 "JOIN races ra ON ra.id = re.race_id JOIN events e ON e.id = ra.event_id "
