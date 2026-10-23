@@ -91,7 +91,11 @@ tarbert|scottish series|clyde,Tarbert,GBR,55.865,-5.425
 pwllheli|cardigan bay|welsh,Pwllheli,GBR,52.885,-4.415
 portishead|shanghai cup|bristol channel,Portishead,GBR,51.490,-2.770
 ramsgate|goodwins,Ramsgate,GBR,51.330,1.425
-mersea|burnham|essex rum|east coast,West Mersea,GBR,51.775,0.915
+# 'burnham' was on this pattern and it is a different town - Burnham-on-Crouch
+# is fifteen miles down the coast from West Mersea, and it has its own row
+# further down this file. Same area either way, so nothing moved regions, but
+# Burnham Week was being filed at the wrong club's water.
+mersea|essex rum|east coast,West Mersea,GBR,51.775,0.915
 rorc east coast|harwich,Harwich,GBR,51.945,1.285
 dartmouth,Dartmouth,GBR,50.350,-3.575
 plymouth|royal western,Plymouth,GBR,50.360,-4.140

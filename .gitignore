@@ -32,3 +32,7 @@ dist-host/
 # CSV per race on the way into the DB, never read again, regenerable from the
 # scraper. 268 of them arrived from a single dry run of one club season.
 exports/halarch_*.csv
+# one CSV per race, written by the scrapers on the way to the loader.
+# Regenerated on every run and not worth versioning, same as halarch_*.
+exports/corkweek_*.csv
+exports/burnham_*.csv

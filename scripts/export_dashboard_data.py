@@ -476,7 +476,16 @@ def main():
     # boats" at the exact moment we finally had every one of them. Matched on
     # name rather than category because its category is "Club", which covers a
     # lot of racing that genuinely is not IRC.
-    IRC_BY_NAME_RE = re.compile(r"^Round the Island", re.I)
+    # Cork Week has the same shape of problem and needed the same answer. Its
+    # divisions ARE IRC - the rating column on every one of them is headed IRC
+    # and carries a TCC - but they are written "Class 1 - IRC", "Coastal 1 -
+    # IRC", "NS - 1 - IRC", with the word at the END. IRC_DIVISION_RE wants a
+    # division number AFTER the word, so it matches none of them, and all 545
+    # entries would have been dropped at the entry level despite being the
+    # largest IRC fleet outside the Solent. The Echo and ICRA scorings of the
+    # same races are not loaded at all - see scrape_cork_week.py - so this
+    # cannot let a progressive handicap in by the back door.
+    IRC_BY_NAME_RE = re.compile(r"^(Round the Island|Cork Week)", re.I)
 
     def irc_organiser(reg):
         return bool(reg) and (reg.get("category") in IRC_BY_ORGANISER
