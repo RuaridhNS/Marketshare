@@ -1,0 +1,21 @@
+# An entry list that was pasted into the wrong workbook, and the workbook it
+# really belongs to. Applied by scripts/drop_misfiled_entry_lists.py, which
+# drops only the rows that are a COPY - a sail number present in both - and
+# leaves anything unique to the wrong workbook alone.
+#
+# This is not the same fault as data/*superseded* handles. Those rows are a
+# real entry list made obsolete by results arriving. These were never an entry
+# list for the event they are filed under at all.
+#
+# How it was found: KHUMBU, GBR3142, a Cape 31, appeared three times in 2025 -
+# at the 470 Worlds, the Moth Worlds and the UK IRC Nationals - which made it
+# look like a duplicate boat record worth merging away. It was one entry
+# triplicated. Checking the rest of the sheet, all 174 keelboats of the IRC
+# Nationals list are in all three workbooks: Carkeek 40s, a TP 52, a Botin 56,
+# an Oyster 82, a Hallberg Rassy 37. None of them sailed a Moth or a 470.
+#
+# The surviving entries on those two events are the real dinghy fleets, which
+# carry no boat type and a national sail number - ARG 4378, AUS 5054.
+Regatta,Season,SourceRegatta,Why
+Moth Worlds,2025,IRC National Championship,"174 keelboats from the UK IRC Nationals 2025 entry list, pasted into Moth Worlds Marketshare 2025.xlsx. 100% of them are also in the IRC Nationals list for the same season."
+470 Worlds,2025,IRC National Championship,"The same 174 plus one more, in 470 Worlds Marketshare 2025.xlsx. The 470 Worlds is a two-person dinghy championship; a Botin 56 did not sail it."

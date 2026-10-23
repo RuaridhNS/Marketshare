@@ -177,6 +177,15 @@ def main():
         ("Merge boats", ["merge_boats.py", "--file", "data/boat_merges.csv"], "boat merges"),
         ("Split wrongly-merged boats", ["split_boat.py", "data/boat_splits.csv"], "boat splits"),
 
+        # Before everything that reasons about boats, because a copy of an
+        # entry list makes one boat look like three and sends the duplicate
+        # report after records that are not duplicates. The UK IRC Nationals
+        # 2025 list is inside the Moth Worlds and 470 Worlds workbooks as
+        # well as its own.
+        ("Drop misfiled entry lists",
+         ["drop_misfiled_entry_lists.py", "--file", "data/misfiled_entry_lists.csv"],
+         "misfiled entry lists"),
+
         # Before the split below, which reads boat_type_used as evidence of
         # what a boat IS. One import slipped a column and wrote the owner's
         # home town there, and a town that looks like a type is a town that
